@@ -73,30 +73,6 @@ export function UserViewDialog({
               </h4>
               <p className="text-sm">{user.username || "Not set"}</p>
             </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                Team
-              </h4>
-              <p className="text-sm">{user.team || "Not assigned"}</p>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                BPO Role
-              </h4>
-              <p className="text-sm">{user.bpo_role || "Not set"}</p>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                Role
-              </h4>
-              <Badge variant={getRoleBadgeVariant(user.role)}>
-                {user.role || "user"}
-              </Badge>
-            </div>
-
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-1">
                 Status

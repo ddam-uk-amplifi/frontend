@@ -3,14 +3,13 @@ import type {
   UserCreate,
   UserListResponse,
   UserResponse,
-  UserRole,
   UserUpdate,
   UserUpdatePassword,
 } from "@/lib/types/api";
 import { apiClient } from "./client";
 
 export interface GetUsersParams {
-  role?: UserRole;
+  is_superuser?: boolean;
   is_active?: boolean;
   page?: number;
   page_size?: number;

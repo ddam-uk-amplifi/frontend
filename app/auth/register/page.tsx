@@ -66,7 +66,7 @@ export default function RegisterPage() {
         username: data.username,
       });
 
-      await registerUser(data.email, data.password, data.username);
+      await registerUser(data.username, data.email, data.password);
 
       console.log("Registration successful, redirecting...");
       router.push("/dashboard");

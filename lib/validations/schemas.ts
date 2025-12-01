@@ -1,9 +1,8 @@
 import { z } from "zod";
-import { UserRole } from "@/lib/types/api";
 
 // Auth schemas
 export const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -19,7 +18,6 @@ export const registerSchema = z
         "Password must contain at least one uppercase letter, one lowercase letter, and one number",
       ),
     confirmPassword: z.string(),
-    role: z.nativeEnum(UserRole).optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -49,16 +47,12 @@ export const passwordResetSchema = z
 
 // User schemas
 export const userCreateSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
   username: z.string().min(2, "Username must be at least 2 characters long"),
+  email: z.string().email("Please enter a valid email address"),
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters long")
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number",
-    ),
-  role: z.nativeEnum(UserRole).optional(),
+    .min(8, "Password must be at least 8 characters long"),
+  is_superuser: z.boolean().optional(),
 });
 
 export const userUpdateSchema = z.object({
@@ -67,8 +61,8 @@ export const userUpdateSchema = z.object({
     .min(2, "Username must be at least 2 characters long")
     .optional(),
   email: z.string().email("Please enter a valid email address").optional(),
-  role: z.nativeEnum(UserRole).optional(),
   is_active: z.boolean().optional(),
+  is_superuser: z.boolean().optional(),
 });
 
 export const userUpdatePasswordSchema = z

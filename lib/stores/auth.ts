@@ -3,19 +3,15 @@ import { persist } from "zustand/middleware";
 import { authApi } from "@/lib/api/auth";
 import { usersApi } from "@/lib/api/users";
 import type { AuthState, User } from "@/lib/types/auth";
-import { UserRole } from "@/lib/types/auth";
 import { tokenUtils } from "@/lib/utils/token";
 
 interface AuthStore extends AuthState {
   // Actions
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   register: (
+    username: string,
     email: string,
     password: string,
-    username: string,
-    team?: string,
-    bpo_role?: string,
-    role?: UserRole,
   ) => Promise<void>;
   logout: () => void;
   refreshToken: () => Promise<void>;
@@ -89,11 +85,11 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      login: async (email: string, password: string) => {
+      login: async (username: string, password: string) => {
         try {
           set({ isLoading: true, error: null });
 
-          const tokens = await authApi.login({ email, password });
+          const tokens = await authApi.login({ username, password });
 
           // Store tokens using utility
           tokenUtils.setTokens(tokens.access_token, tokens.refresh_token);
@@ -129,30 +125,24 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       register: async (
+        username: string,
         email: string,
         password: string,
-        username: string,
-        team?: string,
-        bpo_role?: string,
-        role = UserRole.USER,
       ) => {
         try {
           set({ isLoading: true, error: null });
 
           console.log("Calling registration API...");
           const registrationResponse = await authApi.register({
+            username,
             email,
             password,
-            username,
-            team,
-            bpo_role,
-            role,
           });
           console.log("Registration API response:", registrationResponse);
 
           // Auto-login after registration
           console.log("Registration successful, attempting auto-login...");
-          await get().login(email, password);
+          await get().login(username, password);
           console.log("Auto-login successful");
         } catch (error) {
           console.error("Registration/Login error details:", error);

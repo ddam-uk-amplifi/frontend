@@ -1,9 +1,8 @@
 /**
- * Enhanced types for authentication system
+ * Authentication system types
  */
 
 import type { User } from "@/lib/types/api";
-import { UserRole } from "@/lib/types/api";
 
 export interface TokenPair {
   access_token: string;
@@ -11,12 +10,14 @@ export interface TokenPair {
 }
 
 export interface AuthCredentials {
-  email: string;
+  username: string;
   password: string;
 }
 
-export interface RegisterCredentials extends AuthCredentials {
-  role?: UserRole;
+export interface RegisterCredentials {
+  username: string;
+  email: string;
+  password: string;
 }
 
 export interface RefreshTokenRequest {
@@ -28,15 +29,6 @@ export interface AuthError {
   code?: string;
 }
 
-// Role hierarchy for permission checking
-export const ROLE_HIERARCHY = {
-  [UserRole.ADMIN]: 3,
-  [UserRole.MODERATOR]: 2,
-  [UserRole.USER]: 1,
-} as const;
-
-export type RoleLevel = (typeof ROLE_HIERARCHY)[keyof typeof ROLE_HIERARCHY];
-
 // Auth store state
 export interface AuthState {
   user: User | null;
@@ -46,5 +38,4 @@ export interface AuthState {
 }
 
 // Re-export types from API
-export { UserRole };
 export type { User };
