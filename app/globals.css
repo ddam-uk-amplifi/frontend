@@ -234,3 +234,52 @@
 .prose em {
   color: #be185d;
 }
+
+/* Uppy Dashboard Styles - Ensure visibility */
+.excel-file-uploader .uppy-Dashboard {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important;
+  background: #ffffff !important;
+}
+
+.excel-file-uploader .uppy-Dashboard-inner {
+  background: #ffffff !important;
+}
+
+.excel-file-uploader .uppy-Dashboard-AddFiles {
+  background: #f9fafb !important;
+  border: 2px dashed #d1d5db !important;
+  border-radius: 0.375rem !important;
+}
+
+.excel-file-uploader .uppy-Dashboard-AddFiles-title {
+  color: #374151 !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
+
+.excel-file-uploader .uppy-Dashboard-note {
+  color: #6b7280 !important;
+  font-size: 0.875rem !important;
+}
+
+.excel-file-uploader .uppy-DashboardContent-bar {
+  background: #f3f4f6 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.excel-file-uploader button {
+  cursor: pointer !important;
+  font-size: 0.875rem !important;
+}
+
+.excel-file-uploader .uppy-DashboardContent-addMore {
+  background: #3b82f6 !important;
+  color: white !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.375rem !important;
+}
+
+.excel-file-uploader .uppy-DashboardContent-addMore:hover {
+  background: #2563eb !important;
+}

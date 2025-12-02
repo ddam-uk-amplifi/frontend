@@ -1,48 +1,21 @@
 /**
- * Role management utilities
+ * Role management utilities - simplified for superuser-only system
  */
-
-import { ROLE_HIERARCHY, UserRole } from "@/lib/types/auth";
 
 export const roleUtils = {
   /**
-   * Check if a user role has access to a required role level
+   * Check if a user has access (simplified - always returns true for now)
    */
-  hasRoleAccess: (userRole?: string, requiredRole?: string): boolean => {
-    if (!requiredRole) return true;
-    if (!userRole) return false;
-
-    const userLevel = ROLE_HIERARCHY[userRole as UserRole] || 0;
-    const requiredLevel = ROLE_HIERARCHY[requiredRole as UserRole] || 0;
-
-    return userLevel >= requiredLevel;
+  hasRoleAccess: (_userRole?: any, _requiredRole?: any): boolean => {
+    // All authenticated users have access
+    // Superuser checks should be done explicitly where needed
+    return true;
   },
 
   /**
-   * Get numeric level for a role
+   * Check if user is superuser
    */
-  getRoleLevel: (role: string): number => {
-    return ROLE_HIERARCHY[role as UserRole] || 0;
-  },
-
-  /**
-   * Check if role is admin
-   */
-  isAdmin: (role?: string): boolean => {
-    return role === UserRole.ADMIN;
-  },
-
-  /**
-   * Check if role is moderator or higher
-   */
-  isModerator: (role?: string): boolean => {
-    return roleUtils.hasRoleAccess(role, UserRole.MODERATOR);
-  },
-
-  /**
-   * Get all available roles
-   */
-  getAllRoles: (): UserRole[] => {
-    return Object.values(UserRole);
+  isSuperuser: (isSuperuser?: boolean): boolean => {
+    return isSuperuser === true;
   },
 };

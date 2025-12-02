@@ -143,16 +143,6 @@ export default function ProfilePage() {
                 </h4>
                 <p className="text-sm">{user.username || "Not set"}</p>
               </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                  Role
-                </h4>
-                <Badge variant={getRoleBadgeVariant(user.role)}>
-                  {user.role || "user"}
-                </Badge>
-              </div>
-
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-1">
                   Status
@@ -167,7 +157,9 @@ export default function ProfilePage() {
                   Member Since
                 </h4>
                 <p className="text-sm">
-                  {format(new Date(user.created_at), "MMMM yyyy")}
+                  {user.created_at
+                    ? format(new Date(user.created_at), "MMMM yyyy")
+                    : "N/A"}
                 </p>
               </div>
 
@@ -176,7 +168,9 @@ export default function ProfilePage() {
                   Last Updated
                 </h4>
                 <p className="text-sm">
-                  {format(new Date(user.updated_at), "MMM dd, yyyy")}
+                  {user.updated_at
+                    ? format(new Date(user.updated_at), "MMM dd, yyyy")
+                    : "N/A"}
                 </p>
               </div>
             </div>

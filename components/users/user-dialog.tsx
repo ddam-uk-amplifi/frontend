@@ -26,8 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { User, UserRole } from "@/lib/types/api";
-import { BpoRole } from "@/lib/types/api";
+import type { User } from "@/lib/types/api";
 import {
   type UserCreateFormData,
   type UserUpdateFormData,
@@ -58,18 +57,14 @@ export function UserDialog({
       ? {
           email: user.email,
           username: user.username,
-          team: user.team,
-          bpo_role: user.bpo_role as BpoRole,
-          role: user.role,
+          is_superuser: user.is_superuser,
           is_active: user.is_active,
         }
       : {
           email: "",
           username: "",
           password: "",
-          team: "Bayan",
-          bpo_role: undefined,
-          role: "user" as UserRole,
+          is_superuser: false,
         },
   });
 
@@ -104,25 +99,6 @@ export function UserDialog({
           >
             <FormField
               control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="Enter email address"
-                      disabled={isLoading}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="username"
               render={({ field }) => (
                 <FormItem>
@@ -142,62 +118,18 @@ export function UserDialog({
 
             <FormField
               control={form.control}
-              name="team"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Team</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={isLoading}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a team" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Bayan">Bayan</SelectItem>
-                      <SelectItem value="Cashmere">Cashmere</SelectItem>
-                      <SelectItem value="Tenger">Tenger</SelectItem>
-                      <SelectItem value="Khadaan">Khadaan</SelectItem>
-                      <SelectItem value="Nomads">Nomads</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="bpo_role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>BPO Role</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={isLoading}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a BPO role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={BpoRole.MANAGER}>Manager</SelectItem>
-                      <SelectItem value={BpoRole.TEAM_LEADER}>
-                        Team Leader
-                      </SelectItem>
-                      <SelectItem value={BpoRole.FULL_TIMER}>
-                        Full Timer
-                      </SelectItem>
-                      <SelectItem value={BpoRole.PART_TIMER}>
-                        Part Timer
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="Enter email address"
+                      disabled={isLoading}
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -213,7 +145,7 @@ export function UserDialog({
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder="Enter password"
+                        placeholder="Enter password (min 8 characters)"
                         disabled={isLoading}
                         {...field}
                       />
@@ -226,24 +158,23 @@ export function UserDialog({
 
             <FormField
               control={form.control}
-              name="role"
+              name="is_superuser"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel>User Type</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    onValueChange={(value) => field.onChange(value === "true")}
+                    defaultValue={field.value ? "true" : "false"}
                     disabled={isLoading}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
+                        <SelectValue />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="moderator">Moderator</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="false">Regular User</SelectItem>
+                      <SelectItem value="true">Superuser (Admin)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

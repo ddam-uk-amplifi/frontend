@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { type GetUsersParams, usersApi } from "@/lib/api/users";
-import type { User, UserListResponse, UserRole } from "@/lib/types/api";
+import type { User, UserListResponse } from "@/lib/types/api";
 
 interface UsersStore {
   users: User[];
@@ -17,12 +17,10 @@ interface UsersStore {
     email: string;
     password: string;
     username: string;
-    team?: string;
-    bpo_role?: string;
-    role?: UserRole;
+    is_superuser?: boolean;
   }) => Promise<void>;
-  updateUser: (userId: string, userData: Partial<User>) => Promise<void>;
-  deleteUser: (userId: string) => Promise<void>;
+  updateUser: (userId: number, userData: Partial<User>) => Promise<void>;
+  deleteUser: (userId: number) => Promise<void>;
   setLoading: (loading: boolean) => void;
   clearError: () => void;
   setPage: (page: number) => void;
@@ -83,11 +81,11 @@ export const useUsersStore = create<UsersStore>((set, get) => ({
     }
   },
 
-  updateUser: async (userId: string, userData: Partial<User>) => {
+  updateUser: async (userId: number, userData: Partial<User>) => {
     try {
       set({ isLoading: true, error: null });
 
-      await usersApi.updateUser(userId, userData);
+      await usersApi.updateUser(userId.toString(), userData);
 
       // Update the user in the local state
       const currentUsers = get().users;
@@ -104,11 +102,11 @@ export const useUsersStore = create<UsersStore>((set, get) => ({
     }
   },
 
-  deleteUser: async (userId: string) => {
+  deleteUser: async (userId: number) => {
     try {
       set({ isLoading: true, error: null });
 
-      await usersApi.deleteUser(userId);
+      await usersApi.deleteUser(userId.toString());
 
       // Remove the user from the local state
       const currentUsers = get().users;

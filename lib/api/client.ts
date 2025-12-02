@@ -17,11 +17,11 @@ let refreshPromise: Promise<unknown> | null = null;
 
 // Create axios instance with base configuration
 const createApiClient = (): AxiosInstance => {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const client = axios.create({
     baseURL,
-    timeout: 120000, // 2 minutes for large file operations (PDF downloads)
+    timeout: 0, // No timeout - extraction can take a long time for large files
     withCredentials: true,
     headers: {
       "Content-Type": "application/json",
@@ -71,8 +71,8 @@ const createApiClient = (): AxiosInstance => {
               const refreshToken = tokenUtils.getRefreshToken();
               if (refreshToken) {
                 const refreshResponse = await axios.post(
-                  `${baseURL}/api/v1/auth/refresh`,
-                  { refresh_token: refreshToken },
+                  `${baseURL}/api/v1/auth/refresh?refresh_token=${refreshToken}`,
+                  {},
                   {
                     timeout: 30000,
                     withCredentials: true,
@@ -172,10 +172,8 @@ const createApiClient = (): AxiosInstance => {
           refreshPromise = (async () => {
             // Use a separate axios instance for refresh to avoid interceptor loops
             const refreshResponse = await axios.post(
-              `${baseURL}/api/v1/auth/refresh`,
-              {
-                refresh_token: refreshToken,
-              },
+              `${baseURL}/api/v1/auth/refresh?refresh_token=${refreshToken}`,
+              {},
               {
                 timeout: 30000, // 30 second timeout for refresh
                 withCredentials: true, // Include credentials for refresh

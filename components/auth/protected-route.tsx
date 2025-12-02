@@ -3,18 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/stores/auth";
-import type { UserRole } from "@/lib/types/auth";
 import { roleUtils } from "@/lib/utils/role";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: UserRole;
+  requireSuperuser?: boolean;
   fallbackPath?: string;
 }
 
 export function ProtectedRoute({
   children,
-  requiredRole,
+  requireSuperuser = false,
   fallbackPath = "/auth/login",
 }: ProtectedRouteProps) {
   const router = useRouter();
@@ -34,9 +33,9 @@ export function ProtectedRoute({
         return;
       }
 
-      // Check role-based access if required
-      if (requiredRole && user) {
-        const hasAccess = roleUtils.hasRoleAccess(user.role, requiredRole);
+      // Check superuser access if required
+      if (requireSuperuser && user) {
+        const hasAccess = roleUtils.isSuperuser(user.is_superuser);
         if (!hasAccess) {
           router.push("/unauthorized");
           return;
@@ -53,7 +52,7 @@ export function ProtectedRoute({
     isAuthenticated,
     user,
     isLoading,
-    requiredRole,
+    requireSuperuser,
     router,
     fallbackPath,
     hasHydrated,
@@ -72,9 +71,9 @@ export function ProtectedRoute({
   }
 
   if (
-    requiredRole &&
+    requireSuperuser &&
     user &&
-    !roleUtils.hasRoleAccess(user.role, requiredRole)
+    !roleUtils.isSuperuser(user.is_superuser)
   ) {
     return null; // Will redirect in useEffect
   }

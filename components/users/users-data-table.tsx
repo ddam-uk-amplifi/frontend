@@ -36,7 +36,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { User } from "@/lib/types/api";
-import { UserRole } from "@/lib/types/api";
 
 interface UsersDataTableProps {
   data: User[];
@@ -108,51 +107,13 @@ export function UsersDataTable({
       },
     },
     {
-      accessorKey: "team",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Team
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        );
-      },
+      accessorKey: "is_superuser",
+      header: "User Type",
       cell: ({ row }) => {
-        const team = row.getValue("team") as string;
-        return <div>{team || "Not assigned"}</div>;
-      },
-    },
-    {
-      accessorKey: "bpo_role",
-      header: ({ column }) => {
+        const isSuperuser = row.getValue("is_superuser") as boolean;
         return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            BPO Role
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        );
-      },
-      cell: ({ row }) => {
-        const bpoRole = row.getValue("bpo_role") as string;
-        return <div>{bpoRole || "Not set"}</div>;
-      },
-    },
-    {
-      accessorKey: "role",
-      header: "Role",
-      cell: ({ row }) => {
-        const role = row.getValue("role") as UserRole;
-        return (
-          <Badge
-            variant={role === UserRole.ADMIN ? "destructive" : "secondary"}
-          >
-            {role}
+          <Badge variant={isSuperuser ? "destructive" : "secondary"}>
+            {isSuperuser ? "Superuser" : "Regular User"}
           </Badge>
         );
       },

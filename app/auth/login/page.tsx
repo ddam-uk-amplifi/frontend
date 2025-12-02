@@ -36,7 +36,7 @@ export default function LoginPage() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
   });
@@ -44,12 +44,27 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     try {
       setError(null);
-      await login(data.email, data.password);
-      router.push("/manuals");
+      await login(data.username, data.password);
+      router.push("/dashboard");
     } catch (err) {
       setError(handleApiError(err));
     }
   };
+
+  const demoUser = {
+    username: "admin",
+    password: "admin123",
+  }
+
+  const adminButton = async () => {
+    try {
+      setError(null);
+      await login(demoUser.username, demoUser.password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -59,7 +74,7 @@ export default function LoginPage() {
             Sign in
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your email and password to access your account
+            Enter your username and password to access your account
           </CardDescription>
         </CardHeader>
 
@@ -74,14 +89,14 @@ export default function LoginPage() {
 
               <FormField
                 control={form.control}
-                name="email"
+                name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Username</FormLabel>
                     <FormControl>
                       <Input
-                        type="email"
-                        placeholder="Enter your email"
+                        type="text"
+                        placeholder="Enter your username"
                         disabled={isLoading}
                         {...field}
                       />
@@ -136,6 +151,17 @@ export default function LoginPage() {
             </CardFooter>
           </form>
         </Form>
+
+        <div className="mt-4 text-center pb-6">
+          <button
+            type="button"
+            onClick={adminButton}
+            disabled={isLoading}
+            className="text-sm text-gray-500 hover:text-gray-700 underline disabled:opacity-50 cursor-pointer"
+          >
+            Auto Login (Demo)
+          </button>
+        </div>
       </Card>
     </div>
   );

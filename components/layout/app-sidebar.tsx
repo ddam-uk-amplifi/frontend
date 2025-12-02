@@ -34,14 +34,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useAuthStore } from "@/lib/stores/auth";
-import { UserRole } from "@/lib/types/auth";
-import { roleUtils } from "@/lib/utils/role";
 
 interface NavigationItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  requiredRole?: UserRole;
+  requireSuperuser?: boolean;
 }
 
 const navigationItems: NavigationItem[] = [
@@ -56,15 +54,15 @@ const navigationItems: NavigationItem[] = [
     icon: FileText,
   },
   {
-    href: "/analytics",
-    label: "Analytics",
+    href: "/report-validation",
+    label: "Report Validation",
     icon: BarChart3,
   },
-  {
-    href: "/users",
-    label: "User Management",
+    {
+    href: "/admin",
+    label: "Admin",
     icon: Users,
-    requiredRole: UserRole.MODERATOR,
+    requireSuperuser: true,
   },
 ];
 
@@ -78,9 +76,13 @@ export function AppSidebar() {
     router.push("/auth/login");
   };
 
-  const filteredNavItems = navigationItems.filter((item) =>
-    roleUtils.hasRoleAccess(user?.role, item.requiredRole),
-  );
+  // Filter navigation items based on superuser requirement
+  const filteredNavItems = navigationItems.filter((item) => {
+    if (item.requireSuperuser && !user?.is_superuser) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <Sidebar variant="inset">
@@ -92,7 +94,7 @@ export function AppSidebar() {
                 <FileText className="h-6 w-6 text-blue-600" />
                 <div className="grid flex-1 text-left text-lg leading-tight ml-2">
                   <span className="truncate font-semibold">
-                    Amplifi Report Automation
+                    Report Automation
                   </span>
                 </div>
               </Link>

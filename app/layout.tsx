@@ -26,9 +26,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Amplifi Report Automation",
+  title: "Productivity",
   description:
-    "Automate your report generation and analytics workflows with Amplifi",
+    "Report automation and validation platform",
 };
 
 export default function RootLayout({

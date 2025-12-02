@@ -1,18 +1,5 @@
 // Generated TypeScript types from OpenAPI specification
 
-export enum UserRole {
-  USER = "user",
-  ADMIN = "admin",
-  MODERATOR = "moderator",
-}
-
-export enum BpoRole {
-  MANAGER = "Manager",
-  TEAM_LEADER = "Team leader",
-  FULL_TIMER = "Full timer",
-  PART_TIMER = "Part timer",
-}
-
 export interface HealthResponse {
   status: string;
   timestamp: string;
@@ -21,7 +8,7 @@ export interface HealthResponse {
 }
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -49,33 +36,27 @@ export interface TokenRefresh {
 }
 
 export interface UserCreate {
+  username: string;
   email: string;
   password: string;
-  username: string;
-  team?: string;
-  bpo_role?: string;
-  role?: UserRole;
+  is_superuser?: boolean;
 }
 
 export interface UserResponse {
-  email: string;
+  id: number;
   username: string;
-  team?: "Bayan" | "Cashmere" | "Tenger" | "Khadaan" | "Nomads";
-  bpo_role?: string;
-  role?: UserRole;
-  is_active?: boolean;
-  id: string;
+  email: string;
+  is_active: boolean;
+  is_superuser: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface UserUpdate {
-  email?: string | null;
-  username?: string | null;
-  team?: string | null;
-  bpo_role?: string | null;
-  role?: UserRole | null;
-  is_active?: boolean | null;
+  username?: string;
+  email?: string;
+  is_active?: boolean;
+  is_superuser?: boolean;
 }
 
 export interface UserUpdatePassword {
