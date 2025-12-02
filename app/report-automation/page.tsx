@@ -82,6 +82,9 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   const [includePpt, setIncludePpt] = useState(false);
   const [isConsolidating, setIsConsolidating] = useState(false);
   const [consolidationResult, setConsolidationResult] = useState<any>(null);
+  
+  // Track total markets to upload for accurate consolidation triggering
+  const totalMarketsToUploadRef = useRef(0);
 
   // Fetch available markets on mount
   useEffect(() => {
@@ -282,9 +285,10 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       return;
     }
 
-    // Clear previous results
+    // Clear previous results and set expected count
     setUploadProgress([]);
     setConsolidationResult(null);
+    totalMarketsToUploadRef.current = marketsToUpload.length;
 
     // Upload all files
     for (const market of marketsToUpload) {
@@ -354,16 +358,16 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
               : p
           );
 
-          // Check if all extractions are complete
-          const allComplete = updated.every((p) => p.status === "complete" || p.status === "failed");
-          const hasSuccess = updated.some((p) => p.status === "complete");
+          // Check if all extractions are complete - compare with EXPECTED count
           const completedCount = updated.filter((p) => p.status === "complete").length;
           const failedCount = updated.filter((p) => p.status === "failed").length;
+          const totalProcessed = completedCount + failedCount;
+          const expectedTotal = totalMarketsToUploadRef.current;
 
-          console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${updated.length} total`);
-          console.log('All complete?', allComplete, 'Has success?', hasSuccess);
+          console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
 
-          if (allComplete && hasSuccess) {
+          // Only trigger consolidation when we've processed ALL expected markets
+          if (totalProcessed === expectedTotal && completedCount > 0) {
             console.log('🎯 All extractions done! Triggering consolidation...');
             // Trigger consolidation after a short delay to ensure UI updates
             setTimeout(() => handleConsolidation(updated), 500);
@@ -374,20 +378,36 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       } catch (error: any) {
         console.error("Upload error:", error);
         // Mark as failed
-        setUploadProgress((prev) =>
-          prev.map((p) =>
+        setUploadProgress((prev) => {
+          const updated = prev.map((p) =>
             p.id === uploadId
               ? {
                   ...p,
-                  status: "failed",
+                  status: "failed" as const,
                   error:
                     error.response?.data?.message ||
                     error.response?.data?.detail ||
                     "Upload failed",
                 }
               : p
-          )
-        );
+          );
+
+          // Check if all extractions are complete after failure too
+          const completedCount = updated.filter((p) => p.status === "complete").length;
+          const failedCount = updated.filter((p) => p.status === "failed").length;
+          const totalProcessed = completedCount + failedCount;
+          const expectedTotal = totalMarketsToUploadRef.current;
+
+          console.log(`📊 Progress after error: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
+
+          // Only trigger consolidation when we've processed ALL expected markets
+          if (totalProcessed === expectedTotal && completedCount > 0) {
+            console.log('🎯 All extractions done (some failed)! Triggering consolidation...');
+            setTimeout(() => handleConsolidation(updated), 500);
+          }
+
+          return updated;
+        });
       }
     }
   };
