@@ -22,12 +22,14 @@ export interface Market {
   id: number;
   code: string;
   name: string;
+  client_id: number;
   created_at: string;
 }
 
 export interface MarketCreate {
   code: string;
   name: string;
+  client_id: number;
 }
 
 export interface MarketsResponse {

@@ -9,6 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,6 +42,7 @@ export default function AdminPage(){
     const [marketsLoading, setMarketsLoading] = useState(false);
     const [newMarketCode, setNewMarketCode] = useState('');
     const [newMarketName, setNewMarketName] = useState('');
+    const [selectedClientId, setSelectedClientId] = useState<string>('');
     const [isAddingMarket, setIsAddingMarket] = useState(false);
 
     // Delete confirmation state
@@ -116,14 +124,21 @@ export default function AdminPage(){
             return;
         }
 
+        if (!selectedClientId) {
+            alert('Please select a client for this market');
+            return;
+        }
+
         try {
             setIsAddingMarket(true);
             await marketsApi.createMarket({
                 code: newMarketCode.trim(),
                 name: newMarketName.trim(),
+                client_id: parseInt(selectedClientId),
             });
             setNewMarketCode('');
             setNewMarketName('');
+            setSelectedClientId('');
             await fetchMarkets();
         } catch (error: any) {
             alert(error.response?.data?.detail || 'Failed to create market');
@@ -269,11 +284,30 @@ export default function AdminPage(){
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Add Market Form */}
-                            <div className="space-y-2">
+                            <div className="space-y-3">
+                                <div>
+                                    <Label className="text-sm text-gray-600 mb-1.5 block">Select Client</Label>
+                                    <Select
+                                        value={selectedClientId}
+                                        onValueChange={setSelectedClientId}
+                                        disabled={isAddingMarket || clients.length === 0}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder={clients.length === 0 ? "No clients available" : "Select a client"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {clients.map((client) => (
+                                                <SelectItem key={client.id} value={client.id.toString()}>
+                                                    {client.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                                 <div className="flex gap-2">
                                     <div className="w-1/3">
                                         <Input
-                                            placeholder="Code (UK)"
+                                            placeholder="Code (DK)"
                                             value={newMarketCode}
                                             onChange={(e) => setNewMarketCode(e.target.value.toUpperCase())}
                                             maxLength={5}
@@ -282,7 +316,7 @@ export default function AdminPage(){
                                     </div>
                                     <div className="flex-1">
                                         <Input
-                                            placeholder="Name (United Kingdom)"
+                                            placeholder="Name (Denmark)"
                                             value={newMarketName}
                                             onChange={(e) => setNewMarketName(e.target.value)}
                                             onKeyPress={(e) => e.key === 'Enter' && handleAddMarket()}
@@ -291,7 +325,7 @@ export default function AdminPage(){
                                     </div>
                                     <Button
                                         onClick={handleAddMarket}
-                                        disabled={isAddingMarket || !newMarketCode.trim() || !newMarketName.trim()}
+                                        disabled={isAddingMarket || !newMarketCode.trim() || !newMarketName.trim() || !selectedClientId}
                                         size="sm"
                                     >
                                         <Plus className="h-4 w-4 mr-1" />
@@ -312,39 +346,42 @@ export default function AdminPage(){
                                     </div>
                                 ) : (
                                     <div className="divide-y">
-                                        {(markets || []).map((market) => (
-                                            <div
-                                                key={market.id}
-                                                className="flex items-center justify-between p-3 hover:bg-gray-50"
-                                            >
-                                                <div>
-                                                    <p className="font-medium text-gray-900">
-                                                        <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold mr-2">
-                                                            {market.code}
-                                                        </span>
-                                                        {market.name}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        ID: {market.id} • Created: {new Date(market.created_at).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setDeleteDialog({
-                                                            open: true,
-                                                            type: 'market',
-                                                            id: market.id,
-                                                            name: `${market.code} - ${market.name}`,
-                                                        })
-                                                    }
-                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        {(markets || []).map((market) => {
+                                            const client = clients.find(c => c.id === market.client_id);
+                                            return (
+                                                <div
+                                                    key={market.id}
+                                                    className="flex items-center justify-between p-3 hover:bg-gray-50"
                                                 >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">
+                                                            <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold mr-2">
+                                                                {market.code}
+                                                            </span>
+                                                            {market.name}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500">
+                                                            ID: {market.id} • Client: <span className="font-medium">{client?.name || 'Unknown'}</span> • Created: {new Date(market.created_at).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setDeleteDialog({
+                                                                open: true,
+                                                                type: 'market',
+                                                                id: market.id,
+                                                                name: `${market.code} - ${market.name}`,
+                                                            })
+                                                        }
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

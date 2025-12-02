@@ -21,7 +21,7 @@ const createApiClient = (): AxiosInstance => {
 
   const client = axios.create({
     baseURL,
-    timeout: 120000, // 2 minutes for large file operations (PDF downloads)
+    timeout: 0, // No timeout - extraction can take a long time for large files
     withCredentials: true,
     headers: {
       "Content-Type": "application/json",
