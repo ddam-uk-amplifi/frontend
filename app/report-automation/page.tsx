@@ -406,22 +406,21 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     setUploadProgress((prev) => prev.filter((p) => p.id !== uploadId));
   };
 
-  const handleDownloadConsolidation = () => {
+  const handleDownloadConsolidation = (type: 'excel' | 'ppt' = 'excel') => {
     if (!consolidationResult || consolidationResult.error) return;
 
-    // Extract filename from excel_path
-    const excelPath = consolidationResult.excel_path;
-    if (!excelPath) {
-      console.error("No excel_path in consolidation result");
+    const downloadUrl = type === 'excel'
+      ? consolidationResult.excel_download_url
+      : consolidationResult.ppt_download_url;
+
+    if (!downloadUrl) {
+      console.error(`No ${type} download URL in consolidation result`);
       return;
     }
 
-    const filename = excelPath.split('/').pop();
-    
-    // Use the local download endpoint
-    const downloadUrl = `${API_BASE_URL}/api/v1/consolidation/download/${filename}`;
-    
-    // Open download in new window
+    console.log(`Downloading ${type} file from:`, downloadUrl);
+
+    // Open download URL directly (signed S3 URL)
     window.open(downloadUrl, '_blank');
   };
 
@@ -782,18 +781,6 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                   </p>
                                 )}
                               </div>
-                              {upload.downloadUrl && (
-                                <button
-                                  onClick={() => {
-                                    const fullUrl = `${API_BASE_URL}/${upload.downloadUrl}`;
-                                    window.open(fullUrl, "_blank");
-                                  }}
-                                  className="ml-3 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
-                                >
-                                  <Download size={16} />
-                                  Download
-                                </button>
-                              )}
                             </div>
                           </div>
                         )}
@@ -872,11 +859,17 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                           {consolidationResult.id && (
                             <p>• Job ID: {consolidationResult.id}</p>
                           )}
-                          {consolidationResult.excel_path && (
-                            <p className="font-mono break-all">• Excel: {consolidationResult.excel_path}</p>
+                          {consolidationResult.status && (
+                            <p>• Status: <span className="font-semibold capitalize">{consolidationResult.status}</span></p>
                           )}
-                          {consolidationResult.ppt_path && (
-                            <p className="font-mono break-all">• PowerPoint: {consolidationResult.ppt_path}</p>
+                          {consolidationResult.excel_download_url && (
+                            <p>• ✅ Excel file ready for download</p>
+                          )}
+                          {consolidationResult.ppt_download_url && (
+                            <p>• ✅ PowerPoint file ready for download</p>
+                          )}
+                          {consolidationResult.completed_at && (
+                            <p>• Completed: {new Date(consolidationResult.completed_at).toLocaleString()}</p>
                           )}
                         </div>
                       </>
@@ -894,14 +887,25 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
             {/* Run Automation Button */}
             <div className="flex justify-end gap-3">
-              {consolidationResult && !consolidationResult.error && consolidationResult.excel_path && (
-                <button
-                  onClick={handleDownloadConsolidation}
-                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2"
-                >
-                  <Download size={18} />
-                  Download Consolidated File
-                </button>
+              {consolidationResult && !consolidationResult.error && consolidationResult.excel_download_url && (
+                <>
+                  <button
+                    onClick={() => handleDownloadConsolidation('excel')}
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2"
+                  >
+                    <Download size={18} />
+                    Download Excel
+                  </button>
+                  {consolidationResult.ppt_download_url && (
+                    <button
+                      onClick={() => handleDownloadConsolidation('ppt')}
+                      className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2"
+                    >
+                      <Download size={18} />
+                      Download PowerPoint
+                    </button>
+                  )}
+                </>
               )}
               <button
                 onClick={handleRunAutomation}
