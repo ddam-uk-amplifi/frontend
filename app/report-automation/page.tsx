@@ -231,8 +231,36 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
         consolidationData
       );
 
-      console.log("Consolidation response:", response.data);
-      setConsolidationResult(response.data);
+      console.log("Consolidation job created:", response.data);
+      const jobId = response.data.id;
+
+      // Poll for consolidation completion
+      const maxWaitSeconds = 300; // 5 minutes
+      const pollIntervalMs = 2000; // 2 seconds
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < maxWaitSeconds * 1000) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+        const statusResponse = await apiClient.get(`/api/v1/consolidation/${jobId}`);
+        const job = statusResponse.data;
+
+        console.log(`Consolidation status: ${job.status}`);
+
+        if (job.status === 'completed') {
+          console.log("Consolidation completed successfully!");
+          setConsolidationResult(job);
+          break;
+        } else if (job.status === 'failed') {
+          console.error("Consolidation failed:", job.error_message);
+          setConsolidationResult({
+            error: true,
+            message: job.error_message || "Consolidation failed"
+          });
+          break;
+        }
+        // Continue polling if status is still 'pending' or 'processing'
+      }
     } catch (error: any) {
       console.error("Consolidation error:", error);
       setConsolidationResult({
@@ -376,6 +404,25 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
   const removeUpload = (uploadId: string) => {
     setUploadProgress((prev) => prev.filter((p) => p.id !== uploadId));
+  };
+
+  const handleDownloadConsolidation = () => {
+    if (!consolidationResult || consolidationResult.error) return;
+
+    // Extract filename from excel_path
+    const excelPath = consolidationResult.excel_path;
+    if (!excelPath) {
+      console.error("No excel_path in consolidation result");
+      return;
+    }
+
+    const filename = excelPath.split('/').pop();
+    
+    // Use the local download endpoint
+    const downloadUrl = `${API_BASE_URL}/api/v1/consolidation/download/${filename}`;
+    
+    // Open download in new window
+    window.open(downloadUrl, '_blank');
   };
 
   const getStatusColor = (status: string) => {
@@ -846,7 +893,16 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
             )}
 
             {/* Run Automation Button */}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              {consolidationResult && !consolidationResult.error && consolidationResult.excel_path && (
+                <button
+                  onClick={handleDownloadConsolidation}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2"
+                >
+                  <Download size={18} />
+                  Download Consolidated File
+                </button>
+              )}
               <button
                 onClick={handleRunAutomation}
                 disabled={isConsolidating}
