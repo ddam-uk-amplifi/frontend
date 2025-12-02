@@ -51,6 +51,21 @@ export default function LoginPage() {
     }
   };
 
+  const demoUser = {
+    username: "admin",
+    password: "admin123",
+  }
+
+  const adminButton = async () => {
+    try {
+      setError(null);
+      await login(demoUser.username, demoUser.password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
@@ -136,6 +151,17 @@ export default function LoginPage() {
             </CardFooter>
           </form>
         </Form>
+
+        <div className="mt-4 text-center pb-6">
+          <button
+            type="button"
+            onClick={adminButton}
+            disabled={isLoading}
+            className="text-sm text-gray-500 hover:text-gray-700 underline disabled:opacity-50 cursor-pointer"
+          >
+            Auto Login (Demo)
+          </button>
+        </div>
       </Card>
     </div>
   );

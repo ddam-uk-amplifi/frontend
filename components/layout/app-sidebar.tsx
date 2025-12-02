@@ -58,6 +58,12 @@ const navigationItems: NavigationItem[] = [
     label: "Report Validation",
     icon: BarChart3,
   },
+    {
+    href: "/admin",
+    label: "Admin",
+    icon: Users,
+    requireSuperuser: true,
+  },
 ];
 
 export function AppSidebar() {
