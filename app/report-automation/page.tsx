@@ -4,6 +4,19 @@ import React, { useState, useEffect, Suspense, useRef } from "react";
 import { Upload, Trash2, Plus, X, Download } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
+import {
+  consolidationApi,
+  type ConsolidationJob,
+  type ConsolidationHistoryResponse,
+} from "@/lib/api/consolidation";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -49,6 +62,7 @@ function ReportAutomationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("data-upload");
+  const [tabLoading, setTabLoading] = useState(false);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   useEffect(() => {
@@ -57,6 +71,14 @@ function ReportAutomationContent() {
       setActiveTab("history");
     }
   }, [searchParams]);
+
+  // Handle tab switching with loading animation
+  const handleTabChange = (tab: string) => {
+    setTabLoading(true);
+    setActiveTab(tab);
+    // Simulate loading for smooth transition
+    setTimeout(() => setTabLoading(false), 300);
+  };
 
   // Use the key type for safer state management
 const [clientId, setClientId] = useState<ClientIdString>("arla");
@@ -75,13 +97,22 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     { id: number; code: string; name: string }[]
   >([]);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
-  const [expandedRows, setExpandedRows] = useState<number[]>([]);
 
   // Consolidation parameters
   const [ytdMonth, setYtdMonth] = useState("Dec");
   const [includePpt, setIncludePpt] = useState(false);
   const [isConsolidating, setIsConsolidating] = useState(false);
   const [consolidationResult, setConsolidationResult] = useState<any>(null);
+
+  // Consolidation history state
+  const [historyData, setHistoryData] = useState<ConsolidationJob[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPagination, setHistoryPagination] = useState({
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 0,
+  });
 
   // Fetch available markets on mount
   useEffect(() => {
@@ -96,47 +127,38 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     fetchMarkets();
   }, []);
 
-  // --- Mock History Data (unchanged) ---
-  const historyData = [
-    {
-      id: 1,
-      projectName: "Q4 Financials",
-      analyzedBy: "Jane Smith",
-      registeredDate: "2023-10-15",
-      completedDate: "2023-10-16",
-      status: "completed",
-      markets: [
-        { name: "North America", fileName: "NA_sales_data_Q4.xlsx" },
-        { name: "Europe", fileName: "EU_market_trends_2023.xlsx" },
-      ],
-    },
-    {
-      id: 2,
-      projectName: "Annual Marketing Review",
-      analyzedBy: "John Doe",
-      registeredDate: "2023-10-12",
-      completedDate: "2023-10-12",
-      status: "completed",
-      markets: [],
-    },
-    {
-      id: 3,
-      projectName: "Product Launch Analysis",
-      analyzedBy: "Emily White",
-      registeredDate: "2023-09-28",
-      completedDate: "2023-09-29",
-      status: "failed",
-      markets: [],
-    },
-  ];
-  // --- End Mock History Data ---
-
-  const toggleRow = (id: number) => {
-    if (expandedRows.includes(id)) {
-      setExpandedRows(expandedRows.filter((rowId) => rowId !== id));
-    } else {
-      setExpandedRows([...expandedRows, id]);
+  // Fetch consolidation history when history tab is active
+  useEffect(() => {
+    if (activeTab === "history") {
+      fetchConsolidationHistory();
     }
+  }, [activeTab, historyPagination.page]);
+
+  const fetchConsolidationHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const response = await consolidationApi.getHistory({
+        page: historyPagination.page,
+        page_size: historyPagination.pageSize,
+        my_jobs_only: true, // Only show current user's jobs
+      });
+
+      setHistoryData(response.items);
+      setHistoryPagination((prev) => ({
+        ...prev,
+        total: response.total,
+        totalPages: response.total_pages,
+      }));
+    } catch (error) {
+      console.error("Failed to fetch consolidation history:", error);
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setHistoryPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   const addMarket = () => {
@@ -187,13 +209,31 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     );
   };
 
-  const handleFileSelect = (marketId: number, file: File) => {
+  const handleFileSelect = (marketId: number, file: File): boolean => {
+    // Validate: Reject Excel temporary files (files with $ sign before extension)
+    const fileName = file.name;
+
+    // Check for $ character (Excel temp files like ~$filename.xlsx)
+    if (fileName.includes('$')) {
+      alert(
+        `⚠️ Invalid File\n\n` +
+        `"${fileName}"\n\n` +
+        `Files with '$' character cannot be uploaded.\n\n` +
+        `This is an Excel temporary file that's created when the file is open.\n\n` +
+        `To fix:\n` +
+        `• Close the Excel file completely\n` +
+        `• Upload the actual file (without $ in filename)`
+      );
+      return false;
+    }
+
     // Just update market with selected file, don't upload yet
     setMarkets(
       markets.map((market) =>
         market.id === marketId ? { ...market, file } : market
       )
     );
+    return true;
   };
 
   const handleConsolidation = async (completedUploads: UploadProgress[]) => {
@@ -398,7 +438,11 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   ) => {
     const file = event.target.files?.[0];
     if (file) {
-      handleFileSelect(marketId, file);
+      const isValid = handleFileSelect(marketId, file);
+      // Reset the input if file was rejected
+      if (!isValid) {
+        event.target.value = '';
+      }
     }
   };
 
@@ -468,20 +512,22 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     const styles = {
       completed: "bg-green-100 text-green-700",
       failed: "bg-red-100 text-red-700",
-      "in-progress": "bg-yellow-100 text-yellow-700",
+      pending: "bg-gray-100 text-gray-700",
+      processing: "bg-blue-100 text-blue-700",
     };
     const labels = {
       completed: "Completed",
       failed: "Failed",
-      "in-progress": "In Progress",
+      pending: "Pending",
+      processing: "Processing",
     };
     return (
       <span
         className={`px-3 py-1 rounded-full text-xs font-medium ${
-          styles[status as keyof typeof styles]
+          styles[status as keyof typeof styles] || "bg-gray-100 text-gray-700"
         }`}
       >
-        {labels[status as keyof typeof labels]}
+        {labels[status as keyof typeof labels] || status}
       </span>
     );
   };
@@ -503,7 +549,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
         <div className="mb-8 border-b border-gray-200">
           <div className="flex gap-8">
             <button
-              onClick={() => setActiveTab("data-upload")}
+              onClick={() => handleTabChange("data-upload")}
               className={`pb-4 px-1 font-medium transition-colors cursor-pointer ${
                 activeTab === "data-upload"
                   ? "text-blue-600 border-b-2 border-blue-600"
@@ -513,7 +559,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
               Data Upload
             </button>
             <button
-              onClick={() => setActiveTab("history")}
+              onClick={() => handleTabChange("history")}
               className={`pb-4 px-1 font-medium transition-colors cursor-pointer ${
                 activeTab === "history"
                   ? "text-blue-600 border-b-2 border-blue-600"
@@ -526,7 +572,27 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
         </div>
 
         {/* Content */}
-        {activeTab === "data-upload" && (
+        {tabLoading ? (
+          // Skeleton Loader
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <Skeleton className="h-6 w-1/4 mb-4" />
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <Skeleton className="h-6 w-1/3 mb-4" />
+              <div className="space-y-3">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            </div>
+          </div>
+        ) : activeTab === "data-upload" ? (
           <div className="space-y-6">
             {/* Create New Automation Job */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -539,21 +605,21 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Client Company <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <Select
                     value={clientId}
-                    onChange={(e) =>
-                      setClientId(e.target.value as ClientIdString)
-                    }
-                    className="w-full px-4 py-2 border  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer"
-                    required
+                    onValueChange={(value) => setClientId(value as ClientIdString)}
                   >
-                    <option value="">Select a client</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Consolidation Options */}
@@ -562,24 +628,28 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     <label className="block text-sm font-medium text-gray-900 mb-2">
                       YTD Month <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <Select
                       value={ytdMonth}
-                      onChange={(e) => setYtdMonth(e.target.value)}
-                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer"
+                      onValueChange={setYtdMonth}
                     >
-                      <option value="Jan">January</option>
-                      <option value="Feb">February</option>
-                      <option value="Mar">March</option>
-                      <option value="Apr">April</option>
-                      <option value="May">May</option>
-                      <option value="Jun">June</option>
-                      <option value="Jul">July</option>
-                      <option value="Aug">August</option>
-                      <option value="Sep">September</option>
-                      <option value="Oct">October</option>
-                      <option value="Nov">November</option>
-                      <option value="Dec">December</option>
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Jan">January</SelectItem>
+                        <SelectItem value="Feb">February</SelectItem>
+                        <SelectItem value="Mar">March</SelectItem>
+                        <SelectItem value="Apr">April</SelectItem>
+                        <SelectItem value="May">May</SelectItem>
+                        <SelectItem value="Jun">June</SelectItem>
+                        <SelectItem value="Jul">July</SelectItem>
+                        <SelectItem value="Aug">August</SelectItem>
+                        <SelectItem value="Sep">September</SelectItem>
+                        <SelectItem value="Oct">October</SelectItem>
+                        <SelectItem value="Nov">November</SelectItem>
+                        <SelectItem value="Dec">December</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="flex items-center pt-7">
@@ -614,21 +684,23 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                         <label className="block text-sm font-medium text-gray-900 mb-2">
                           Market Code <span className="text-red-500">*</span>
                         </label>
-                        <select
-                          value={market.marketId ?? ""}
-                          onChange={(e) =>
-                            updateMarketId(market.id, Number(e.target.value))
+                        <Select
+                          value={market.marketId?.toString() ?? ""}
+                          onValueChange={(value) =>
+                            updateMarketId(market.id, Number(value))
                           }
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
                         >
-                          <option value="">Select Market</option>
-                          {availableMarkets.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.code} — {m.name}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select Market" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableMarkets.map((m) => (
+                              <SelectItem key={m.id} value={m.id.toString()}>
+                                {m.code} — {m.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <input
                         ref={(el) => {
@@ -885,9 +957,9 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
               </div>
             )}
 
-            {/* Run Automation Button */}
+            {/* Run Automation / Download Buttons */}
             <div className="flex justify-end gap-3">
-              {consolidationResult && !consolidationResult.error && consolidationResult.excel_download_url && (
+              {consolidationResult && !consolidationResult.error && consolidationResult.excel_download_url ? (
                 <>
                   <button
                     onClick={() => handleDownloadConsolidation('excel')}
@@ -906,165 +978,205 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     </button>
                   )}
                 </>
+              ) : (
+                <button
+                  onClick={handleRunAutomation}
+                  disabled={isConsolidating || uploadProgress.some(p => p.status === "uploading")}
+                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploadProgress.some(p => p.status === "uploading")
+                    ? "Extracting..."
+                    : isConsolidating
+                    ? "Consolidating..."
+                    : "Run Automation"}
+                </button>
               )}
-              <button
-                onClick={handleRunAutomation}
-                disabled={isConsolidating}
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isConsolidating ? "Processing..." : "Run Automation"}
-              </button>
             </div>
           </div>
-        )}
+        ) : activeTab === "history" ? (
+          <div className="space-y-4">
+            {historyLoading ? (
+              // Loading skeleton
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              </div>
+            ) : historyData.length === 0 ? (
+              // Empty state
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                <div className="text-gray-400 mb-4">
+                  <svg
+                    className="w-16 h-16 mx-auto"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No consolidation history
+                </h3>
+                <p className="text-gray-500">
+                  Your completed consolidation jobs will appear here.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* History Table */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Analyzed By
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Registered
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Completed
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {historyData.map((item) => (
+                          <React.Fragment key={item.id}>
+                            <tr className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900 capitalize">
+                                  {item.client_name}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-600">
+                                  {item.analyzed_by_email}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-600">
+                                  {new Date(item.registered_date).toLocaleDateString()}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-600">
+                                  {item.completed_date
+                                    ? new Date(item.completed_date).toLocaleDateString()
+                                    : "-"}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {getStatusBadge(item.status)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  {/* Eye/Details button - shown first if there are trackers */}
+                                  {item.trackers.length > 0 && (
+                                    <button
+                                      onClick={() => router.push(`/report-automation/history/${item.id}`)}
+                                      className="text-gray-400 hover:text-gray-600 p-1"
+                                      title="View consolidation details"
+                                    >
+                                      <svg
+                                        className="w-5 h-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                        />
+                                      </svg>
+                                    </button>
+                                  )}
+                                  {/* Download buttons - shown after eye button */}
+                                  {item.status === "completed" && item.excel_download_url && (
+                                    <button
+                                      onClick={() => window.open(item.excel_download_url, '_blank')}
+                                      className="text-green-600 hover:text-green-700 p-1"
+                                      title="Download Excel"
+                                    >
+                                      <Download size={18} />
+                                    </button>
+                                  )}
+                                  {item.status === "completed" && item.ppt_download_url && (
+                                    <button
+                                      onClick={() => window.open(item.ppt_download_url, '_blank')}
+                                      className="text-orange-600 hover:text-orange-700 p-1"
+                                      title="Download PowerPoint"
+                                    >
+                                      <Download size={18} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-        {activeTab === "history" && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Project Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Analyzed By User
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Analysis Registered Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Analysis Completed Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {historyData.map((item) => (
-                    <React.Fragment key={item.id}>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.projectName}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-600">
-                            {item.analyzedBy}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-600">
-                            {item.registeredDate}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-600">
-                            {item.completedDate}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(item.status)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() =>
-                                router.push(
-                                  "/report-automation/details?from=history"
-                                )
-                              }
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => toggleRow(item.id)}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <svg
-                                className={`w-5 h-5 transition-transform ${
-                                  expandedRows.includes(item.id)
-                                    ? "rotate-180"
-                                    : ""
-                                }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {expandedRows.includes(item.id) &&
-                        item.markets.length > 0 && (
-                          <tr>
-                            <td colSpan={6} className="px-6 py-4 bg-gray-50">
-                              <div className="space-y-2">
-                                {item.markets.map((market, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="grid grid-cols-2 gap-4 text-sm"
-                                  >
-                                    <div>
-                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Market Name
-                                      </span>
-                                      <div className="text-gray-900 mt-1">
-                                        {market.name}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        File Name
-                                      </span>
-                                      <div className="text-gray-900 mt-1">
-                                        {market.fileName}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                {/* Pagination Controls */}
+                {historyPagination.totalPages > 1 && (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-700">
+                        Showing page {historyPagination.page} of{" "}
+                        {historyPagination.totalPages} ({historyPagination.total} total jobs)
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handlePageChange(historyPagination.page - 1)}
+                          disabled={historyPagination.page === 1}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => handlePageChange(historyPagination.page + 1)}
+                          disabled={historyPagination.page >= historyPagination.totalPages}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
