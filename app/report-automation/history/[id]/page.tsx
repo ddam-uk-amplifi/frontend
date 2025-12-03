@@ -2,7 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Download, Calendar, Clock, User, CheckCircle, XCircle, Loader } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileText,
+  Calendar,
+  Clock,
+  User,
+  CheckCircle,
+  XCircle,
+  Loader,
+} from "lucide-react";
 import {
   consolidationApi,
   type ConsolidationJobDetail,
@@ -19,6 +29,11 @@ const getDownloadUrl = (downloadUrl: string | null | undefined, filePath: string
     return `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
   }
   return null;
+};
+
+const formatTrackerFileName = (fileName: string | null): string => {
+  if (!fileName) return "";
+  return fileName.replace(/^extracted_[^_]+_/, "");
 };
 
 export default function ConsolidationDetailPage() {
@@ -131,185 +146,146 @@ export default function ConsolidationDetailPage() {
     );
   }
 
+  const statusClasses = getStatusColor(jobDetail.status);
+  const statusIconElement = getStatusIcon(jobDetail.status);
+
+  const excelUrl = getDownloadUrl(jobDetail.excel_download_url, jobDetail.excel_path);
+  const pptUrl = getDownloadUrl(jobDetail.ppt_download_url, jobDetail.ppt_path);
+  const hasDownloads = Boolean(excelUrl || pptUrl);
+
+  const registeredDate = new Date(jobDetail.registered_date).toLocaleString();
+  const startedDate = jobDetail.started_at
+    ? new Date(jobDetail.started_at).toLocaleString()
+    : null;
+  const completedDate = jobDetail.completed_date
+    ? new Date(jobDetail.completed_date).toLocaleString()
+    : null;
+  const analyzedByName = jobDetail.analyzed_by_name || jobDetail.analyzed_by_email;
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
+      <div className="mx-auto max-w-5xl space-y-6">
         <button
           onClick={() => router.push("/report-automation?tab=history")}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+          className="flex items-center gap-2 text-gray-600 transition-colors hover:text-gray-900"
         >
           <ArrowLeft size={20} />
-          Back to History
+          <span className="text-sm font-medium">Back to History</span>
         </button>
 
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Consolidation Details
-            </h1>
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium ${getStatusColor(jobDetail.status)}`}>
-              {getStatusIcon(jobDetail.status)}
+        <section className="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold text-gray-900">Consolidation Details</h1>
+              <p className="text-sm text-gray-600">
+                {jobDetail.client_name} • {jobDetail.ytd_month}
+              </p>
+              <p className="text-xs text-gray-500">Analyzed by {analyzedByName}</p>
+            </div>
+            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${statusClasses}`}>
+              {statusIconElement}
               <span className="capitalize">{jobDetail.status}</span>
-            </div>
-          </div>
-          <p className="text-gray-500">Job ID: {jobDetail.id}</p>
-        </div>
-
-        {/* Job Information */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Job Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-start gap-3 mb-4">
-                <User className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Client</p>
-                  <p className="text-base text-gray-900 capitalize">{jobDetail.client_name}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 mb-4">
-                <User className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Analyzed By</p>
-                  <p className="text-base text-gray-900">{jobDetail.analyzed_by_email}</p>
-                  <p className="text-sm text-gray-500">{jobDetail.analyzed_by_name}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">YTD Month</p>
-                  <p className="text-base text-gray-900">{jobDetail.ytd_month}</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-start gap-3 mb-4">
-                <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Registered Date</p>
-                  <p className="text-base text-gray-900">
-                    {new Date(jobDetail.registered_date).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              {jobDetail.started_at && (
-                <div className="flex items-start gap-3 mb-4">
-                  <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Started At</p>
-                    <p className="text-base text-gray-900">
-                      {new Date(jobDetail.started_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {jobDetail.completed_date && (
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Completed Date</p>
-                    <p className="text-base text-gray-900">
-                      {new Date(jobDetail.completed_date).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            </span>
           </div>
 
-          {/* Error Message */}
+          <dl className="grid grid-cols-1 gap-4 text-sm text-gray-600 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Registered</dt>
+              <dd className="mt-1 text-gray-900">{registeredDate}</dd>
+            </div>
+            {startedDate && (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Started</dt>
+                <dd className="mt-1 text-gray-900">{startedDate}</dd>
+              </div>
+            )}
+            {completedDate && (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Completed</dt>
+                <dd className="mt-1 text-gray-900">{completedDate}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Analyzed By</dt>
+              <dd className="mt-1 text-gray-900">{jobDetail.analyzed_by_email}</dd>
+            </div>
+          </dl>
+
           {jobDetail.error_message && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm font-medium text-red-800 mb-1">Error Message:</p>
-              <p className="text-sm text-red-700">{jobDetail.error_message}</p>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {jobDetail.error_message}
             </div>
           )}
 
-          {/* Download Buttons */}
-          {jobDetail.status === "completed" && (jobDetail.excel_download_url || jobDetail.excel_path || jobDetail.ppt_download_url || jobDetail.ppt_path) && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-700 mb-3">Download Results:</p>
-              <div className="flex gap-3">
-                {(jobDetail.excel_download_url || jobDetail.excel_path) && (
-                  <button
-                    onClick={() => {
-                      const url = getDownloadUrl(jobDetail.excel_download_url, jobDetail.excel_path);
-                      if (url) window.open(url, '_blank');
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Download size={18} />
-                    Download Excel
-                  </button>
-                )}
-                {(jobDetail.ppt_download_url || jobDetail.ppt_path) && (
-                  <button
-                    onClick={() => {
-                      const url = getDownloadUrl(jobDetail.ppt_download_url, jobDetail.ppt_path);
-                      if (url) window.open(url, '_blank');
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                  >
-                    <Download size={18} />
-                    Download PowerPoint
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Tracker Files */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Tracker Files ({jobDetail.trackers.length})
-          </h2>
-          {jobDetail.trackers.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No tracker files found.</p>
-          ) : (
-            <div className="space-y-3">
-              {jobDetail.trackers.map((tracker) => (
-                <div
-                  key={tracker.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+          {hasDownloads && (
+            <div className="flex flex-wrap gap-3">
+              {excelUrl && (
+                <button
+                  onClick={() => window.open(excelUrl, "_blank")}
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Market Code</p>
-                      <p className="text-sm font-semibold text-gray-900 bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">
-                        {tracker.market_code}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Market Name</p>
-                      <p className="text-sm text-gray-900">{tracker.market_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">File Name</p>
-                      <p className="text-sm text-gray-900 truncate" title={tracker.file_name}>
-                        {tracker.file_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Year</p>
-                      <p className="text-sm text-gray-900">{tracker.year}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-500">
-                      Uploaded: {new Date(tracker.uploaded_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                  <Download size={18} />
+                  Download Excel
+                </button>
+              )}
+              {pptUrl && (
+                <button
+                  onClick={() => window.open(pptUrl, "_blank")}
+                  className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+                >
+                  <FileText size={18} />
+                  Download PowerPoint
+                </button>
+              )}
             </div>
           )}
-        </div>
+        </section>
+
+        <section className="rounded-lg border border-gray-200 bg-white">
+          <div className="border-b border-gray-200 px-6 py-4">
+            <h2 className="text-lg font-semibold text-gray-900">Tracker Files</h2>
+            <p className="text-sm text-gray-600">Files processed for this consolidation job.</p>
+          </div>
+          {jobDetail.trackers.length === 0 ? (
+            <p className="px-6 py-10 text-center text-gray-500">No tracker files found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-6 py-3 text-left">Market</th>
+                    <th className="px-6 py-3 text-left">File Name</th>
+                    <th className="px-6 py-3 text-left">Year</th>
+                    <th className="px-6 py-3 text-left">Uploaded</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white text-gray-700">
+                  {jobDetail.trackers.map((tracker) => (
+                    <tr key={tracker.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold uppercase text-blue-700">
+                            {tracker.market_code}
+                          </span>
+                          <span>{tracker.market_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="block truncate" title={formatTrackerFileName(tracker.file_name)}>
+                          {formatTrackerFileName(tracker.file_name)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">{tracker.year}</td>
+                      <td className="px-6 py-3 text-sm text-gray-500">
+                        {new Date(tracker.uploaded_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, Suspense, useRef } from "react";
-import { Upload, Trash2, Plus, X, Download } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Upload, Trash2, Plus, X, Download, ChevronDown } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
 import {
@@ -116,6 +117,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     total: 0,
     totalPages: 0,
   });
+  const [expandedHistoryRows, setExpandedHistoryRows] = useState<Record<string, boolean>>({});
 
   // Fetch available markets on mount
   useEffect(() => {
@@ -147,6 +149,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       });
 
       setHistoryData(response.items);
+      setExpandedHistoryRows({});
       setHistoryPagination((prev) => ({
         ...prev,
         total: response.total,
@@ -162,6 +165,19 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
   const handlePageChange = (newPage: number) => {
     setHistoryPagination((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const toggleHistoryRow = (rowId: string | number) => {
+    const key = String(rowId);
+    setExpandedHistoryRows((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const formatTrackerFileName = (fileName: string | undefined): string => {
+    if (!fileName) return "";
+    return fileName.replace(/^extracted_[^_]+_/, "");
   };
 
   const addMarket = () => {
@@ -508,15 +524,6 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   };
 
   // Helper to get download URL (S3 presigned or local endpoint)
-  const getDownloadUrl = (downloadUrl: string | undefined, filePath: string | undefined): string | null => {
-    if (downloadUrl) return downloadUrl;
-    if (filePath) {
-      const fileName = filePath.split('/').pop();
-      return `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
-    }
-    return null;
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "complete":
@@ -1108,94 +1115,154 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {historyData.map((item) => (
-                          <React.Fragment key={item.id}>
-                            <tr className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900 capitalize">
-                                  {item.client_name}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-600">
-                                  {item.analyzed_by_email}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-600">
-                                  {new Date(item.registered_date).toLocaleDateString()}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-600">
-                                  {item.completed_date
-                                    ? new Date(item.completed_date).toLocaleDateString()
-                                    : "-"}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {getStatusBadge(item.status)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                  {/* Eye/Details button - shown first if there are trackers */}
-                                  {item.trackers.length > 0 && (
-                                    <button
-                                      onClick={() => router.push(`/report-automation/history/${item.id}`)}
-                                      className="text-gray-400 hover:text-gray-600 p-1"
-                                      title="View consolidation details"
-                                    >
-                                      <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
+                        {historyData.map((item) => {
+                          const rowKey = String(item.id);
+                          const isExpanded = !!expandedHistoryRows[rowKey];
+                          const canExpand = item.trackers.length > 0;
+
+                          return (
+                            <React.Fragment key={item.id}>
+                              <tr className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900 capitalize">
+                                    {item.client_name}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-600">
+                                    {item.analyzed_by_email}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-600">
+                                    {new Date(item.registered_date).toLocaleDateString()}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-600">
+                                    {item.completed_date
+                                      ? new Date(item.completed_date).toLocaleDateString()
+                                      : "-"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {getStatusBadge(item.status)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    {/* Eye/Details button - shown first if there are trackers */}
+                                    {item.trackers.length > 0 && (
+                                      <button
+                                        onClick={() => router.push(`/report-automation/history/${item.id}`)}
+                                        className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                                        title="View consolidation details"
                                       >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                        />
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                        />
-                                      </svg>
-                                    </button>
-                                  )}
-                                  {/* Download buttons - shown after eye button */}
-                                  {item.status === "completed" && (item.excel_download_url || item.excel_path) && (
-                                    <button
-                                      onClick={() => {
-                                        const url = getDownloadUrl(item.excel_download_url, item.excel_path);
-                                        if (url) window.open(url, '_blank');
-                                      }}
-                                      className="text-green-600 hover:text-green-700 p-1"
-                                      title="Download Excel"
+                                        <svg
+                                          className="w-5 h-5"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                          />
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                          />
+                                        </svg>
+                                      </button>
+                                    )}
+                                    {/* Dropdown toggle replaces download icon */}
+                                    {item.status === "completed" && canExpand && (
+                                      <button
+                                        onClick={() => toggleHistoryRow(rowKey)}
+                                        className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                                        title={isExpanded ? "Hide markets" : "Show markets"}
+                                        aria-expanded={isExpanded}
+                                        aria-controls={`history-row-${rowKey}`}
+                                      >
+                                        <span
+                                          className={`block transition-transform duration-200 ${
+                                            isExpanded ? "rotate-180" : ""
+                                          }`}
+                                        >
+                                          <ChevronDown size={18} />
+                                        </span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              <AnimatePresence initial={false}>
+                                {isExpanded && canExpand && (
+                                  <motion.tr
+                                    key={`history-row-${rowKey}`}
+                                    id={`history-row-${rowKey}`}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="bg-gray-50"
+                                  >
+                                    <motion.td
+                                      colSpan={6}
+                                      className="px-6 py-0"
+                                      style={{ overflow: "hidden" }}
+                                      initial={{ height: 0 }}
+                                      animate={{ height: "auto" }}
+                                      exit={{ height: 0 }}
+                                      transition={{ duration: 0.2 }}
                                     >
-                                      <Download size={18} />
-                                    </button>
-                                  )}
-                                  {item.status === "completed" && (item.ppt_download_url || item.ppt_path) && (
-                                    <button
-                                      onClick={() => {
-                                        const url = getDownloadUrl(item.ppt_download_url, item.ppt_path);
-                                        if (url) window.open(url, '_blank');
-                                      }}
-                                      className="text-orange-600 hover:text-orange-700 p-1"
-                                      title="Download PowerPoint"
-                                    >
-                                      <Download size={18} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          </React.Fragment>
-                        ))}
+                                      <div className="overflow-hidden">
+                                        <div className="py-4">
+                                          <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
+                                            <table className="w-full text-sm text-gray-700">
+                                              <tbody>
+                                                {item.trackers.map((tracker, trackerIndex) => (
+                                                  <tr
+                                                    key={`${tracker.market_code}-${tracker.file_name}-${trackerIndex}`}
+                                                    className={`bg-white ${
+                                                      trackerIndex !== 0 ? "border-t border-gray-200" : ""
+                                                    }`}
+                                                  >
+                                                    <td className="w-1/2 px-4 py-3 align-top">
+                                                      <div className="flex items-center gap-2">
+                                                        <span className="inline-flex items-center justify-center rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold uppercase text-blue-700">
+                                                          {tracker.market_code}
+                                                        </span>
+                                                        <span className="text-sm font-medium text-gray-900">
+                                                          {tracker.market_name || "-"}
+                                                        </span>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                      <span
+                                                        className="block truncate text-sm text-gray-600"
+                                                        title={formatTrackerFileName(tracker.file_name)}
+                                                      >
+                                                        {formatTrackerFileName(tracker.file_name)}
+                                                      </span>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </motion.td>
+                                  </motion.tr>
+                                )}
+                              </AnimatePresence>
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
