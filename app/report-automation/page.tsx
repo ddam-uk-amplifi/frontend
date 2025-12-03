@@ -44,7 +44,8 @@ interface TableInfo {
 
 interface UploadProgress {
   id: string;
-  marketId: number;
+  marketId: number; // UI row ID
+  dbMarketId: number; // Database market ID (for consolidation)
   marketCode: string;
   fileName: string;
   progress: number;
@@ -103,6 +104,8 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   const [includePpt, setIncludePpt] = useState(false);
   const [isConsolidating, setIsConsolidating] = useState(false);
   const [consolidationResult, setConsolidationResult] = useState<any>(null);
+  // Track total markets to upload for accurate consolidation triggering
+  const totalMarketsToUploadRef = useRef(0);
 
   // Consolidation history state
   const [historyData, setHistoryData] = useState<ConsolidationJob[]>([]);
@@ -251,15 +254,16 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     console.log("Starting consolidation...");
 
     try {
-      // Collect extracted paths and market names
-      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!);
-      const marketNames = successfulExtractions.map((p) => p.marketCode);
+      // Build extracted_files array with path and market_id (new format)
+      const extractedFiles = successfulExtractions.map((p) => ({
+        path: p.extractedPath!,
+        market_id: p.dbMarketId,
+      }));
 
-      // Prepare consolidation request
+      // Prepare consolidation request with new format
       const consolidationData = {
         client_name: clientId, // lowercase client name
-        // markets: marketNames,
-        extracted_paths: extractedPaths,
+        extracted_files: extractedFiles, // New format with market info
         ytd_month: ytdMonth,
         include_ppt: includePpt,
       };
@@ -325,6 +329,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     // Clear previous results
     setUploadProgress([]);
     setConsolidationResult(null);
+    totalMarketsToUploadRef.current = marketsToUpload.length;
 
     // Upload all files
     for (const market of marketsToUpload) {
@@ -332,6 +337,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
       const uploadId = `${market.id}-${Date.now()}`;
       const marketCode = market.code || "";
+      const dbMarketId = market.marketId!; // DB market ID
 
 
       // Add to upload progress
@@ -340,6 +346,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
         {
           id: uploadId,
           marketId: market.id,
+          dbMarketId,
           marketCode,
           fileName: market.file!.name,
           progress: 0,
@@ -399,11 +406,17 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
           const hasSuccess = updated.some((p) => p.status === "complete");
           const completedCount = updated.filter((p) => p.status === "complete").length;
           const failedCount = updated.filter((p) => p.status === "failed").length;
+          const totalProcessed = completedCount + failedCount;
+          const expectedTotal = totalMarketsToUploadRef.current;
 
           console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${updated.length} total`);
           console.log('All complete?', allComplete, 'Has success?', hasSuccess);
+          console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
 
-          if (allComplete && hasSuccess) {
+
+
+          // Only trigger consolidation when we've processed ALL expected markets
+          if (totalProcessed === expectedTotal && completedCount > 0) {
             console.log('🎯 All extractions done! Triggering consolidation...');
             // Trigger consolidation after a short delay to ensure UI updates
             setTimeout(() => handleConsolidation(updated), 500);
@@ -414,20 +427,36 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       } catch (error: any) {
         console.error("Upload error:", error);
         // Mark as failed
-        setUploadProgress((prev) =>
-          prev.map((p) =>
+        setUploadProgress((prev) => {
+          const updated = prev.map((p) =>
             p.id === uploadId
               ? {
                   ...p,
-                  status: "failed",
+                  status: "failed" as const,
                   error:
                     error.response?.data?.message ||
                     error.response?.data?.detail ||
                     "Upload failed",
                 }
               : p
-          )
-        );
+          );
+
+          // Check if all extractions are complete after failure too
+          const completedCount = updated.filter((p) => p.status === "complete").length;
+          const failedCount = updated.filter((p) => p.status === "failed").length;
+          const totalProcessed = completedCount + failedCount;
+          const expectedTotal = totalMarketsToUploadRef.current;
+
+          console.log(`📊 Progress after error: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
+
+          // Only trigger consolidation when we've processed ALL expected markets
+          if (totalProcessed === expectedTotal && completedCount > 0) {
+            console.log('🎯 All extractions done (some failed)! Triggering consolidation...');
+            setTimeout(() => handleConsolidation(updated), 500);
+          }
+
+          return updated;
+        });
       }
     }
   };
@@ -453,19 +482,39 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   const handleDownloadConsolidation = (type: 'excel' | 'ppt' = 'excel') => {
     if (!consolidationResult || consolidationResult.error) return;
 
-    const downloadUrl = type === 'excel'
+    // Check for S3 presigned URL first, then fall back to local path
+    let downloadUrl = type === 'excel'
       ? consolidationResult.excel_download_url
       : consolidationResult.ppt_download_url;
 
+    // For local storage, construct download URL from path
     if (!downloadUrl) {
-      console.error(`No ${type} download URL in consolidation result`);
-      return;
+      const filePath = type === 'excel'
+        ? consolidationResult.excel_path
+        : consolidationResult.ppt_path;
+
+      if (!filePath) {
+        console.error(`No ${type} file path in consolidation result`);
+        return;
+      }
+
+      // Extract filename from path and construct local download URL
+      const fileName = filePath.split('/').pop();
+      downloadUrl = `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
     }
 
     console.log(`Downloading ${type} file from:`, downloadUrl);
-
-    // Open download URL directly (signed S3 URL)
     window.open(downloadUrl, '_blank');
+  };
+
+  // Helper to get download URL (S3 presigned or local endpoint)
+  const getDownloadUrl = (downloadUrl: string | undefined, filePath: string | undefined): string | null => {
+    if (downloadUrl) return downloadUrl;
+    if (filePath) {
+      const fileName = filePath.split('/').pop();
+      return `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
+    }
+    return null;
   };
 
   const getStatusColor = (status: string) => {
@@ -959,7 +1008,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
             {/* Run Automation / Download Buttons */}
             <div className="flex justify-end gap-3">
-              {consolidationResult && !consolidationResult.error && consolidationResult.excel_download_url ? (
+              {consolidationResult && !consolidationResult.error && (consolidationResult.excel_download_url || consolidationResult.excel_path) ? (
                 <>
                   <button
                     onClick={() => handleDownloadConsolidation('excel')}
@@ -968,7 +1017,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     <Download size={18} />
                     Download Excel
                   </button>
-                  {consolidationResult.ppt_download_url && (
+                  {(consolidationResult.ppt_download_url || consolidationResult.ppt_path) && (
                     <button
                       onClick={() => handleDownloadConsolidation('ppt')}
                       className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2"
@@ -1118,18 +1167,24 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                     </button>
                                   )}
                                   {/* Download buttons - shown after eye button */}
-                                  {item.status === "completed" && item.excel_download_url && (
+                                  {item.status === "completed" && (item.excel_download_url || item.excel_path) && (
                                     <button
-                                      onClick={() => window.open(item.excel_download_url, '_blank')}
+                                      onClick={() => {
+                                        const url = getDownloadUrl(item.excel_download_url, item.excel_path);
+                                        if (url) window.open(url, '_blank');
+                                      }}
                                       className="text-green-600 hover:text-green-700 p-1"
                                       title="Download Excel"
                                     >
                                       <Download size={18} />
                                     </button>
                                   )}
-                                  {item.status === "completed" && item.ppt_download_url && (
+                                  {item.status === "completed" && (item.ppt_download_url || item.ppt_path) && (
                                     <button
-                                      onClick={() => window.open(item.ppt_download_url, '_blank')}
+                                      onClick={() => {
+                                        const url = getDownloadUrl(item.ppt_download_url, item.ppt_path);
+                                        if (url) window.open(url, '_blank');
+                                      }}
                                       className="text-orange-600 hover:text-orange-700 p-1"
                                       title="Download PowerPoint"
                                     >

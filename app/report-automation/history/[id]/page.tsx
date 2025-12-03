@@ -9,6 +9,18 @@ import {
 } from "@/lib/api/consolidation";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// Helper to get download URL (S3 presigned or local endpoint)
+const getDownloadUrl = (downloadUrl: string | null | undefined, filePath: string | null | undefined): string | null => {
+  if (downloadUrl) return downloadUrl;
+  if (filePath) {
+    const fileName = filePath.split('/').pop();
+    return `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
+  }
+  return null;
+};
+
 export default function ConsolidationDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -219,22 +231,28 @@ export default function ConsolidationDetailPage() {
           )}
 
           {/* Download Buttons */}
-          {jobDetail.status === "completed" && (jobDetail.excel_download_url || jobDetail.ppt_download_url) && (
+          {jobDetail.status === "completed" && (jobDetail.excel_download_url || jobDetail.excel_path || jobDetail.ppt_download_url || jobDetail.ppt_path) && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-sm font-medium text-gray-700 mb-3">Download Results:</p>
               <div className="flex gap-3">
-                {jobDetail.excel_download_url && (
+                {(jobDetail.excel_download_url || jobDetail.excel_path) && (
                   <button
-                    onClick={() => window.open(jobDetail.excel_download_url!, '_blank')}
+                    onClick={() => {
+                      const url = getDownloadUrl(jobDetail.excel_download_url, jobDetail.excel_path);
+                      if (url) window.open(url, '_blank');
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     <Download size={18} />
                     Download Excel
                   </button>
                 )}
-                {jobDetail.ppt_download_url && (
+                {(jobDetail.ppt_download_url || jobDetail.ppt_path) && (
                   <button
-                    onClick={() => window.open(jobDetail.ppt_download_url!, '_blank')}
+                    onClick={() => {
+                      const url = getDownloadUrl(jobDetail.ppt_download_url, jobDetail.ppt_path);
+                      if (url) window.open(url, '_blank');
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                   >
                     <Download size={18} />

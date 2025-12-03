@@ -26,7 +26,9 @@ export interface ConsolidationJob {
   completed_date: string | null;
   status: "pending" | "processing" | "completed" | "failed";
   trackers: ConsolidationTracker[];
+  excel_path?: string;
   excel_download_url?: string;
+  ppt_path?: string;
   ppt_download_url?: string;
 }
 
