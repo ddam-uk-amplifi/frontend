@@ -118,6 +118,9 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     totalPages: 0,
   });
   const [expandedHistoryRows, setExpandedHistoryRows] = useState<Record<string, boolean>>({});
+  
+  // Track total markets to upload for accurate consolidation triggering
+  const totalMarketsToUploadRef = useRef(0);
 
   // Fetch available markets on mount
   useEffect(() => {
@@ -342,7 +345,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       return;
     }
 
-    // Clear previous results
+    // Clear previous results and set expected count
     setUploadProgress([]);
     setConsolidationResult(null);
     totalMarketsToUploadRef.current = marketsToUpload.length;
@@ -417,9 +420,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
               : p
           );
 
-          // Check if all extractions are complete
-          const allComplete = updated.every((p) => p.status === "complete" || p.status === "failed");
-          const hasSuccess = updated.some((p) => p.status === "complete");
+          // Check if all extractions are complete - compare with EXPECTED count
           const completedCount = updated.filter((p) => p.status === "complete").length;
           const failedCount = updated.filter((p) => p.status === "failed").length;
           const totalProcessed = completedCount + failedCount;
@@ -430,6 +431,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
           console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
 
 
+          console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
 
           // Only trigger consolidation when we've processed ALL expected markets
           if (totalProcessed === expectedTotal && completedCount > 0) {
