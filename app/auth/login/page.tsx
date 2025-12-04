@@ -56,15 +56,15 @@ export default function LoginPage() {
     password: "Super123",
   }
 
-  const adminButton = async () => {
-    try {
-      setError(null);
-      await login(demoUser.username, demoUser.password);
-      router.push("/dashboard");
-    } catch (err) {
-      setError(handleApiError(err));
-    }
-  }
+  // const adminButton = async () => {
+  //   try {
+  //     setError(null);
+  //     await login(demoUser.username, demoUser.password);
+  //     router.push("/dashboard");
+  //   } catch (err) {
+  //     setError(handleApiError(err));
+  //   }
+  // }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -152,7 +152,7 @@ export default function LoginPage() {
           </form>
         </Form>
 
-        <div className="mt-4 text-center pb-6">
+        {/* <div className="mt-4 text-center pb-6">
           <button
             type="button"
             onClick={adminButton}
@@ -161,7 +161,7 @@ export default function LoginPage() {
           >
             Auto Login (Demo)
           </button>
-        </div>
+        </div> */}
       </Card>
     </div>
   );
