@@ -99,7 +99,9 @@ export const consolidationApi = {
 
   // Get detailed consolidation job information
   async getJobDetail(jobId: string): Promise<ConsolidationJobDetail> {
-    const response = await apiClient.get(`/api/v1/consolidation/history/${jobId}`);
+    const response = await apiClient.get(
+      `/api/v1/consolidation/history/${jobId}`
+    );
     return response.data;
   },
 };
