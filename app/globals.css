@@ -283,3 +283,119 @@
 .excel-file-uploader .uppy-DashboardContent-addMore:hover {
   background: #2563eb !important;
 }
+
+/* Custom Toast Styles - Professional & Minimal Design */
+[data-sonner-toast] {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  padding: 14px 16px !important;
+  min-width: 340px !important;
+  max-width: 420px !important;
+}
+
+/* Success Toast - Green Theme */
+[data-sonner-toast][data-type="success"] {
+  background: #ECFDF5 !important;
+  border-color: #A7F3D0 !important;
+  color: #065F46 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: #10B981 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-title] {
+  color: #065F46 !important;
+  font-weight: 600 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: #047857 !important;
+  font-size: 13px !important;
+  opacity: 0.9 !important;
+}
+
+/* Error Toast - Red Theme */
+[data-sonner-toast][data-type="error"] {
+  background: #FEF2F2 !important;
+  border-color: #FECACA !important;
+  color: #991B1B !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: #EF4444 !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-title] {
+  color: #991B1B !important;
+  font-weight: 600 !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: #B91C1C !important;
+  font-size: 13px !important;
+  opacity: 0.9 !important;
+}
+
+/* Warning Toast - Yellow/Amber Theme */
+[data-sonner-toast][data-type="warning"] {
+  background: #FFFBEB !important;
+  border-color: #FDE68A !important;
+  color: #92400E !important;
+}
+
+[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: #F59E0B !important;
+}
+
+[data-sonner-toast][data-type="warning"] [data-title] {
+  color: #92400E !important;
+  font-weight: 600 !important;
+}
+
+[data-sonner-toast][data-type="warning"] [data-description] {
+  color: #B45309 !important;
+  font-size: 13px !important;
+  opacity: 0.9 !important;
+}
+
+/* Info Toast - Blue Theme */
+[data-sonner-toast][data-type="info"] {
+  background: #EFF6FF !important;
+  border-color: #BFDBFE !important;
+  color: #1E40AF !important;
+}
+
+[data-sonner-toast][data-type="info"] [data-icon] {
+  color: #3B82F6 !important;
+}
+
+[data-sonner-toast][data-type="info"] [data-title] {
+  color: #1E40AF !important;
+  font-weight: 600 !important;
+}
+
+[data-sonner-toast][data-type="info"] [data-description] {
+  color: #1D4ED8 !important;
+  font-size: 13px !important;
+  opacity: 0.9 !important;
+}
+
+/* Toast Close Button */
+[data-sonner-toast] [data-close-button] {
+  border: none !important;
+  background: transparent !important;
+  color: currentColor !important;
+  opacity: 0.5 !important;
+  transition: opacity 0.15s ease !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  opacity: 1 !important;
+}
+
+/* Loading Spinner */
+[data-sonner-toast] [data-icon] svg {
+  width: 20px !important;
+  height: 20px !important;
+}
