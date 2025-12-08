@@ -1,21 +1,40 @@
 'use client';
 
-import { useState } from 'react';
-import { BarChart3, PieChart as PieIcon, LineChart as LineIcon, Activity, Table2, Grid3x3, TrendingUp, Layers, Map, AlertCircle, Gauge, Star } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BarChart3, PieChart as PieIcon, LineChart as LineIcon, Activity, Table2, Grid3x3, TrendingUp, Layers, Map, AlertCircle, Gauge, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { isChartCompatible, getRecommendedCharts } from './utils/dataProcessing';
 
 interface GraphRecommendationsPanelProps {
   selectedFields: Record<string, string[]>;
   onSelectGraph: (graphType: string) => void;
   selectedGraphType: string | null;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function GraphRecommendationsPanel({
   selectedFields,
   onSelectGraph,
   selectedGraphType,
+  isOpen = false,
+  onOpenChange,
 }: GraphRecommendationsPanelProps) {
   const [hoveredGraph, setHoveredGraph] = useState<string | null>(null);
+  const [internalOpen, setInternalOpen] = useState(isOpen);
+
+  // Use controlled or uncontrolled mode
+  const isPanelOpen = onOpenChange ? isOpen : internalOpen;
+  const setIsPanelOpen = onOpenChange || setInternalOpen;
+
+  // Auto-open panel when fields are selected (first time)
+  const hasSelectedFields = Object.values(selectedFields).some(arr => arr.length > 0);
+  
+  useEffect(() => {
+    // Auto-open when fields are first selected
+    if (hasSelectedFields && !isPanelOpen) {
+      setIsPanelOpen(true);
+    }
+  }, [hasSelectedFields]);
 
   const graphTypes = [
     {
@@ -133,18 +152,61 @@ export function GraphRecommendationsPanel({
     return scoreB - scoreA;
   });
 
+  // If no fields selected and panel is not open, don't render
+  if (!hasSelectedFields && !isPanelOpen) {
+    return null;
+  }
+
+  // Collapsed state - show toggle button
+  if (!isPanelOpen) {
+    return (
+      <div className="bg-white/80 backdrop-blur-sm border-l border-slate-200/60 h-full p-2 flex flex-col items-center">
+        <button
+          onClick={() => setIsPanelOpen(true)}
+          className="p-3 hover:bg-slate-100 rounded-xl transition-colors group"
+          title="Open Visualizations Panel"
+        >
+          <ChevronLeft className="w-5 h-5 text-slate-600 group-hover:text-violet-600 transition-colors" />
+        </button>
+        <div className="mt-4 writing-mode-vertical flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-violet-600" />
+          <span className="text-xs font-medium text-slate-600 [writing-mode:vertical-lr] rotate-180">Visualizations</span>
+        </div>
+        {hasSelectedFields && (
+          <div className="mt-2 w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center">
+            {recommendedGraphIds.length}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="w-[320px] bg-white border-l border-gray-200 h-full overflow-y-auto">
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10">
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">Graph Options</h3>
-        <p className="text-sm text-gray-500">
+    <div className="w-[280px] bg-gradient-to-b from-white to-slate-50/50 border-l border-slate-200/60 h-full overflow-y-auto">
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-200/60 p-4 z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+              <BarChart3 className="w-4 h-4 text-white" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-800">Visualizations</h3>
+          </div>
+          <button
+            onClick={() => setIsPanelOpen(false)}
+            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors group"
+            title="Close Panel"
+          >
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">
           {getTotalSelected() > 0
-            ? `${recommendedGraphIds.length} recommended for your selection`
-            : 'Select fields to see recommendations'}
+            ? `${recommendedGraphIds.length} recommended`
+            : 'Select fields first'}
         </p>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-3 space-y-2">
         {sortedGraphTypes.map((graph) => {
           const isRecommended = recommendedGraphIds.includes(graph.id);
           const compatibility = isChartCompatible(graph.id, selectedFields);
@@ -159,76 +221,67 @@ export function GraphRecommendationsPanel({
                 onMouseEnter={() => setHoveredGraph(graph.id)}
                 onMouseLeave={() => setHoveredGraph(null)}
                 className={`
-                  w-full p-4 rounded-xl border-2 text-left transition-all relative
+                  w-full p-3 rounded-xl border text-left transition-all relative
                   ${selectedGraphType === graph.id
-                    ? 'border-[#004D9F] bg-blue-50 shadow-md'
+                    ? 'border-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 shadow-md shadow-violet-100'
                     : isDisabled
-                    ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                    : 'border-gray-200 hover:border-[#004D9F] hover:shadow-md bg-white cursor-pointer'
+                    ? 'border-slate-100 bg-slate-50/50 opacity-40 cursor-not-allowed'
+                    : 'border-slate-200/60 hover:border-violet-300 hover:shadow-md bg-white cursor-pointer'
                   }
                 `}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: `${graph.color}15` }}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${graph.color}20, ${graph.color}10)` }}
                   >
-                    <graph.icon className="w-5 h-5" style={{ color: graph.color }} />
+                    <graph.icon className="w-4 h-4" style={{ color: graph.color }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="text-sm font-medium text-gray-900">{graph.name}</h4>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <h4 className="text-sm font-medium text-slate-800">{graph.name}</h4>
                       {isRecommended && score >= 80 && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" />
-                          Best Match
+                        <span className="px-1.5 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-medium rounded-full flex items-center gap-0.5">
+                          <Star className="w-2.5 h-2.5 fill-current" />
+                          Best
                         </span>
                       )}
                       {isRecommended && score >= 60 && score < 80 && (
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                        <span className="px-1.5 py-0.5 bg-sky-100 text-sky-700 text-[10px] font-medium rounded-full">
                           Good
                         </span>
                       )}
-                      {isDisabled && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          N/A
-                        </span>
-                      )}
                     </div>
-                    <p className="text-xs text-gray-600 mb-2">{graph.description}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {graph.supportedFields.map((field, idx) => (
-                        <span key={idx} className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                          {field}
-                        </span>
-                      ))}
-                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">{graph.description}</p>
                     {/* Score indicator */}
                     {!isDisabled && getTotalSelected() > 0 && (
                       <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
                           <div 
                             className="h-full rounded-full transition-all"
                             style={{ 
                               width: `${score}%`,
-                              backgroundColor: score >= 80 ? '#10B981' : score >= 60 ? '#3B82F6' : '#F59E0B'
+                              background: score >= 80 
+                                ? 'linear-gradient(90deg, #10B981, #14B8A6)' 
+                                : score >= 60 
+                                ? 'linear-gradient(90deg, #3B82F6, #6366F1)' 
+                                : 'linear-gradient(90deg, #F59E0B, #F97316)'
                             }}
                           />
                         </div>
-                        <span className="text-xs text-gray-500">{score}%</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{score}%</span>
                       </div>
                     )}
                   </div>
                 </div>
               </button>
 
-              {/* Tooltip on hover */}
+              {/* Tooltip on hover - positioned to the left */}
               {hoveredGraph === graph.id && (
-                <div className="absolute left-full ml-2 top-0 z-20 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
-                  {graph.tooltip}
+                <div className="absolute right-full mr-2 top-0 z-20 w-56 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-xl border border-slate-700">
+                  <p className="leading-relaxed">{graph.tooltip}</p>
                   {isDisabled && compatibility.reason && (
-                    <div className="mt-2 pt-2 border-t border-gray-700 text-red-300">
+                    <div className="mt-2 pt-2 border-t border-slate-700 text-rose-300 text-[11px]">
                       ⚠️ {compatibility.reason}
                     </div>
                   )}

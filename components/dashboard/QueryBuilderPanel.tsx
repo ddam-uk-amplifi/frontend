@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronRight, ChevronDown, X, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, X, Trash2, Database } from 'lucide-react';
 import { FieldTypeIndicator } from './FieldTypeIndicator';
 import { getFieldType } from './utils/dataProcessing';
 
@@ -178,16 +178,16 @@ const carlsbergCostResultFields = [
   { id: 'savings-pct', label: 'Savings %' },
 ];
 
-const carlsbergMBUFields = [
-  { id: 'total-spend-tracker-fy24-mbu', label: 'Total spend Tracker FY24 & MBU' },
+const carlsbergMEUFields = [
+  { id: 'total-spend-tracker-fy24-MEU', label: 'Total spend Tracker FY24 & MEU' },
   { id: 'fy-hold-vs-actual-spend-pct', label: 'FY Hold vs Actual Spend %' },
-  { id: 'fy-projected-spend-mbu', label: 'FY Projected Spend & MBU' },
+  { id: 'fy-projected-spend-MEU', label: 'FY Projected Spend & MEU' },
   { id: 'fy-hold-vs-projected-spend-pct', label: 'FY Hold vs Projected Spend %' },
   { id: 'fy-projected-savings-vs-hold', label: 'FY Projected Savings (vs Hold)' },
-  { id: 'fy-mbu-impact-vs-actual-hold', label: 'FY MBU Impact vs Actual Hold Spend' },
-  { id: 'fy-mbu-impact-vs-projected', label: 'FY MBU Impact vs Projected Spend' },
-  { id: 'fy-projected-savings-mbu-only', label: 'FY Projected Savings (MBU only vs Hold)' },
-  { id: 'fy-projected-mbu-achievement', label: 'FY Projected MBU Achievement (Actual vs Projected)' },
+  { id: 'fy-MEU-impact-vs-actual-hold', label: 'FY MEU Impact vs Actual Hold Spend' },
+  { id: 'fy-MEU-impact-vs-projected', label: 'FY MEU Impact vs Projected Spend' },
+  { id: 'fy-projected-savings-MEU-only', label: 'FY Projected Savings (MEU only vs Hold)' },
+  { id: 'fy-projected-MEU-achievement', label: 'FY Projected MEU Achievement (Actual vs Projected)' },
 ];
 
 const carlsbergSummaryGroups: FieldGroup[] = [
@@ -213,9 +213,9 @@ const carlsbergSummaryGroups: FieldGroup[] = [
     fields: carlsbergCostResultFields.map(f => ({ ...f, id: `carlsberg-cost-${f.id}` })),
   },
   {
-    id: 'carlsberg-mbu',
-    title: 'MBU',
-    fields: carlsbergMBUFields.map(f => ({ ...f, id: `carlsberg-mbu-${f.id}` })),
+    id: 'carlsberg-meu',
+    title: 'MEU',
+    fields: carlsbergMEUFields.map(f => ({ ...f, id: `carlsberg-MEU-${f.id}` })),
   },
   {
     id: 'carlsberg-overview',
@@ -307,28 +307,30 @@ export function QueryBuilderPanel({
     }
 
     return (
-      <div key={group.id} className={`bg-[#F4F4F4] rounded-2xl overflow-hidden ${depth > 0 ? 'ml-4 mt-2' : ''}`}>
+      <div key={group.id} className={`bg-slate-50/80 rounded-xl overflow-hidden border border-slate-100 ${depth > 0 ? 'ml-3 mt-2' : ''}`}>
         <button
           onClick={() => toggleGroup(group.id)}
-          className={`w-full flex items-center justify-between p-4 hover:bg-gray-200 transition-colors ${depth > 0 ? 'py-3' : ''}`}
+          className={`w-full flex items-center justify-between p-3 hover:bg-slate-100/80 transition-all ${depth > 0 ? 'py-2.5' : ''}`}
         >
-          <div className="flex items-center gap-3">
-            {isExpanded ? (
-              <ChevronDown className="w-4 h-4 text-gray-600" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-gray-600" />
-            )}
-            <span className={`font-medium text-gray-900 ${depth > 0 ? 'text-sm' : ''}`}>{group.title}</span>
+          <div className="flex items-center gap-2.5">
+            <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isExpanded ? 'bg-violet-100' : 'bg-slate-200/60'}`}>
+              {isExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5 text-violet-600" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+              )}
+            </div>
+            <span className={`font-medium text-slate-700 ${depth > 0 ? 'text-sm' : 'text-sm'}`}>{group.title}</span>
           </div>
           {totalSubgroupSelections > 0 && (
-            <span className="px-2 py-1 bg-[#004D9F] text-white text-xs rounded-full">
+            <span className="px-2 py-0.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-medium rounded-full shadow-sm">
               {totalSubgroupSelections}
             </span>
           )}
         </button>
 
         {isExpanded && (
-          <div className="px-4 pb-4 space-y-2">
+          <div className="px-3 pb-3 space-y-1.5">
             {/* Render fields if present */}
             {hasFields && group.fields.map((field) => {
               const isSelected = selectedFields[group.id]?.includes(field.id) || false;
@@ -338,10 +340,10 @@ export function QueryBuilderPanel({
                 <button
                   key={field.id}
                   onClick={() => onFieldToggle(group.id, field.id)}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
                     isSelected
-                      ? 'bg-[#004D9F] text-white shadow-md'
-                      : 'bg-white hover:bg-gray-50 text-gray-900 border border-gray-200'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300'
                   }`}
                 >
                   <span className="text-sm">{field.label}</span>
@@ -361,37 +363,49 @@ export function QueryBuilderPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="w-[400px] bg-white border-r border-gray-200 h-full overflow-y-auto shadow-lg">
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-gray-900">Query Builder</h2>
+    <div className="w-[340px] bg-gradient-to-b from-white to-slate-50/50 border-r border-slate-200/60 h-full overflow-y-auto">
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-200/60 p-4 z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+              <span className="text-white text-sm font-bold">Q</span>
+            </div>
+            <h2 className="text-base font-semibold text-slate-800">Query Builder</h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-4 h-4 text-slate-400" />
           </button>
         </div>
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            {getTotalSelected()} field{getTotalSelected() !== 1 ? 's' : ''} selected
-          </p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+            <p className="text-sm text-slate-500">
+              {getTotalSelected()} field{getTotalSelected() !== 1 ? 's' : ''} selected
+            </p>
+          </div>
           {onClearAll && getTotalSelected() > 0 && (
             <button
               onClick={onClearAll}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
             >
-              <Trash2 className="w-4 h-4" />
-              Clear All
+              <Trash2 className="w-3.5 h-3.5" />
+              Clear
             </button>
           )}
         </div>
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="p-3 space-y-2">
         {queryGroups.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p className="text-sm">Select a client and data source to see available fields</p>
+          <div className="text-center py-12">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+              <Database className="w-6 h-6 text-slate-400" />
+            </div>
+            <p className="text-sm text-slate-500">Select a client and data source</p>
+            <p className="text-xs text-slate-400 mt-1">to see available fields</p>
           </div>
         ) : (
           queryGroups.map((group) => renderFieldGroup(group, 0))

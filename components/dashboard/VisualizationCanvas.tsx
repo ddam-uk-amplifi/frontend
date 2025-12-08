@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { BarChart3, Sparkles } from 'lucide-react';
+import { BarChart3, Sparkles, Maximize2, FileText, Check } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -25,6 +25,7 @@ import {
 import { applyOthersLogic, checkDataDensity, arlaFieldMappings } from './utils/dataProcessing';
 import { DataDensityWarning } from './DataDensityWarning';
 import { GaugeChart } from './GaugeChart';
+import { GraphModal } from './GraphModal';
 import arlaData from '@/lib/static/arla-summary-excel.json';
 
 interface VisualizationCanvasProps {
@@ -34,6 +35,10 @@ interface VisualizationCanvasProps {
   market: string;
   period: string;
   dataSource?: 'summary' | 'trackers' | '';
+  selectedGraphsForPPT?: Set<string>;
+  onToggleGraphForPPT?: (graphId: string, graphTitle: string) => void;
+  onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
+  getSlideNumber?: (graphId: string) => number | undefined;
 }
 
 export function VisualizationCanvas({
@@ -43,9 +48,20 @@ export function VisualizationCanvas({
   market,
   period,
   dataSource = '',
+  selectedGraphsForPPT = new Set(),
+  onToggleGraphForPPT,
+  onUpdateSlideNumber,
+  getSlideNumber,
 }: VisualizationCanvasProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [autoSwitchedToTable, setAutoSwitchedToTable] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Generate a unique graph ID based on current state
+  const graphId = `${selectedGraphType}-${client}-${market}-${period}`;
+  const graphTitle = `${client || 'Client'} - ${market || 'All Markets'} - ${period || 'YTD'}`;
+  const isIncludedInReport = selectedGraphsForPPT.has(graphId);
+  const slideNumber = getSlideNumber?.(graphId);
 
   const getTotalSelected = () => {
     return Object.values(selectedFields).reduce((sum, arr) => sum + arr.length, 0);
@@ -203,7 +219,7 @@ export function VisualizationCanvas({
     ? sampleData.filter(item => item.name === activeFilter)
     : sampleData;
 
-  const COLORS = ['#004D9F', '#0066CC', '#3385DB', '#66A3E5', '#99C2EF', '#CCE0F7'];
+  const COLORS = ['#7C3AED', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE'];
 
   // Handle clicking on chart elements (cross-filtering)
   const handleChartClick = (dataPoint: any) => {
@@ -225,47 +241,47 @@ export function VisualizationCanvas({
     return (
       <div className="space-y-6">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Available Chart Types</h2>
-          <p className="text-gray-500">Select fields from the Query Builder, then choose a chart type to visualize your data</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Available Chart Types</h2>
+          <p className="text-slate-500">Select fields from the Query Builder, then choose a chart type to visualize your data</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {/* KPI Cards */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-violet-500"></span>
               KPI Cards
             </h4>
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-bold text-gray-900">€24.5M</div>
-                <div className="text-xs text-gray-500">Total Spend</div>
-                <div className="text-xs text-green-600">↑ 12.3%</div>
+              <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-slate-800">€24.5M</div>
+                <div className="text-xs text-slate-500">Total Spend</div>
+                <div className="text-xs text-emerald-600">↑ 12.3%</div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-bold text-gray-900">8.5%</div>
-                <div className="text-xs text-gray-500">Savings</div>
-                <div className="text-xs text-green-600">↑ 0.8pp</div>
+              <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-slate-800">8.5%</div>
+                <div className="text-xs text-slate-500">Savings</div>
+                <div className="text-xs text-emerald-600">↑ 0.8pp</div>
               </div>
             </div>
           </div>
 
           {/* Bar Chart */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-violet-500"></span>
               Bar Chart
             </h4>
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={demoData}>
-                <Bar dataKey="spend" fill="#004D9F" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="spend" fill="#7C3AED" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           {/* Pie Chart */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-pink-500"></span>
               Pie Chart
             </h4>
@@ -281,8 +297,8 @@ export function VisualizationCanvas({
           </div>
 
           {/* Line Chart */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
               Line Chart
             </h4>
@@ -294,8 +310,8 @@ export function VisualizationCanvas({
           </div>
 
           {/* Area Chart */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
               Area Chart
             </h4>
@@ -307,72 +323,72 @@ export function VisualizationCanvas({
           </div>
 
           {/* Grouped Bar */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-amber-500"></span>
               Grouped Bar
             </h4>
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={demoData}>
-                <Bar dataKey="spend" fill="#004D9F" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="spend" fill="#7C3AED" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="savings" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           {/* Stacked Bar */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
               Stacked Bar
             </h4>
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={demoData}>
-                <Bar dataKey="spend" stackId="a" fill="#004D9F" />
+                <Bar dataKey="spend" stackId="a" fill="#7C3AED" />
                 <Bar dataKey="savings" stackId="a" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           {/* Scatter Plot */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-500"></span>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-rose-500"></span>
               Scatter Plot
             </h4>
             <ResponsiveContainer width="100%" height={120}>
               <ScatterChart>
-                <Scatter data={demoData.map(d => ({ x: d.spend, y: d.savings }))} fill="#EF4444" />
+                <Scatter data={demoData.map(d => ({ x: d.spend, y: d.savings }))} fill="#F43F5E" />
               </ScatterChart>
             </ResponsiveContainer>
           </div>
 
           {/* Table */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-slate-500"></span>
               Data Table
             </h4>
             <div className="text-xs">
-              <div className="grid grid-cols-3 gap-1 font-medium text-gray-600 mb-1 pb-1 border-b">
+              <div className="grid grid-cols-3 gap-1 font-medium text-slate-600 mb-1 pb-1 border-b border-slate-200">
                 <span>Media</span>
                 <span className="text-right">Spend</span>
                 <span className="text-right">Savings</span>
               </div>
               {demoData.slice(0, 3).map((row, i) => (
-                <div key={i} className="grid grid-cols-3 gap-1 text-gray-900 py-0.5">
+                <div key={i} className="grid grid-cols-3 gap-1 text-slate-800 py-0.5">
                   <span>{row.name}</span>
                   <span className="text-right">€{(row.spend / 1000).toFixed(1)}K</span>
-                  <span className="text-right text-green-600">€{row.savings}</span>
+                  <span className="text-right text-emerald-600">€{row.savings}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Gauge */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-amber-500"></span>
               Gauge Chart
             </h4>
             <div className="flex items-center justify-center h-[120px]">
@@ -382,16 +398,16 @@ export function VisualizationCanvas({
                   <path d="M 10 55 A 40 40 0 0 1 70 20" fill="none" stroke="#10B981" strokeWidth="8" strokeLinecap="round" />
                 </svg>
                 <div className="absolute inset-0 flex items-end justify-center pb-1">
-                  <span className="text-lg font-bold text-gray-900">85%</span>
+                  <span className="text-lg font-bold text-slate-800">85%</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Heatmap placeholder */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-orange-600"></span>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
               Heatmap
             </h4>
             <div className="grid grid-cols-5 gap-1 h-[120px]">
@@ -400,7 +416,7 @@ export function VisualizationCanvas({
                   key={i}
                   className="rounded"
                   style={{
-                    backgroundColor: `rgba(0, 77, 159, ${0.2 + Math.random() * 0.8})`,
+                    backgroundColor: `rgba(124, 58, 237, ${0.2 + Math.random() * 0.8})`,
                   }}
                 />
               ))}
@@ -408,8 +424,8 @@ export function VisualizationCanvas({
           </div>
         </div>
 
-        <div className="text-center mt-8 p-4 bg-blue-50 rounded-xl">
-          <p className="text-sm text-blue-800">
+        <div className="text-center mt-8 p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl border border-violet-100">
+          <p className="text-sm text-violet-800">
             👈 <strong>Step 1:</strong> Select data fields from the Query Builder on the left
             <br />
             👉 <strong>Step 2:</strong> Choose a chart type from the Graph Options on the right
@@ -429,9 +445,11 @@ export function VisualizationCanvas({
     if (!selectedGraphType && getTotalSelected() > 0) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center px-8">
-          <BarChart3 className="w-16 h-16 text-[#004D9F] mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a graph type</h3>
-          <p className="text-sm text-gray-500 max-w-md">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 mb-4">
+            <BarChart3 className="w-12 h-12 text-violet-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-800 mb-2">Select a graph type</h3>
+          <p className="text-sm text-slate-500 max-w-md">
             You have selected {getTotalSelected()} field(s). Choose a visualization from the Graph Options panel on the right.
           </p>
         </div>
@@ -465,34 +483,34 @@ export function VisualizationCanvas({
       case 'kpi-card':
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-              <div className="text-sm text-gray-600 mb-2">Total Spend</div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">Total Spend</div>
+              <div className="text-4xl font-bold text-slate-800 mb-1">
                 €{(kpis.totalSpend / 1000000).toFixed(2)}M
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">↑ 12.3%</span>
-                <span className="text-gray-500">vs last period</span>
+                <span className="text-emerald-600">↑ 12.3%</span>
+                <span className="text-slate-500">vs last period</span>
               </div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-              <div className="text-sm text-gray-600 mb-2">Average Savings %</div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">Average Savings %</div>
+              <div className="text-4xl font-bold text-slate-800 mb-1">
                 {kpis.savingsPct.toFixed(1)}%
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">↑ 0.8pp</span>
-                <span className="text-gray-500">vs last period</span>
+                <span className="text-emerald-600">↑ 0.8pp</span>
+                <span className="text-slate-500">vs last period</span>
               </div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-              <div className="text-sm text-gray-600 mb-2">Average Inflation %</div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">Average Inflation %</div>
+              <div className="text-4xl font-bold text-slate-800 mb-1">
                 {kpis.inflationPct.toFixed(1)}%
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-amber-600">↓ 1.2pp</span>
-                <span className="text-gray-500">after mitigation</span>
+                <span className="text-slate-500">after mitigation</span>
               </div>
             </div>
           </div>
@@ -500,10 +518,33 @@ export function VisualizationCanvas({
 
       case 'pie-chart':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{graphTitle}</h3>
-            <p className="text-sm text-gray-500 mb-4">Click on any slice to filter and see details below</p>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+                title={isIncludedInReport ? 'Remove from PPT' : 'Add to PPT Report'}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Expand"
+              >
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+            <p className="text-sm text-slate-500 mb-4">Click on any slice to filter and see details below</p>
+            <ResponsiveContainer width="100%" height={450}>
               <PieChart>
                 <Pie
                   data={sampleData}
@@ -511,7 +552,7 @@ export function VisualizationCanvas({
                   cy="50%"
                   labelLine={false}
                   label={({ name, value }) => `${name}: €${(Number(value) / 1000).toFixed(0)}K`}
-                  outerRadius={120}
+                  outerRadius={140}
                   fill="#8884d8"
                   dataKey={dataKeys.spend}
                   onClick={handleChartClick}
@@ -534,12 +575,35 @@ export function VisualizationCanvas({
       case 'bar-chart':
         const hasIndexData = sampleData.some(item => item.index !== undefined);
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{graphTitle}</h3>
-            <p className="text-sm text-gray-500 mb-4">Click on any bar to filter and see details below</p>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+                title={isIncludedInReport ? 'Remove from PPT' : 'Add to PPT Report'}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Expand"
+              >
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+            <p className="text-sm text-slate-500 mb-4">Click on any bar to filter and see details below</p>
+            <ResponsiveContainer width="100%" height={450}>
               <BarChart data={sampleData} onClick={(e: any) => e && e.activePayload && handleChartClick(e.activePayload[0].payload)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
@@ -554,7 +618,7 @@ export function VisualizationCanvas({
                 )}
                 <Bar 
                   dataKey={dataKeys.spend} 
-                  fill="#004D9F" 
+                  fill="#7C3AED" 
                   radius={[8, 8, 0, 0]} 
                   name="Spend (€)"
                   style={{ cursor: 'pointer' }}
@@ -566,16 +630,33 @@ export function VisualizationCanvas({
 
       case 'grouped-bar':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{graphTitle}</h3>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+            <ResponsiveContainer width="100%" height={450}>
               <BarChart data={sampleData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
                 <Legend />
-                <Bar dataKey={dataKeys.spend} fill="#004D9F" radius={[8, 8, 0, 0]} name="Total Spend" />
+                <Bar dataKey={dataKeys.spend} fill="#7C3AED" radius={[8, 8, 0, 0]} name="Total Spend" />
                 <Bar dataKey={dataKeys.savings} fill="#10B981" radius={[8, 8, 0, 0]} name="Savings Value" />
               </BarChart>
             </ResponsiveContainer>
@@ -584,16 +665,33 @@ export function VisualizationCanvas({
 
       case 'stacked-bar':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{graphTitle}</h3>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+            <ResponsiveContainer width="100%" height={450}>
               <BarChart data={sampleData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
                 <Legend />
-                <Bar dataKey={dataKeys.spend} stackId="a" fill="#004D9F" radius={[0, 0, 0, 0]} name="Total Spend" />
+                <Bar dataKey={dataKeys.spend} stackId="a" fill="#7C3AED" radius={[0, 0, 0, 0]} name="Total Spend" />
                 <Bar dataKey={dataKeys.savings} stackId="a" fill="#10B981" radius={[8, 8, 0, 0]} name="Savings Value" />
               </BarChart>
             </ResponsiveContainer>
@@ -602,16 +700,33 @@ export function VisualizationCanvas({
 
       case 'line-chart':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{graphTitle}</h3>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+            <ResponsiveContainer width="100%" height={450}>
               <LineChart data={sampleData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
                 <Legend />
-                <Line type="monotone" dataKey={dataKeys.spend} stroke="#004D9F" strokeWidth={2} name="Total Spend" />
+                <Line type="monotone" dataKey={dataKeys.spend} stroke="#7C3AED" strokeWidth={2} name="Total Spend" />
                 <Line type="monotone" dataKey={dataKeys.savings} stroke="#10B981" strokeWidth={2} name="Savings Value" />
               </LineChart>
             </ResponsiveContainer>
@@ -620,16 +735,33 @@ export function VisualizationCanvas({
 
       case 'area-chart':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{graphTitle}</h3>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+            <ResponsiveContainer width="100%" height={450}>
               <AreaChart data={sampleData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
                 <Legend />
-                <Area type="monotone" dataKey={dataKeys.spend} stackId="1" stroke="#004D9F" fill="#004D9F" fillOpacity={0.6} name="Total Spend" />
+                <Area type="monotone" dataKey={dataKeys.spend} stackId="1" stroke="#7C3AED" fill="#7C3AED" fillOpacity={0.6} name="Total Spend" />
                 <Area type="monotone" dataKey={dataKeys.savings} stackId="1" stroke="#10B981" fill="#10B981" fillOpacity={0.6} name="Savings Value" />
               </AreaChart>
             </ResponsiveContainer>
@@ -638,15 +770,32 @@ export function VisualizationCanvas({
 
       case 'scatter':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">CPU vs Benchmark</h3>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <button
+                onClick={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isIncludedInReport
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {isIncludedInReport ? <Check className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isIncludedInReport ? 'In PPT' : 'Add to PPT'}
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">CPU vs Benchmark</h3>
+            <ResponsiveContainer width="100%" height={450}>
               <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis type="number" dataKey="cpu" name="CPU" tick={{ fontSize: 12 }} />
                 <YAxis type="number" dataKey="benchmark" name="Benchmark" tick={{ fontSize: 12 }} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                <Scatter name="Media" data={sampleData} fill="#004D9F" />
+                <Scatter name="Media" data={sampleData} fill="#7C3AED" />
               </ScatterChart>
             </ResponsiveContainer>
           </div>
@@ -655,7 +804,7 @@ export function VisualizationCanvas({
       case 'gauge':
         return (
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">{graphTitle} - Performance Metrics</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-6">{graphTitle} - Performance Metrics</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <GaugeChart value={105.3} label="CPU Index" />
               <GaugeChart value={87.2} label="Savings %" thresholds={{ red: 70, yellow: 85, green: 95 }} max={150} />
@@ -666,32 +815,32 @@ export function VisualizationCanvas({
 
       case 'table':
         return (
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">{graphTitle}</h3>
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800">{graphTitle}</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-[#F4F4F4] border-b border-gray-200">
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Dimension</th>
-                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-700">Spend (€K)</th>
-                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-700">Savings (€K)</th>
-                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-700">Savings %</th>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">Dimension</th>
+                    <th className="text-right px-6 py-4 text-sm font-medium text-slate-600">Spend (€K)</th>
+                    <th className="text-right px-6 py-4 text-sm font-medium text-slate-600">Savings (€K)</th>
+                    <th className="text-right px-6 py-4 text-sm font-medium text-slate-600">Savings %</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sampleData.map((row, index) => (
-                    <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                      <td className="px-6 py-4 text-gray-900">{row.name}</td>
-                      <td className="px-6 py-4 text-right text-gray-900">
+                    <tr key={index} className="border-b border-slate-100 hover:bg-slate-50/50">
+                      <td className="px-6 py-4 text-slate-800">{row.name}</td>
+                      <td className="px-6 py-4 text-right text-slate-800">
                         €{Math.round(row.spend).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 text-right text-gray-900">
+                      <td className="px-6 py-4 text-right text-slate-800">
                         €{Math.round(row.savings || 0).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm">
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm">
                           {(row.savingsPct || 6.5).toFixed(1)}%
                         </span>
                       </td>
@@ -706,19 +855,19 @@ export function VisualizationCanvas({
       default:
         return (
           <div className="flex items-center justify-center h-full">
-            <BarChart3 className="w-16 h-16 text-gray-300" />
+            <BarChart3 className="w-16 h-16 text-slate-300" />
           </div>
         );
     }
   };
 
   return (
-    <div className="flex-1 p-8 bg-[#F4F4F4] overflow-y-auto">
+    <div className="flex-1 p-8 bg-gradient-to-br from-slate-50 to-slate-100/80 overflow-y-auto">
       <div className="max-w-7xl mx-auto">
         {/* Active Filter Indicator */}
         {activeFilter && (
           <div className="mb-4 flex items-center gap-3">
-            <div className="px-4 py-2 bg-[#004D9F] text-white rounded-lg flex items-center gap-2">
+            <div className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl flex items-center gap-2 shadow-sm">
               <span className="text-sm">Filtered by: {activeFilter}</span>
               <button
                 onClick={() => setActiveFilter(null)}
@@ -746,31 +895,31 @@ export function VisualizationCanvas({
 
         {/* Cross-filtering Detail Table */}
         {activeFilter && selectedGraphType !== 'table' && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Detailed View: {activeFilter}</h3>
-              <p className="text-sm text-gray-500 mt-1">
+          <div className="mt-6 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800">Detailed View: {activeFilter}</h3>
+              <p className="text-sm text-slate-500 mt-1">
                 Click the filter badge above to clear and see all data
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-[#F4F4F4] border-b border-gray-200">
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Metric</th>
-                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-700">Value</th>
-                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-700">vs Avg</th>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">Metric</th>
+                    <th className="text-right px-6 py-4 text-sm font-medium text-slate-600">Value</th>
+                    <th className="text-right px-6 py-4 text-sm font-medium text-slate-600">vs Avg</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredData.map((item, idx) => (
-                    <tr key={idx} className="border-b border-gray-200">
-                      <td className="px-6 py-4 text-gray-900">Spend</td>
-                      <td className="px-6 py-4 text-right text-gray-900">
+                    <tr key={idx} className="border-b border-slate-100">
+                      <td className="px-6 py-4 text-slate-800">Spend</td>
+                      <td className="px-6 py-4 text-right text-slate-800">
                         €{Math.round(item.spend).toLocaleString()}K
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-green-600">+12%</span>
+                        <span className="text-emerald-600">+12%</span>
                       </td>
                     </tr>
                   ))}
@@ -779,6 +928,22 @@ export function VisualizationCanvas({
             </div>
           </div>
         )}
+
+        {/* Graph Modal - Expanded View with Include in PPT Button */}
+        <GraphModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          graphId={graphId}
+          title={graphTitle}
+          isIncluded={isIncludedInReport}
+          onToggleInclude={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+          slideNumber={slideNumber}
+          onUpdateSlideNumber={(num) => onUpdateSlideNumber?.(graphId, num)}
+        >
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm">
+            {renderVisualization()}
+          </div>
+        </GraphModal>
       </div>
     </div>
   );
