@@ -1,0 +1,298 @@
+// Utility functions for data processing and density handling
+
+export interface ProcessedDataItem {
+  name: string;
+  [key: string]: any;
+  isOther?: boolean;
+}
+
+// Field mappings from query builder to actual data keys
+export const arlaFieldMappings: Record<string, string> = {
+  'total-net-not-spend': 'total_net_net_spend',
+  'total-addressable-net-not-spend': 'total_addressable_net_net_spend',
+  'total-net-not-measured': 'total_net_net_measured',
+  'measured-spend-pct': 'measured_spend_percent',
+  'savings-value': 'savings_value',
+  'savings-pct': 'savings_percent',
+  'inflation-pct': 'inflation_percent',
+  'inflation-mitigation': 'inflation_mitigation_percent',
+  'inflation-after-mitigation-pct': 'inflation_after_mitigation_percent',
+};
+
+// Categories for chart recommendations
+export interface FieldAnalysis {
+  dimensions: string[];
+  metrics: string[];
+  percentages: string[];
+  totalFields: number;
+}
+
+/**
+ * Analyzes selected fields and categorizes them for chart recommendations
+ */
+export function analyzeSelectedFields(selectedFields: Record<string, string[]>): FieldAnalysis {
+  const allFields = Object.values(selectedFields).flat();
+  const dimensions: string[] = [];
+  const metrics: string[] = [];
+  const percentages: string[] = [];
+
+  allFields.forEach(fieldId => {
+    const type = getFieldType(fieldId);
+    if (type === 'dimension') dimensions.push(fieldId);
+    else if (type === 'percentage') percentages.push(fieldId);
+    else if (type === 'metric') metrics.push(fieldId);
+  });
+
+  return {
+    dimensions,
+    metrics,
+    percentages,
+    totalFields: allFields.length,
+  };
+}
+
+/**
+ * Gets recommended chart types based on selected fields
+ */
+export function getRecommendedCharts(selectedFields: Record<string, string[]>): string[] {
+  const analysis = analyzeSelectedFields(selectedFields);
+  const { dimensions, metrics, percentages, totalFields } = analysis;
+  const numericFields = metrics.length + percentages.length;
+
+  if (totalFields === 0) return [];
+
+  const recommendations: string[] = [];
+
+  // Single metric/percentage - KPI Card or Gauge
+  if (numericFields === 1 && dimensions.length === 0) {
+    recommendations.push('kpi-card', 'gauge');
+  }
+
+  // 1 metric - Bar chart is great for comparing across categories
+  if (numericFields >= 1) {
+    recommendations.push('bar-chart');
+  }
+
+  // Multiple metrics (2+) - Grouped bar for comparison
+  if (numericFields >= 2) {
+    recommendations.push('grouped-bar', 'scatter');
+  }
+
+  // Percentage fields work great with pie charts (showing composition)
+  if (percentages.length >= 1 && numericFields <= 2) {
+    recommendations.push('pie-chart');
+  }
+
+  // Multiple dimensions + metric - Stacked bar or Heatmap
+  if (dimensions.length >= 2 && numericFields >= 1) {
+    recommendations.push('stacked-bar', 'heatmap');
+  }
+
+  // Many fields - Table is always safe
+  if (totalFields >= 3) {
+    recommendations.push('table');
+  }
+
+  // Line/Area charts for trends (when we have time dimension)
+  // Note: Arla data structure has market/media dimensions, not time
+  // But if showing across markets, line can still work
+  if (numericFields >= 1 && totalFields >= 2) {
+    recommendations.push('line-chart', 'area-chart');
+  }
+
+  // Remove duplicates and return
+  return [...new Set(recommendations)];
+}
+
+/**
+ * Handles data density by grouping low-value items into "Others"
+ */
+export function applyOthersLogic(
+  data: any[],
+  maxItems: number = 9,
+  valueKey: string = 'spend'
+): ProcessedDataItem[] {
+  if (data.length <= maxItems) {
+    return data;
+  }
+
+  // Sort by value descending
+  const sorted = [...data].sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
+  
+  // Take top items
+  const topItems = sorted.slice(0, maxItems);
+  
+  // Aggregate remaining items
+  const remainingItems = sorted.slice(maxItems);
+  const othersData: any = { name: 'Others', isOther: true };
+  
+  // Sum all numeric values
+  remainingItems.forEach(item => {
+    Object.keys(item).forEach(key => {
+      if (key !== 'name' && typeof item[key] === 'number') {
+        othersData[key] = (othersData[key] || 0) + item[key];
+      }
+    });
+  });
+
+  return [...topItems, othersData];
+}
+
+/**
+ * Checks if data density is too high for visualization
+ */
+export function checkDataDensity(
+  dataLength: number,
+  chartType: string
+): { isHigh: boolean; message?: string; suggestedChart?: string } {
+  const limits: Record<string, number> = {
+    'pie-chart': 10,
+    'bar-chart': 20,
+    'grouped-bar': 15,
+    'stacked-bar': 12,
+    'line-chart': 25,
+    'area-chart': 20,
+  };
+
+  const limit = limits[chartType];
+  
+  if (!limit) return { isHigh: false };
+
+  if (dataLength > limit * 2) {
+    return {
+      isHigh: true,
+      message: `Data volume is very high (${dataLength} items). Switching to Table View for better readability.`,
+      suggestedChart: 'table',
+    };
+  }
+
+  if (dataLength > limit) {
+    return {
+      isHigh: true,
+      message: `Showing top ${limit} items. ${dataLength - limit} items grouped as "Others".`,
+    };
+  }
+
+  return { isHigh: false };
+}
+
+/**
+ * Determines field type from field ID
+ */
+export type FieldType = 'dimension' | 'metric' | 'percentage' | 'index' | 'time';
+
+export function getFieldType(fieldId: string): FieldType {
+  if (fieldId.includes('pct') || fieldId.includes('percentage')) return 'percentage';
+  if (fieldId.includes('index') || fieldId.includes('idx')) return 'index';
+  if (fieldId.includes('month') || fieldId.includes('quarter') || fieldId.includes('year') || fieldId.includes('period')) return 'time';
+  if (fieldId.includes('spend') || fieldId.includes('value') || fieldId.includes('cpu') || fieldId.includes('savings')) return 'metric';
+  return 'dimension';
+}
+
+/**
+ * Gets user-friendly label for field type
+ */
+export function getFieldTypeLabel(type: FieldType): string {
+  const labels: Record<FieldType, string> = {
+    dimension: 'Category',
+    metric: 'Value',
+    percentage: 'Percentage',
+    index: 'Index',
+    time: 'Trend/Period',
+  };
+  return labels[type];
+}
+
+/**
+ * Checks if chart type is compatible with selected fields
+ */
+export function isChartCompatible(
+  chartType: string,
+  selectedFields: Record<string, string[]>
+): { compatible: boolean; reason?: string; score?: number } {
+  const allFields = Object.values(selectedFields).flat();
+  const fieldTypes = allFields.map(getFieldType);
+  
+  const hasTime = fieldTypes.includes('time');
+  const hasDimension = fieldTypes.includes('dimension');
+  const hasMetric = fieldTypes.some(t => t === 'metric' || t === 'percentage' || t === 'index');
+  const metricCount = fieldTypes.filter(t => t === 'metric' || t === 'percentage' || t === 'index').length;
+  const percentageCount = fieldTypes.filter(t => t === 'percentage').length;
+  const dimensionCount = fieldTypes.filter(t => t === 'dimension').length;
+  const totalFields = allFields.length;
+
+  // If no fields selected, all charts are technically compatible (for demo)
+  if (totalFields === 0) {
+    return { compatible: true, score: 0 };
+  }
+
+  switch (chartType) {
+    case 'kpi-card':
+    case 'gauge':
+      if (metricCount === 0) {
+        return { compatible: false, reason: 'Requires at least one numeric field (spend, savings, %).' };
+      }
+      if (totalFields > 2) {
+        return { compatible: true, score: 30, reason: 'Works, but best with 1-2 fields only.' };
+      }
+      return { compatible: true, score: metricCount === 1 ? 100 : 70 };
+
+    case 'pie-chart':
+      if (hasTime) {
+        return { compatible: false, reason: 'Pie charts cannot display time-series data. Use Line or Area chart instead.' };
+      }
+      if (metricCount === 0) {
+        return { compatible: false, reason: 'Pie chart requires at least 1 numeric field.' };
+      }
+      if (metricCount > 1) {
+        return { compatible: true, score: 50, reason: 'Pie charts work best with a single metric.' };
+      }
+      return { compatible: true, score: 90 };
+
+    case 'bar-chart':
+      if (metricCount === 0) {
+        return { compatible: false, reason: 'Bar chart requires at least 1 numeric field.' };
+      }
+      return { compatible: true, score: metricCount >= 1 ? 85 : 60 };
+
+    case 'grouped-bar':
+      if (metricCount < 2) {
+        return { compatible: false, reason: 'Grouped bar chart needs 2+ numeric fields to compare side-by-side.' };
+      }
+      return { compatible: true, score: metricCount >= 2 ? 95 : 70 };
+
+    case 'stacked-bar':
+      if (metricCount === 0) {
+        return { compatible: false, reason: 'Stacked bar chart requires at least 1 numeric field.' };
+      }
+      return { compatible: true, score: 80 };
+
+    case 'line-chart':
+    case 'area-chart':
+      if (metricCount === 0) {
+        return { compatible: false, reason: 'Line/Area charts require numeric fields to plot.' };
+      }
+      // For Arla data (market × media), line charts can show trends across markets
+      return { compatible: true, score: hasTime ? 95 : 70 };
+
+    case 'scatter':
+      if (metricCount < 2) {
+        return { compatible: false, reason: 'Scatter plot requires at least 2 numeric fields to show correlation.' };
+      }
+      return { compatible: true, score: 90 };
+
+    case 'heatmap':
+      if (metricCount === 0) {
+        return { compatible: false, reason: 'Heatmap requires at least 1 numeric field for intensity.' };
+      }
+      // Heatmap is great for Arla's market × media structure
+      return { compatible: true, score: totalFields >= 2 ? 85 : 60 };
+
+    case 'table':
+      // Table is always compatible
+      return { compatible: true, score: totalFields >= 3 ? 80 : 50 };
+
+    default:
+      return { compatible: true, score: 50 };
+  }
+}
