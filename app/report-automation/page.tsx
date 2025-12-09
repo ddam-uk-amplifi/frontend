@@ -12,6 +12,11 @@ import {
   type ConsolidationJob,
   type ConsolidationHistoryResponse,
 } from "@/lib/api/consolidation";
+import {
+  extractionApi,
+  extractMarketCodeFromPath,
+  type BatchExtractionResponse,
+} from "@/lib/api/extraction";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -340,16 +345,13 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     console.log("Starting consolidation...");
 
     try {
-      // Build extracted_files array with path and market_id (new format)
-      const extractedFiles = successfulExtractions.map((p) => ({
-        path: p.extractedPath!,
-        market_id: p.dbMarketId,
-      }));
+      // Build extracted_paths array (simple string array of paths)
+      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!);
 
-      // Prepare consolidation request with new format
+      // Prepare consolidation request
       const consolidationData = {
         client_name: clientId, // lowercase client name
-        extracted_files: extractedFiles, // New format with market info
+        extracted_paths: extractedPaths, // Simple array of path strings
         ytd_month: ytdMonth,
         include_ppt: includePpt,
       };
@@ -413,6 +415,233 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   };
 
   const handleRunAutomation = async () => {
+    const marketsToUpload = markets.filter(
+     (m) => m.file !== null && m.marketId !== null
+    );
+
+    if (marketsToUpload.length === 0) {
+      toast.error("Please select at least one market and upload a file");
+      return;
+    }
+
+    // Clear previous results and set expected count
+    setUploadProgress([]);
+    setConsolidationResult(null);
+    totalMarketsToUploadRef.current = marketsToUpload.length;
+
+    // Prepare files and market codes for batch upload
+    const files: File[] = [];
+    const marketCodes: string[] = [];
+    const marketMap = new Map<string, { id: number; dbMarketId: number; code: string }>();
+
+    marketsToUpload.forEach((market) => {
+      if (market.file && market.code) {
+        files.push(market.file);
+        marketCodes.push(market.code);
+        marketMap.set(market.file.name, {
+          id: market.id,
+          dbMarketId: market.marketId!,
+          code: market.code,
+        });
+      }
+    });
+
+    // Initialize upload progress for all files
+    marketsToUpload.forEach((market) => {
+      if (market.file) {
+        setUploadProgress((prev) => [
+          ...prev,
+          {
+            id: `${market.id}-${Date.now()}`,
+            marketId: market.id,
+            dbMarketId: market.marketId!,
+            marketCode: market.code || "",
+            fileName: market.file!.name,
+            progress: 0,
+            status: "uploading",
+          },
+        ]);
+      }
+    });
+
+    try {
+      // Step 1: Submit batch extraction
+      console.log("🚀 Submitting batch extraction...");
+      console.log("📁 Files:", files.map(f => f.name));
+      console.log("🌍 Market codes:", marketCodes);
+      console.log("🏢 Client:", clientId);
+      
+      toast.info("Uploading files...", {
+        description: `Submitting ${files.length} file(s) for extraction`,
+      });
+
+      const batchResponse = await extractionApi.submitBatch(
+        files,
+        marketCodes,
+        clientId
+      );
+
+      console.log("📦 Batch job created:", batchResponse);
+      console.log("📦 Batch ID:", batchResponse.id);
+      
+      // Validate response has required ID
+      if (!batchResponse.id) {
+        throw new Error("Backend did not return a batch ID");
+      }
+      
+      toast.success("Files uploaded successfully", {
+        description: `Batch ID: ${batchResponse.id} • Processing ${files.length} file(s)`,
+      });
+
+      // Update progress to show uploading complete, now processing
+      setUploadProgress((prev) =>
+        prev.map((p) => ({
+          ...p,
+          progress: 50,
+          status: "uploading" as const,
+        }))
+      );
+
+      // Step 2: Poll for completion
+      console.log("⏳ Polling for extraction completion...");
+      const finalStatus = await extractionApi.waitForBatchCompletion(
+        batchResponse.id,
+        {
+          pollIntervalMs: 2000,
+          maxWaitSeconds: 600,
+          onProgress: (status: BatchExtractionResponse) => {
+            console.log(`📊 Batch status: ${status.status}, ${status.completed_files}/${status.total_files} completed`);
+
+            // Calculate progress percentage
+            const progressPct = status.total_files > 0 
+              ? Math.round((status.completed_files / status.total_files) * 100)
+              : 50;
+
+            // Update progress based on extracted_paths
+            if (status.extracted_paths && status.extracted_paths.length > 0) {
+              setUploadProgress((prev) =>
+                prev.map((p) => {
+                  // Find matching path by market code
+                  const matchingPath = status.extracted_paths.find(
+                    (path) => extractMarketCodeFromPath(path) === p.marketCode
+                  );
+                  if (matchingPath) {
+                    return {
+                      ...p,
+                      progress: 100,
+                      status: "complete" as const,
+                      extractedPath: matchingPath,
+                    };
+                  }
+                  // Check if this market failed
+                  if (status.failed_markets?.includes(p.marketCode)) {
+                    return {
+                      ...p,
+                      status: "failed" as const,
+                      error: "Extraction failed for this market",
+                    };
+                  }
+                  // Still processing
+                  return { ...p, progress: progressPct };
+                })
+              );
+            } else {
+              // No paths yet, just update progress
+              setUploadProgress((prev) =>
+                prev.map((p) => ({ ...p, progress: progressPct }))
+              );
+            }
+          },
+        }
+      );
+
+      console.log("✅ Batch extraction completed:", finalStatus);
+
+      // Step 3: Handle completion
+      if (finalStatus.status === "completed") {
+        const successCount = finalStatus.completed_files;
+        const failedCount = finalStatus.failed_files;
+
+        if (successCount > 0) {
+          toast.success("Extraction completed", {
+            description: `${successCount} file(s) extracted${failedCount > 0 ? `, ${failedCount} failed` : ""} • Starting consolidation`,
+          });
+
+          // Build final progress directly from marketsToUpload and finalStatus
+          // (avoiding stale closure issue with uploadProgress state)
+          const finalProgress: UploadProgress[] = marketsToUpload
+            .filter((m) => m.file && m.code)
+            .map((market) => {
+              const matchingPath = finalStatus.extracted_paths?.find(
+                (path) => extractMarketCodeFromPath(path) === market.code
+              );
+              const isFailed = finalStatus.failed_markets?.includes(market.code || "");
+              
+              return {
+                id: `${market.id}-final`,
+                marketId: market.id,
+                dbMarketId: market.marketId!,
+                marketCode: market.code || "",
+                fileName: market.file!.name,
+                progress: matchingPath ? 100 : 0,
+                status: matchingPath ? "complete" as const : (isFailed ? "failed" as const : "uploading" as const),
+                extractedPath: matchingPath,
+                error: isFailed ? "Extraction failed" : undefined,
+              };
+            });
+
+          // Update UI with final status
+          setUploadProgress(finalProgress);
+
+          // Log for debugging
+          console.log("📋 Final progress for consolidation:", finalProgress);
+          console.log("📋 Successful extractions:", finalProgress.filter(p => p.status === "complete" && p.extractedPath));
+
+          setTimeout(() => handleConsolidation(finalProgress), 500);
+        } else {
+          toast.error("All extractions failed", {
+            description: finalStatus.error_message || "No files were successfully extracted",
+          });
+        }
+      } else if (finalStatus.status === "failed") {
+        toast.error("Batch extraction failed", {
+          description: finalStatus.error_message || "An error occurred during extraction",
+        });
+
+        // Mark all as failed
+        setUploadProgress((prev) =>
+          prev.map((p) => ({
+            ...p,
+            status: "failed" as const,
+            error: finalStatus.error_message || "Batch extraction failed",
+          }))
+        );
+      }
+    } catch (error: any) {
+      console.error("Batch extraction error:", error);
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Batch extraction failed";
+
+      toast.error("Extraction error", {
+        description: errorMessage,
+      });
+
+      // Mark all as failed
+      setUploadProgress((prev) =>
+        prev.map((p) => ({
+          ...p,
+          status: "failed" as const,
+          error: errorMessage,
+        }))
+      );
+    }
+  };
+
+  // Legacy single-file extraction (fallback)
+  const handleRunAutomationLegacy = async () => {
     const marketsToUpload = markets.filter(
      (m) => m.file !== null && m.marketId !== null
     );
