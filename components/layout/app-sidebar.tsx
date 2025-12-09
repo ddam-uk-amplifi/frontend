@@ -53,11 +53,11 @@ const navigationItems: NavigationItem[] = [
     label: "Report Automation",
     icon: FileText,
   },
-  {
-    href: "/report-validation",
-    label: "Report Validation",
-    icon: BarChart3,
-  },
+  // {
+  //   href: "/report-validation",
+  //   label: "Report Validation",
+  //   icon: BarChart3,
+  // },
     {
     href: "/admin",
     label: "Admin",
