@@ -50,14 +50,138 @@ const arlaSummaryGroups: FieldGroup[] = [
   },
 ];
 
+// Tracker-specific fields for each media type
+const trackerTVFields = [
+  // FY/General fields
+  { id: 'fy-net-net-spend', label: 'FY Net Net Spend' },
+  { id: 'fy-measured-spend', label: 'FY Measured Spend' },
+  { id: 'fy-actual-units', label: 'FY Actual Units' },
+  { id: 'fy-benchmark-spend', label: 'FY Benchmark Spend' },
+  { id: 'fy-savings', label: 'FY Savings' },
+  { id: 'fy-savings-pct', label: 'FY Savings %' },
+  // Monthly fields
+  { id: 'net-net-spend', label: 'Net Net Spend (Monthly)' },
+  { id: 'seasonality', label: 'Seasonality' },
+  { id: 'rate-card-spend', label: 'Rate Card Spend' },
+  { id: 'actual-30', label: 'Actual 30s' },
+  { id: 'prime-time-30', label: 'Prime Time 30s' },
+  { id: 'cpu-discount', label: 'CPU/Discount Achieved' },
+  { id: 'benchmark-spend', label: 'Benchmark Spend' },
+  { id: 'value-loss', label: 'Value Loss' },
+  { id: 'value-loss-pct', label: 'Value Loss %' },
+  { id: 'qecs-pct', label: 'QECs %' },
+  // YTD fields
+  { id: 'ytd-net-net-spend', label: 'YTD Net Net Spend' },
+  { id: 'ytd-savings', label: 'YTD Savings' },
+  { id: 'ytd-savings-pct', label: 'YTD Savings %' },
+];
+
+const trackerRadioFields = [
+  // FY/General fields
+  { id: 'fy-net-net-spend', label: 'FY Net Net Spend' },
+  { id: 'fy-measured-spend', label: 'FY Measured Spend' },
+  { id: 'fy-insertions', label: 'FY Insertions' },
+  { id: 'fy-cg-equivalent', label: 'FY CG Equivalent' },
+  { id: 'fy-savings', label: 'FY Savings' },
+  { id: 'fy-savings-pct', label: 'FY Savings %' },
+  // Monthly fields
+  { id: 'net-net-spend', label: 'Net Net Spend (Monthly)' },
+  { id: 'seasonality', label: 'Seasonality' },
+  { id: 'actual-30', label: 'Actual 30s' },
+  { id: 'drive-time-30', label: 'Drive Time 30s' },
+  { id: 'cpu-discount-pct', label: 'CPU/Discount %' },
+  { id: 'benchmark-spend', label: 'Benchmark Spend' },
+  { id: 'value-loss', label: 'Value Loss' },
+  { id: 'value-loss-pct', label: 'Value Loss %' },
+  // YTD fields
+  { id: 'ytd-net-net-spend', label: 'YTD Net Net Spend' },
+  { id: 'ytd-insertions', label: 'YTD Insertions' },
+  { id: 'ytd-savings', label: 'YTD Savings' },
+  { id: 'ytd-savings-pct', label: 'YTD Savings %' },
+];
+
+const trackerPrintFields = [
+  // FY/General fields
+  { id: 'fy-gross-spend', label: 'FY Gross Spend' },
+  { id: 'fy-net-spend', label: 'FY Net Spend' },
+  { id: 'fy-discount-pct', label: 'FY Discount %' },
+  { id: 'fy-net-net-spend', label: 'FY Net Net Spend' },
+  { id: 'fy-measured-spend', label: 'FY Measured Spend' },
+  { id: 'fy-savings', label: 'FY Savings' },
+  { id: 'fy-savings-pct', label: 'FY Savings %' },
+  // Monthly fields
+  { id: 'net-net-spend', label: 'Net Net Spend (Monthly)' },
+  { id: 'gross-spend', label: 'Gross Spend' },
+  { id: 'net-spend', label: 'Net Spend' },
+  { id: 'discount-pct', label: 'Discount %' },
+  { id: 'insertions', label: 'No. of Insertions' },
+  // YTD fields
+  { id: 'ytd-gross-spend', label: 'YTD Gross Spend' },
+  { id: 'ytd-net-net-spend', label: 'YTD Net Net Spend' },
+  { id: 'ytd-savings', label: 'YTD Savings' },
+  { id: 'ytd-savings-pct', label: 'YTD Savings %' },
+];
+
+const trackerOOHFields = [
+  // FY/General fields
+  { id: 'fy-net-net-spend', label: 'FY Net Net Spend' },
+  { id: 'fy-measured-spend', label: 'FY Measured Spend' },
+  { id: 'fy-benchmark-spend', label: 'FY Benchmark Spend' },
+  { id: 'fy-savings', label: 'FY Savings' },
+  { id: 'fy-savings-pct', label: 'FY Savings %' },
+  // Monthly fields
+  { id: 'net-net-spend', label: 'Net Net Spend (Monthly)' },
+  { id: 'measured-spend', label: 'Measured Spend' },
+  { id: 'benchmark-spend', label: 'Benchmark Spend' },
+  { id: 'savings', label: 'Savings' },
+  { id: 'savings-pct', label: 'Savings %' },
+];
+
+const trackerOnlineFields = [
+  // FY/General fields
+  { id: 'fy-net-net-spend', label: 'FY Net Net Spend' },
+  { id: 'fy-measured-spend', label: 'FY Measured Spend' },
+  { id: 'fy-savings', label: 'FY Savings' },
+  { id: 'fy-savings-pct', label: 'FY Savings %' },
+  // Monthly fields
+  { id: 'net-net-spend', label: 'Net Net Spend (Monthly)' },
+  { id: 'measured-spend', label: 'Measured Spend' },
+  { id: 'impressions', label: 'Impressions' },
+  { id: 'cpm', label: 'CPM' },
+];
+
+const trackerCinemaFields = [
+  // FY/General fields
+  { id: 'fy-net-net-spend', label: 'FY Net Net Spend' },
+  { id: 'fy-measured-spend', label: 'FY Measured Spend' },
+  { id: 'fy-savings', label: 'FY Savings' },
+  { id: 'fy-savings-pct', label: 'FY Savings %' },
+  // Monthly fields
+  { id: 'net-net-spend', label: 'Net Net Spend (Monthly)' },
+  { id: 'admissions', label: 'Admissions' },
+  { id: 'cpa', label: 'CPA' },
+];
+
+// Summary fields (from Summary_YTD sheets - aggregated by media type)
+const trackerSummaryFields = [
+  { id: 'total-net-net-spend', label: 'Total Net Net Spend' },
+  { id: 'total-non-addressable-spend', label: 'Total Non-Addressable Spend' },
+  { id: 'total-addressable-spend', label: 'Total Addressable Spend' },
+  { id: 'measured-spend', label: 'Measured Spend' },
+  { id: 'measured-spend-pct', label: 'Measured Spend %' },
+  { id: 'benchmark-equivalent-net-net-spend', label: 'Benchmark Equivalent Spend' },
+  { id: 'value-loss', label: 'Value Loss' },
+  { id: 'value-loss-pct', label: 'Value Loss %' },
+];
+
 const arlaTrackerGroups: FieldGroup[] = [
-  { id: 'arla-tracker-summary', title: 'Summary', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-summary-${f.id}` })) },
-  { id: 'arla-tracker-tv', title: 'TV', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-tv-${f.id}` })) },
-  { id: 'arla-tracker-print', title: 'Print', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-print-${f.id}` })) },
-  { id: 'arla-tracker-ooh', title: 'OOH', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-ooh-${f.id}` })) },
-  { id: 'arla-tracker-online', title: 'Online', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-online-${f.id}` })) },
-  { id: 'arla-tracker-radio', title: 'Radio', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-radio-${f.id}` })) },
-  { id: 'arla-tracker-cinema', title: 'Cinema', fields: arlaCommonFields.map(f => ({ ...f, id: `arla-tracker-cinema-${f.id}` })) },
+  { id: 'arla-tracker-summary', title: 'Summary', fields: trackerSummaryFields.map(f => ({ ...f, id: `summary-${f.id}` })) },
+  { id: 'arla-tracker-tv', title: 'TV', fields: trackerTVFields.map(f => ({ ...f, id: `tv-${f.id}` })) },
+  { id: 'arla-tracker-radio', title: 'Radio', fields: trackerRadioFields.map(f => ({ ...f, id: `radio-${f.id}` })) },
+  { id: 'arla-tracker-print', title: 'Print', fields: trackerPrintFields.map(f => ({ ...f, id: `print-${f.id}` })) },
+  { id: 'arla-tracker-ooh', title: 'OOH', fields: trackerOOHFields.map(f => ({ ...f, id: `ooh-${f.id}` })) },
+  { id: 'arla-tracker-online', title: 'Online', fields: trackerOnlineFields.map(f => ({ ...f, id: `online-${f.id}` })) },
+  { id: 'arla-tracker-cinema', title: 'Cinema', fields: trackerCinemaFields.map(f => ({ ...f, id: `cinema-${f.id}` })) },
 ];
 
 // ============================================
