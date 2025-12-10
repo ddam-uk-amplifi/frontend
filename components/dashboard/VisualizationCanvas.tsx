@@ -939,9 +939,53 @@ export function VisualizationCanvas({
       );
     }
 
-    // Show chart gallery if no graph type is selected AND no fields are selected
+    // Show welcome/empty state if no client or data source selected
+    if (!client || !dataSource) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-8">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 mb-5">
+            <BarChart3 className="w-14 h-14 text-slate-400" />
+          </div>
+          <h3 className="text-2xl font-semibold text-slate-800 mb-3">Welcome to Dashboard</h3>
+          <p className="text-sm text-slate-500 max-w-md mb-6">
+            Get started by selecting a client and data source from the top bar to visualize your media spend data.
+          </p>
+          <div className="flex flex-col gap-3 text-left bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-semibold text-sm">1</div>
+              <span className="text-sm text-slate-700">Select a <strong>Client</strong> from the dropdown</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-semibold text-sm">2</div>
+              <span className="text-sm text-slate-700">Choose a <strong>Data Source</strong> (Summary or Trackers)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-semibold text-sm">3</div>
+              <span className="text-sm text-slate-700">Select <strong>Fields</strong> from the Query Builder</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-semibold text-sm">4</div>
+              <span className="text-sm text-slate-700">Choose a <strong>Graph Type</strong> to visualize</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Show message if no graph type selected and no fields selected
     if (!selectedGraphType && getTotalSelected() === 0) {
-      return renderChartGallery();
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-8">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 mb-4">
+            <Sparkles className="w-12 h-12 text-violet-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-800 mb-2">Select Fields to Begin</h3>
+          <p className="text-sm text-slate-500 max-w-md">
+            Use the <strong>Query Builder</strong> on the left to select the data fields you want to visualize,
+            then choose a graph type from the <strong>Graph Options</strong> panel on the right.
+          </p>
+        </div>
+      );
     }
 
     // Show message if fields are selected but no graph type chosen
