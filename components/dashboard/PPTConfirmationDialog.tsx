@@ -12,6 +12,7 @@ interface PPTConfirmationDialogProps {
   selectedGraphs: Array<{ id: string; title: string; slideNumber?: number }>;
   onConfirm: () => void;
   onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
+  isGenerating?: boolean;
 }
 
 interface DraggableGraphCardProps {
@@ -187,6 +188,7 @@ function PPTConfirmationDialogContent({
   selectedGraphs,
   onConfirm,
   onUpdateSlideNumber,
+  isGenerating = false,
 }: PPTConfirmationDialogProps) {
   const [viewMode, setViewMode] = useState<'list' | 'preview'>('preview');
 

@@ -490,7 +490,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       }
       
       toast.success("Files uploaded successfully", {
-        description: `Batch ID: ${batchResponse.id} • Processing ${files.length} file(s)`,
+        description: `• Processing ${files.length} file(s)`,
       });
 
       // Update progress to show uploading complete, now processing

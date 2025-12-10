@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { BarChart3, PieChart as PieIcon, LineChart as LineIcon, Activity, Table2, Grid3x3, TrendingUp, Layers, Map, AlertCircle, Gauge, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { isChartCompatible, getRecommendedCharts } from './utils/dataProcessing';
+import { isChartCompatible, getRecommendedCharts, analyzeSelectedFields } from './utils/dataProcessing';
 
 interface GraphRecommendationsPanelProps {
   selectedFields: Record<string, string[]>;
@@ -70,8 +70,17 @@ export function GraphRecommendationsPanel({
       icon: Grid3x3,
       color: '#F59E0B',
       description: 'Compare multiple metrics',
-      supportedFields: ['1 dimension + 2+ metrics'],
-      tooltip: 'Compare 2-3 metrics side by side (e.g., Spend vs Savings vs Budget). Great for multi-metric analysis.',
+      supportedFields: ['1 dimension + 2+ metrics (same scale)'],
+      tooltip: 'Compare 2-3 metrics side by side (e.g., Spend vs Savings vs Budget). Works best when metrics have the same scale.',
+    },
+    {
+      id: 'dual-axis-bar',
+      name: 'Dual-Axis Bar',
+      icon: BarChart3,
+      color: '#7C3AED',
+      description: 'Compare different scales',
+      supportedFields: ['Percentage + Absolute value metrics'],
+      tooltip: 'Perfect for comparing metrics with different scales (e.g., Spend in millions vs Savings %). Uses two Y-axes for accurate comparison.',
     },
     {
       id: 'stacked-bar',
@@ -144,6 +153,7 @@ export function GraphRecommendationsPanel({
 
   // Use the smart recommendation function
   const recommendedGraphIds = getRecommendedCharts(selectedFields);
+  const fieldAnalysis = analyzeSelectedFields(selectedFields);
 
   // Sort graph types by compatibility score
   const sortedGraphTypes = [...graphTypes].sort((a, b) => {
@@ -205,6 +215,21 @@ export function GraphRecommendationsPanel({
             : 'Select fields first'}
         </p>
       </div>
+
+      {/* Scale Warning Banner */}
+      {fieldAnalysis.hasMixedScales && fieldAnalysis.scaleWarning && (
+        <div className="mx-3 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-amber-800">Mixed Scale Warning</p>
+              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                You selected both percentages and absolute values. Use <strong>Dual-Axis Bar</strong> or <strong>Table</strong> for accurate comparison.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-3 space-y-2">
         {sortedGraphTypes.map((graph) => {
@@ -283,6 +308,16 @@ export function GraphRecommendationsPanel({
                   {isDisabled && compatibility.reason && (
                     <div className="mt-2 pt-2 border-t border-slate-700 text-rose-300 text-[11px]">
                       ⚠️ {compatibility.reason}
+                    </div>
+                  )}
+                  {!isDisabled && compatibility.reason && (
+                    <div className="mt-2 pt-2 border-t border-slate-700 text-amber-300 text-[11px]">
+                      💡 {compatibility.reason}
+                    </div>
+                  )}
+                  {!isDisabled && compatibility.scaleWarning && (
+                    <div className="mt-2 pt-2 border-t border-slate-700 text-amber-300 text-[11px]">
+                      ⚖️ {compatibility.scaleWarning}
                     </div>
                   )}
                 </div>

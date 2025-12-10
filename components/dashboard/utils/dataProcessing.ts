@@ -22,9 +22,12 @@ export const arlaFieldMappings: Record<string, string> = {
 // Categories for chart recommendations
 export interface FieldAnalysis {
   dimensions: string[];
-  metrics: string[];
-  percentages: string[];
+  metrics: string[];        // Absolute values (spend, savings_value, etc.)
+  percentages: string[];    // Percentage fields (0-100 scale)
+  indexes: string[];        // Index values (like CPU index)
   totalFields: number;
+  hasMixedScales: boolean;  // True if user selected both percentages and absolute metrics
+  scaleWarning?: string;    // Warning message for UI
 }
 
 /**
@@ -35,19 +38,41 @@ export function analyzeSelectedFields(selectedFields: Record<string, string[]>):
   const dimensions: string[] = [];
   const metrics: string[] = [];
   const percentages: string[] = [];
+  const indexes: string[] = [];
 
   allFields.forEach(fieldId => {
     const type = getFieldType(fieldId);
     if (type === 'dimension') dimensions.push(fieldId);
     else if (type === 'percentage') percentages.push(fieldId);
+    else if (type === 'index') indexes.push(fieldId);
     else if (type === 'metric') metrics.push(fieldId);
   });
+
+  // Detect mixed scales - when user selects both absolute values and percentages
+  const hasAbsoluteValues = metrics.length > 0;
+  const hasPercentages = percentages.length > 0;
+  const hasIndexes = indexes.length > 0;
+  const hasMixedScales = (hasAbsoluteValues && hasPercentages) || 
+                          (hasAbsoluteValues && hasIndexes) ||
+                          (hasPercentages && hasIndexes);
+
+  let scaleWarning: string | undefined;
+  if (hasMixedScales) {
+    const scaleTypes: string[] = [];
+    if (hasAbsoluteValues) scaleTypes.push('absolute values (spend)');
+    if (hasPercentages) scaleTypes.push('percentages (0-100%)');
+    if (hasIndexes) scaleTypes.push('index values');
+    scaleWarning = `Mixed scales detected: ${scaleTypes.join(' and ')}. Consider using separate charts or a dual-axis chart for accurate comparison.`;
+  }
 
   return {
     dimensions,
     metrics,
     percentages,
+    indexes,
     totalFields: allFields.length,
+    hasMixedScales,
+    scaleWarning,
   };
 }
 
@@ -56,8 +81,8 @@ export function analyzeSelectedFields(selectedFields: Record<string, string[]>):
  */
 export function getRecommendedCharts(selectedFields: Record<string, string[]>): string[] {
   const analysis = analyzeSelectedFields(selectedFields);
-  const { dimensions, metrics, percentages, totalFields } = analysis;
-  const numericFields = metrics.length + percentages.length;
+  const { dimensions, metrics, percentages, indexes, totalFields, hasMixedScales } = analysis;
+  const numericFields = metrics.length + percentages.length + indexes.length;
 
   if (totalFields === 0) return [];
 
@@ -68,35 +93,49 @@ export function getRecommendedCharts(selectedFields: Record<string, string[]>): 
     recommendations.push('kpi-card', 'gauge');
   }
 
-  // 1 metric - Bar chart is great for comparing across categories
-  if (numericFields >= 1) {
-    recommendations.push('bar-chart');
-  }
+  // Handle mixed scales - recommend dual-axis or separate charts
+  if (hasMixedScales) {
+    // Dual-axis bar chart is ideal for comparing different scales
+    recommendations.push('dual-axis-bar');
+    // Table is always safe for mixed data
+    recommendations.push('table');
+    // If only 2 numeric fields with mixed scales, still allow grouped bar with warning
+    if (numericFields === 2) {
+      recommendations.push('grouped-bar');
+    }
+  } else {
+    // Non-mixed scales - standard recommendations
+    
+    // 1 metric - Bar chart is great for comparing across categories
+    if (numericFields >= 1) {
+      recommendations.push('bar-chart');
+    }
 
-  // Multiple metrics (2+) - Grouped bar for comparison
-  if (numericFields >= 2) {
-    recommendations.push('grouped-bar', 'scatter');
-  }
+    // Multiple metrics (2+) of same type - Grouped bar for comparison
+    if (numericFields >= 2) {
+      recommendations.push('grouped-bar', 'scatter');
+    }
 
-  // Percentage fields work great with pie charts (showing composition)
-  if (percentages.length >= 1 && numericFields <= 2) {
-    recommendations.push('pie-chart');
-  }
+    // Percentage fields work great with pie charts (showing composition)
+    if (percentages.length >= 1 && numericFields <= 2) {
+      recommendations.push('pie-chart');
+    }
 
-  // Multiple dimensions + metric - Stacked bar or Heatmap
-  if (dimensions.length >= 2 && numericFields >= 1) {
-    recommendations.push('stacked-bar', 'heatmap');
+    // Multiple dimensions + metric - Stacked bar or Heatmap
+    if (dimensions.length >= 2 && numericFields >= 1) {
+      recommendations.push('stacked-bar', 'heatmap');
+    }
   }
 
   // Many fields - Table is always safe
-  if (totalFields >= 3) {
+  if (totalFields >= 3 && !recommendations.includes('table')) {
     recommendations.push('table');
   }
 
   // Line/Area charts for trends (when we have time dimension)
   // Note: Arla data structure has market/media dimensions, not time
   // But if showing across markets, line can still work
-  if (numericFields >= 1 && totalFields >= 2) {
+  if (numericFields >= 1 && totalFields >= 2 && !hasMixedScales) {
     recommendations.push('line-chart', 'area-chart');
   }
 
@@ -209,15 +248,18 @@ export function getFieldTypeLabel(type: FieldType): string {
 export function isChartCompatible(
   chartType: string,
   selectedFields: Record<string, string[]>
-): { compatible: boolean; reason?: string; score?: number } {
+): { compatible: boolean; reason?: string; score?: number; scaleWarning?: string } {
   const allFields = Object.values(selectedFields).flat();
   const fieldTypes = allFields.map(getFieldType);
+  const analysis = analyzeSelectedFields(selectedFields);
   
   const hasTime = fieldTypes.includes('time');
   const hasDimension = fieldTypes.includes('dimension');
   const hasMetric = fieldTypes.some(t => t === 'metric' || t === 'percentage' || t === 'index');
   const metricCount = fieldTypes.filter(t => t === 'metric' || t === 'percentage' || t === 'index').length;
   const percentageCount = fieldTypes.filter(t => t === 'percentage').length;
+  const absoluteMetricCount = fieldTypes.filter(t => t === 'metric').length;
+  const indexCount = fieldTypes.filter(t => t === 'index').length;
   const dimensionCount = fieldTypes.filter(t => t === 'dimension').length;
   const totalFields = allFields.length;
 
@@ -225,6 +267,14 @@ export function isChartCompatible(
   if (totalFields === 0) {
     return { compatible: true, score: 0 };
   }
+
+  // Helper to add scale warning to result
+  const addScaleWarning = (result: { compatible: boolean; reason?: string; score?: number }) => {
+    if (analysis.hasMixedScales && result.compatible) {
+      return { ...result, scaleWarning: analysis.scaleWarning };
+    }
+    return result;
+  };
 
   switch (chartType) {
     case 'kpi-card':
@@ -244,6 +294,9 @@ export function isChartCompatible(
       if (metricCount === 0) {
         return { compatible: false, reason: 'Pie chart requires at least 1 numeric field.' };
       }
+      if (analysis.hasMixedScales) {
+        return { compatible: false, reason: 'Pie charts cannot display mixed scales (percentages + absolute values). Use separate charts or Table view.' };
+      }
       if (metricCount > 1) {
         return { compatible: true, score: 50, reason: 'Pie charts work best with a single metric.' };
       }
@@ -253,17 +306,36 @@ export function isChartCompatible(
       if (metricCount === 0) {
         return { compatible: false, reason: 'Bar chart requires at least 1 numeric field.' };
       }
+      if (analysis.hasMixedScales) {
+        return addScaleWarning({ compatible: true, score: 40, reason: 'Mixed scales may make comparison difficult. Consider Dual-Axis Bar or separate charts.' });
+      }
       return { compatible: true, score: metricCount >= 1 ? 85 : 60 };
 
     case 'grouped-bar':
       if (metricCount < 2) {
         return { compatible: false, reason: 'Grouped bar chart needs 2+ numeric fields to compare side-by-side.' };
       }
+      if (analysis.hasMixedScales) {
+        return addScaleWarning({ compatible: true, score: 50, reason: 'Mixed scales (% vs absolute values) may distort comparison. Consider Dual-Axis Bar chart.' });
+      }
       return { compatible: true, score: metricCount >= 2 ? 95 : 70 };
+
+    case 'dual-axis-bar':
+      if (metricCount < 2) {
+        return { compatible: false, reason: 'Dual-axis bar chart needs 2+ numeric fields with different scales.' };
+      }
+      if (!analysis.hasMixedScales) {
+        return { compatible: true, score: 60, reason: 'Dual-axis works best when fields have different scales (e.g., % vs spend). Use Grouped Bar for same-scale metrics.' };
+      }
+      // Perfect fit for mixed scales
+      return { compatible: true, score: 100, reason: 'Ideal for comparing metrics with different scales (percentages on right axis, values on left).' };
 
     case 'stacked-bar':
       if (metricCount === 0) {
         return { compatible: false, reason: 'Stacked bar chart requires at least 1 numeric field.' };
+      }
+      if (analysis.hasMixedScales) {
+        return { compatible: false, reason: 'Stacked bar cannot display mixed scales. Use Dual-Axis Bar or Table view.' };
       }
       return { compatible: true, score: 80 };
 
@@ -272,6 +344,9 @@ export function isChartCompatible(
       if (metricCount === 0) {
         return { compatible: false, reason: 'Line/Area charts require numeric fields to plot.' };
       }
+      if (analysis.hasMixedScales) {
+        return addScaleWarning({ compatible: true, score: 40, reason: 'Mixed scales may distort trends. Consider using separate charts.' });
+      }
       // For Arla data (market × media), line charts can show trends across markets
       return { compatible: true, score: hasTime ? 95 : 70 };
 
@@ -279,18 +354,25 @@ export function isChartCompatible(
       if (metricCount < 2) {
         return { compatible: false, reason: 'Scatter plot requires at least 2 numeric fields to show correlation.' };
       }
+      // Scatter can handle mixed scales (each axis has its own scale)
+      if (analysis.hasMixedScales && metricCount === 2) {
+        return { compatible: true, score: 85, reason: 'Good for comparing relationship between different metric types.' };
+      }
       return { compatible: true, score: 90 };
 
     case 'heatmap':
       if (metricCount === 0) {
         return { compatible: false, reason: 'Heatmap requires at least 1 numeric field for intensity.' };
       }
+      if (analysis.hasMixedScales) {
+        return { compatible: false, reason: 'Heatmap cannot display multiple metrics with different scales. Select metrics of the same type.' };
+      }
       // Heatmap is great for Arla's market × media structure
       return { compatible: true, score: totalFields >= 2 ? 85 : 60 };
 
     case 'table':
-      // Table is always compatible
-      return { compatible: true, score: totalFields >= 3 ? 80 : 50 };
+      // Table is always compatible and handles mixed scales well
+      return { compatible: true, score: analysis.hasMixedScales ? 90 : (totalFields >= 3 ? 80 : 50) };
 
     default:
       return { compatible: true, score: 50 };
