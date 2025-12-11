@@ -4,7 +4,6 @@ import {
   Building2,
   Database,
   MapPin,
-  Calendar,
   ChevronDown,
 } from "lucide-react";
 
@@ -166,7 +165,7 @@ export function TopBar({
                     disabled={!selectedClient}
                     className={`${selectBaseClass} min-w-[150px]`}
                   >
-                    <option value="">All Markets</option>
+                    <option value="">Select Market...</option>
                     {Object.entries(availableMarkets).map(([code, name]) => (
                       <option key={code} value={code}>
                         {name} ({code})

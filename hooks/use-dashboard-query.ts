@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import {
   fetchDashboardData,
   fetchFieldGroups,
@@ -60,16 +60,15 @@ export function useDashboardData(
   // Track if we should fetch
   const hasRequiredParams = Boolean(
     debouncedParams.client &&
-      debouncedParams.dataSource &&
-      Object.values(debouncedParams.selectedFields).some(
-        (arr) => arr.length > 0,
-      ),
+    debouncedParams.dataSource &&
+    Object.values(debouncedParams.selectedFields).some(
+      (arr) => arr.length > 0,
+    ),
   );
 
   return useQuery({
     queryKey: dashboardKeys.data(debouncedParams),
-    queryFn: ({ signal }) => {
-      // Pass abort signal for request cancellation
+    queryFn: () => {
       return fetchDashboardData(debouncedParams);
     },
     enabled: (options?.enabled ?? true) && hasRequiredParams,
@@ -117,8 +116,6 @@ export function useChartRecommendations(
  * Hook to generate PPT report
  */
 export function useGeneratePPT() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (request: ExportPPTRequest) => generatePPTReport(request),
     onSuccess: () => {
