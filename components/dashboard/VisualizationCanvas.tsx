@@ -24,7 +24,6 @@ import {
 } from 'recharts';
 import { applyOthersLogic, checkDataDensity, arlaFieldMappings, analyzeSelectedFields, getFieldType } from './utils/dataProcessing';
 import { DataDensityWarning } from './DataDensityWarning';
-import { GaugeChart } from './GaugeChart';
 import { GraphModal } from './GraphModal';
 import {
   fetchSummaryDataFromSelection,
@@ -163,12 +162,14 @@ export function VisualizationCanvas({
       try {
         if (dataSource === 'summary' && jobId) {
           // Fetch consolidated summary data
+          // market is now a code string like "UK", "DK" instead of an ID
           const response = await fetchSummaryDataFromSelection(
             client,
             jobId,
             selectedFields,
-            market ? parseInt(market, 10) : undefined,
-            undefined
+            undefined, // deprecated marketId
+            undefined, // mediaType
+            market || undefined // markets parameter (code string)
           );
           setApiData(response);
           setTrackerData(null);
@@ -187,7 +188,8 @@ export function VisualizationCanvas({
             return;
           }
 
-          const marketId = market ? parseInt(market, 10) : undefined;
+          // market is now a code string like "UK", "DK"
+          const marketsParam = market || undefined;
 
           // Handle Summary vs specific media types
           if (detectedMediaType === 'summary') {
@@ -195,7 +197,9 @@ export function VisualizationCanvas({
             const response = await fetchTrackerSummaryData(
               client,
               clientId,
-              !isNaN(marketId as number) ? marketId : undefined
+              undefined, // deprecated marketId
+              undefined, // mediaType
+              marketsParam // markets parameter (code string)
             );
             setTrackerSummaryData(response);
             setTrackerData(null);
@@ -206,7 +210,8 @@ export function VisualizationCanvas({
               client,
               clientId,
               detectedMediaType as TrackerMediaType,
-              !isNaN(marketId as number) ? marketId : undefined
+              undefined, // deprecated marketId
+              marketsParam // markets parameter (code string)
             );
             setTrackerData(response);
             setTrackerSummaryData(null);
@@ -1062,56 +1067,6 @@ export function VisualizationCanvas({
     );
 
     switch (selectedGraphType) {
-      case 'kpi-card':
-        return (
-          <div ref={chartContainerRef} className="relative">
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-0 right-0 flex items-center gap-2 z-10">
-              <PPTButton />
-            </div>
-            {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0 overflow-hidden">
-                  <div className="text-xs sm:text-sm text-slate-500 mb-1.5 truncate">Total Spend</div>
-                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 mb-1 truncate">
-                    €{kpis.totalSpend >= 1000000
-                      ? `${(kpis.totalSpend / 1000000).toFixed(1)}M`
-                      : kpis.totalSpend >= 1000
-                        ? `${(kpis.totalSpend / 1000).toFixed(0)}K`
-                        : kpis.totalSpend.toFixed(0)}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs sm:text-sm flex-wrap">
-                    <span className="text-emerald-600">↑ 12.3%</span>
-                    <span className="text-slate-500">vs last period</span>
-                  </div>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0 overflow-hidden">
-                  <div className="text-xs sm:text-sm text-slate-500 mb-1.5 truncate">Avg Savings %</div>
-                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 mb-1 truncate">
-                    {kpis.savingsPct.toFixed(1)}%
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs sm:text-sm flex-wrap">
-                    <span className="text-emerald-600">↑ 0.8pp</span>
-                    <span className="text-slate-500">vs last period</span>
-                  </div>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0 overflow-hidden sm:col-span-2 lg:col-span-1">
-                  <div className="text-xs sm:text-sm text-slate-500 mb-1.5 truncate">Avg Inflation %</div>
-                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 mb-1 truncate">
-                    {kpis.inflationPct.toFixed(1)}%
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs sm:text-sm flex-wrap">
-                    <span className="text-amber-600">↓ 1.2pp</span>
-                    <span className="text-slate-500">after mitigation</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
       case 'pie-chart':
         return (
           <div ref={chartContainerRef} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
@@ -1155,6 +1110,137 @@ export function VisualizationCanvas({
                   </Pie>
                   <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
                 </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+
+      case 'donut-chart':
+        const totalValue = sampleData.reduce((sum, item) => sum + (item[dataKeys.spend] || 0), 0);
+        return (
+          <div ref={chartContainerRef} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <PPTButton />
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Expand"
+              >
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Chart content for PPT capture */}
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+              <p className="text-sm text-slate-500 mb-4">Click on any slice to filter and see details below</p>
+              <ResponsiveContainer width="100%" height={450}>
+                <PieChart>
+                  <Pie
+                    data={sampleData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => `${name}: €${(Number(value) / 1000).toFixed(0)}K`}
+                    outerRadius={140}
+                    innerRadius={90}
+                    fill="#8884d8"
+                    dataKey={dataKeys.spend}
+                    onClick={handleChartClick}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {sampleData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.name === activeFilter ? '#F59E0B' : COLORS[index % COLORS.length]}
+                        opacity={activeFilter && entry.name !== activeFilter ? 0.3 : 1}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
+                  <text
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-2xl font-bold fill-slate-800"
+                  >
+                    €{(totalValue / 1000).toFixed(0)}K
+                  </text>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+
+      case 'horizontal-bar':
+        return (
+          <div ref={chartContainerRef} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <PPTButton />
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Expand"
+              >
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Chart content for PPT capture */}
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+              <p className="text-sm text-slate-500 mb-4">Click on any bar to filter and see details below</p>
+              <ResponsiveContainer width="100%" height={450}>
+                <BarChart data={sampleData} layout="horizontal" onClick={(e: any) => e && e.activePayload && handleChartClick(e.activePayload[0].payload)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis type="number" tick={{ fontSize: 12 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={100} />
+                  <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
+                  <Legend />
+                  <Bar
+                    dataKey={dataKeys.spend}
+                    fill="#0891B2"
+                    radius={[0, 8, 8, 0]}
+                    name="Spend (€)"
+                    style={{ cursor: 'pointer' }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+
+      case 'combo-chart':
+        return (
+          <div ref={chartContainerRef} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative">
+            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <PPTButton />
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Expand"
+              >
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Chart content for PPT capture */}
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">{graphTitle}</h3>
+              <ResponsiveContainer width="100%" height={450}>
+                <BarChart data={sampleData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(value: number) => `€${value.toLocaleString()}`} />
+                  <Legend />
+                  <Bar dataKey={dataKeys.spend} fill="#7C3AED" radius={[8, 8, 0, 0]} name="Total Spend" />
+                  <Line type="monotone" dataKey={dataKeys.savings} stroke="#10B981" strokeWidth={3} name="Savings Value" />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -1342,56 +1428,6 @@ export function VisualizationCanvas({
                   <Scatter name="Media" data={sampleData} fill="#7C3AED" />
                 </ScatterChart>
               </ResponsiveContainer>
-            </div>
-          </div>
-        );
-
-      case 'gauge':
-        // Calculate gauge values from actual data
-        const avgIndex = sampleData.length > 0
-          ? sampleData.reduce((sum, item) => sum + (item.index || item[dataKeys.index] || 100), 0) / sampleData.length
-          : 100;
-        const avgSavings = sampleData.length > 0
-          ? sampleData.reduce((sum, item) => sum + (item[dataKeys.savingsPct] || item.savings_pct || 0), 0) / sampleData.length
-          : 0;
-        const avgMeasured = sampleData.length > 0
-          ? sampleData.reduce((sum, item) => sum + (item[dataKeys.measuredPct] || item.measured_spend_pct || 85), 0) / sampleData.length
-          : 85;
-
-        return (
-          <div ref={chartContainerRef} className="relative">
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-0 right-0 flex items-center gap-2 z-10">
-              <PPTButton />
-            </div>
-            {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">{graphTitle} - Performance Metrics</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                <GaugeChart
-                  value={isNaN(avgIndex) ? 100 : avgIndex}
-                  label="Average Index"
-                  min={80}
-                  max={120}
-                  thresholds={{ red: 95, yellow: 100, green: 105 }}
-                />
-                <GaugeChart
-                  value={isNaN(avgSavings) ? 0 : avgSavings}
-                  label="Average Savings %"
-                  min={0}
-                  max={15}
-                  thresholds={{ red: 5, yellow: 8, green: 10 }}
-                />
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <GaugeChart
-                    value={isNaN(avgMeasured) ? 85 : avgMeasured}
-                    label="Measured Spend %"
-                    min={60}
-                    max={100}
-                    thresholds={{ red: 75, yellow: 85, green: 90 }}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         );

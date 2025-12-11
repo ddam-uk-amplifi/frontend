@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, PieChart as PieIcon, LineChart as LineIcon, Activity, Table2, Grid3x3, TrendingUp, Layers, Map, AlertCircle, Gauge, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { BarChart3, PieChart as PieIcon, LineChart as LineIcon, Activity, Table2, Grid3x3, TrendingUp, Layers, AlertCircle, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { isChartCompatible, getRecommendedCharts, analyzeSelectedFields } from './utils/dataProcessing';
 
 interface GraphRecommendationsPanelProps {
@@ -38,15 +38,6 @@ export function GraphRecommendationsPanel({
 
   const graphTypes = [
     {
-      id: 'kpi-card',
-      name: 'KPI Card',
-      icon: Activity,
-      color: '#8B5CF6',
-      description: 'Single metric with trend',
-      supportedFields: ['Metrics only (Spend, Savings %, etc.)'],
-      tooltip: 'Use this to highlight key performance indicators. Perfect for executive dashboards showing critical metrics at a glance.',
-    },
-    {
       id: 'pie-chart',
       name: 'Pie Chart',
       icon: PieIcon,
@@ -56,6 +47,15 @@ export function GraphRecommendationsPanel({
       tooltip: 'Best for showing composition or market share. Works well with 3-7 categories. Not suitable for time-series data.',
     },
     {
+      id: 'donut-chart',
+      name: 'Donut Chart',
+      icon: PieIcon,
+      color: '#A855F7',
+      description: 'Part-to-whole with center label',
+      supportedFields: ['1 dimension + 1 metric'],
+      tooltip: 'Similar to pie chart but with a hollow center, perfect for showing totals or percentages in the middle.',
+    },
+    {
       id: 'bar-chart',
       name: 'Bar Chart',
       icon: BarChart3,
@@ -63,6 +63,15 @@ export function GraphRecommendationsPanel({
       description: 'Compare values across categories',
       supportedFields: ['1 dimension + 1 metric'],
       tooltip: 'Compare values across different categories like markets, media types, or suppliers. Easy to read and versatile.',
+    },
+    {
+      id: 'horizontal-bar',
+      name: 'Horizontal Bar',
+      icon: BarChart3,
+      color: '#0891B2',
+      description: 'Rankings and long labels',
+      supportedFields: ['1 dimension + 1 metric'],
+      tooltip: 'Perfect for ranking data or when category names are long. Makes comparing values easier with horizontal orientation.',
     },
     {
       id: 'grouped-bar',
@@ -92,6 +101,15 @@ export function GraphRecommendationsPanel({
       tooltip: 'Show how totals break down into subcategories. Perfect for analyzing spend composition across markets.',
     },
     {
+      id: 'combo-chart',
+      name: 'Combo Chart',
+      icon: TrendingUp,
+      color: '#8B5CF6',
+      description: 'Bar + Line combination',
+      supportedFields: ['1 dimension + 2+ metrics'],
+      tooltip: 'Combine bars and lines to show different metrics together. Great for comparing actuals (bars) vs targets (line).',
+    },
+    {
       id: 'line-chart',
       name: 'Line Chart',
       icon: LineIcon,
@@ -119,15 +137,6 @@ export function GraphRecommendationsPanel({
       tooltip: 'Use this to see if high Spend correlates with high CPU Index. Identify outliers and relationships between metrics.',
     },
     {
-      id: 'heatmap',
-      name: 'Heatmap',
-      icon: Map,
-      color: '#F97316',
-      description: 'Matrix of values',
-      supportedFields: ['2 dimensions + 1 metric'],
-      tooltip: 'Visualize data in a color-coded matrix. Perfect for showing spend patterns across Media × Market combinations.',
-    },
-    {
       id: 'table',
       name: 'Table',
       icon: Table2,
@@ -135,15 +144,6 @@ export function GraphRecommendationsPanel({
       description: 'Detailed data view',
       supportedFields: ['Any combination of fields'],
       tooltip: 'View raw data with formatting. Best for detailed analysis, exporting, or when data density is too high for charts.',
-    },
-    {
-      id: 'gauge',
-      name: 'Gauge',
-      icon: Gauge,
-      color: '#FF9900',
-      description: 'Circular meter',
-      supportedFields: ['Metrics only (Spend, Savings %, etc.)'],
-      tooltip: 'Use this to show a single metric in a circular gauge format. Perfect for visualizing performance metrics.',
     },
   ];
 

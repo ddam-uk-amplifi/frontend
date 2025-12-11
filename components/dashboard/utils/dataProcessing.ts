@@ -277,17 +277,8 @@ export function isChartCompatible(
   };
 
   switch (chartType) {
-    case 'kpi-card':
-    case 'gauge':
-      if (metricCount === 0) {
-        return { compatible: false, reason: 'Requires at least one numeric field (spend, savings, %).' };
-      }
-      if (totalFields > 2) {
-        return { compatible: true, score: 30, reason: 'Works, but best with 1-2 fields only.' };
-      }
-      return { compatible: true, score: metricCount === 1 ? 100 : 70 };
-
     case 'pie-chart':
+    case 'donut-chart':
       if (hasTime) {
         return { compatible: false, reason: 'Pie charts cannot display time-series data. Use Line or Area chart instead.' };
       }
@@ -303,6 +294,7 @@ export function isChartCompatible(
       return { compatible: true, score: 90 };
 
     case 'bar-chart':
+    case 'horizontal-bar':
       if (metricCount === 0) {
         return { compatible: false, reason: 'Bar chart requires at least 1 numeric field.' };
       }
@@ -339,6 +331,15 @@ export function isChartCompatible(
       }
       return { compatible: true, score: 80 };
 
+    case 'combo-chart':
+      if (metricCount < 2) {
+        return { compatible: false, reason: 'Combo chart needs 2+ numeric fields to combine bars and lines.' };
+      }
+      if (analysis.hasMixedScales) {
+        return addScaleWarning({ compatible: true, score: 85, reason: 'Great for comparing different metric types. Bars for one metric, line for another.' });
+      }
+      return { compatible: true, score: metricCount >= 2 ? 90 : 65 };
+
     case 'line-chart':
     case 'area-chart':
       if (metricCount === 0) {
@@ -359,16 +360,6 @@ export function isChartCompatible(
         return { compatible: true, score: 85, reason: 'Good for comparing relationship between different metric types.' };
       }
       return { compatible: true, score: 90 };
-
-    case 'heatmap':
-      if (metricCount === 0) {
-        return { compatible: false, reason: 'Heatmap requires at least 1 numeric field for intensity.' };
-      }
-      if (analysis.hasMixedScales) {
-        return { compatible: false, reason: 'Heatmap cannot display multiple metrics with different scales. Select metrics of the same type.' };
-      }
-      // Heatmap is great for Arla's market × media structure
-      return { compatible: true, score: totalFields >= 2 ? 85 : 60 };
 
     case 'table':
       // Table is always compatible and handles mixed scales well

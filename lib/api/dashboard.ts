@@ -77,7 +77,10 @@ export interface ConsolidatedSummaryParams {
   consolidationJobId: string;
   sheetType: 'ytd' | 'fyfc';
   fields: string[];
+  /** @deprecated Use markets instead */
   marketId?: number;
+  /** Comma-separated market codes (e.g., "UK,DK,SE") or single code */
+  markets?: string;
   mediaType?: string;
 }
 
@@ -136,7 +139,10 @@ export interface TrackerSummaryParams {
   mediaType: TrackerMediaType;
   fields?: string[];
   dataLevel?: TrackerDataLevel;
+  /** @deprecated Use markets instead */
   marketId?: number;
+  /** Comma-separated market codes (e.g., "UK,DK,SE") or single code */
+  markets?: string;
   month?: string;
   /** @deprecated Use clientId instead */
   extractedFileId?: number;
@@ -533,7 +539,7 @@ export async function fetchLatestJob(
 export async function fetchConsolidatedSummary(
   params: ConsolidatedSummaryParams
 ): Promise<ConsolidatedSummaryResponse> {
-  const { clientName, consolidationJobId, sheetType, fields, marketId, mediaType } = params;
+  const { clientName, consolidationJobId, sheetType, fields, marketId, markets, mediaType } = params;
   
   const queryParams = new URLSearchParams({
     consolidation_job_id: consolidationJobId,
@@ -541,7 +547,10 @@ export async function fetchConsolidatedSummary(
     fields: fields.join(','),
   });
   
-  if (marketId !== undefined) {
+  // Prefer markets (new) over marketId (deprecated)
+  if (markets) {
+    queryParams.append('markets', markets);
+  } else if (marketId !== undefined) {
     queryParams.append('market_id', marketId.toString());
   }
   
@@ -558,13 +567,15 @@ export async function fetchConsolidatedSummary(
 
 /**
  * Helper function to fetch summary data based on selected fields in QueryBuilder
+ * @param markets - Comma-separated market codes (e.g., \"UK,DK,SE\")
  */
 export async function fetchSummaryDataFromSelection(
   clientName: string,
   consolidationJobId: string,
   selectedFields: Record<string, string[]>,
   marketId?: number,
-  mediaType?: string
+  mediaType?: string,
+  markets?: string
 ): Promise<ConsolidatedSummaryResponse | null> {
   // Get all selected field IDs
   const allFieldIds = Object.values(selectedFields).flat();
@@ -594,6 +605,7 @@ export async function fetchSummaryDataFromSelection(
     sheetType,
     fields: backendFields,
     marketId,
+    markets,
     mediaType,
   });
 }
@@ -615,19 +627,23 @@ export interface TrackerDataResponse {
  * Fetch complete tracker data for a media type
  * Uses the new /tracker/{media}/complete endpoint
  * Auto-resolves to latest consolidation job using client_id
+ * @param markets - Comma-separated market codes (e.g., "UK,DK,SE")
  */
 export async function fetchTrackerComplete(
   clientName: string,
   clientId: number,
   mediaType: TrackerMediaType,
-  marketId?: number
+  marketId?: number,
+  markets?: string
 ): Promise<TrackerCompleteResponse> {
   const queryParams = new URLSearchParams({
     client_id: clientId.toString(),
   });
   
-  // Only add market_id if it's a valid number (not undefined, null, or NaN)
-  if (marketId !== undefined && marketId !== null && !isNaN(marketId)) {
+  // Prefer markets (new) over marketId (deprecated)
+  if (markets) {
+    queryParams.append('markets', markets);
+  } else if (marketId !== undefined && marketId !== null && !isNaN(marketId)) {
     queryParams.append('market_id', marketId.toString());
   }
   
@@ -642,18 +658,23 @@ export async function fetchTrackerComplete(
  * Fetch tracker summary data (from Summary_YTD sheets)
  * This is different from media-specific data (TV, Print, etc.)
  * Returns aggregated spend data by media type
+ * @param markets - Comma-separated market codes (e.g., "UK,DK,SE")
  */
 export async function fetchTrackerSummaryData(
   clientName: string,
   clientId: number,
   marketId?: number,
-  mediaType?: string
+  mediaType?: string,
+  markets?: string
 ): Promise<TrackerSummaryItem[]> {
   const queryParams = new URLSearchParams({
     client_id: clientId.toString(),
   });
   
-  if (marketId !== undefined && marketId !== null && !isNaN(marketId)) {
+  // Prefer markets (new) over marketId (deprecated)
+  if (markets) {
+    queryParams.append('markets', markets);
+  } else if (marketId !== undefined && marketId !== null && !isNaN(marketId)) {
     queryParams.append('market_id', marketId.toString());
   }
   
@@ -676,7 +697,7 @@ export async function fetchTrackerSummaryData(
 export async function fetchTrackerData(
   params: TrackerSummaryParams
 ): Promise<TrackerDataResponse> {
-  const { clientName, clientId, mediaType, fields, dataLevel, marketId } = params;
+  const { clientName, clientId, mediaType, fields, dataLevel, marketId, markets } = params;
   
   const queryParams = new URLSearchParams({
     client_id: clientId.toString(),
@@ -689,7 +710,10 @@ export async function fetchTrackerData(
     queryParams.append('fields', fields.join(','));
   }
   
-  if (marketId !== undefined) {
+  // Prefer markets (new) over marketId (deprecated)
+  if (markets) {
+    queryParams.append('markets', markets);
+  } else if (marketId !== undefined) {
     queryParams.append('market_id', marketId.toString());
   }
   
@@ -708,7 +732,7 @@ export async function fetchTrackerData(
 export async function fetchTrackerSummary(
   params: TrackerSummaryParams
 ): Promise<TrackerSummaryResponse> {
-  const { clientName, clientId, mediaType, fields, dataLevel, marketId, month } = params;
+  const { clientName, clientId, mediaType, fields, dataLevel, marketId, markets, month } = params;
   
   const queryParams = new URLSearchParams({
     client_id: clientId.toString(),
@@ -720,7 +744,10 @@ export async function fetchTrackerSummary(
     queryParams.append('fields', fields.join(','));
   }
   
-  if (marketId !== undefined) {
+  // Prefer markets (new) over marketId (deprecated)
+  if (markets) {
+    queryParams.append('markets', markets);
+  } else if (marketId !== undefined) {
     queryParams.append('market_id', marketId.toString());
   }
   
@@ -754,13 +781,15 @@ export async function fetchTrackerAvailableFields(
 /**
  * Helper function to fetch tracker data based on selected fields in QueryBuilder
  * Uses the /tracker/data endpoint with client_id
+ * @param markets - Comma-separated market codes (e.g., \"UK,DK,SE\")
  */
 export async function fetchTrackerDataFromSelection(
   clientName: string,
   clientId: number,
   mediaType: TrackerMediaType,
   selectedFields: Record<string, string[]>,
-  marketId?: number
+  marketId?: number,
+  markets?: string
 ): Promise<TrackerDataResponse | null> {
   // Get all selected field IDs
   const allFieldIds = Object.values(selectedFields).flat();
@@ -792,6 +821,7 @@ export async function fetchTrackerDataFromSelection(
     fields: backendFields,
     dataLevel,
     marketId,
+    markets,
   });
 }
 

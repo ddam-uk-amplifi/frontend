@@ -2,7 +2,16 @@
 
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Upload, Trash2, Plus, X, Download, ChevronDown, FileUp, CheckCircle } from "lucide-react";
+import {
+  Upload,
+  Trash2,
+  Plus,
+  X,
+  Download,
+  ChevronDown,
+  FileUp,
+  CheckCircle,
+} from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -99,9 +108,8 @@ function ReportAutomationContent() {
   };
 
   // Use the key type for safer state management
-const [clientId, setClientId] = useState<ClientIdString>("arla");
-const clientNumberId = clientMap[clientId]; // <-- FIX
-
+  const [clientId, setClientId] = useState<ClientIdString>("arla");
+  const clientNumberId = clientMap[clientId]; // <-- FIX
 
   // Client companies - lowercase names for API
   const clients = [
@@ -135,7 +143,9 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     total: 0,
     totalPages: 0,
   });
-  const [expandedHistoryRows, setExpandedHistoryRows] = useState<Record<string, boolean>>({});
+  const [expandedHistoryRows, setExpandedHistoryRows] = useState<
+    Record<string, boolean>
+  >({});
 
   // Fetch available markets on mount
   useEffect(() => {
@@ -299,10 +309,15 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     setMarkets(newMarkets);
     setShowReviewModal(false);
     setFilesToReview([]);
-    
-    toast.success(`${confirmedFiles.length} file${confirmedFiles.length > 1 ? 's' : ''} ready to process`, {
-      description: "Click 'Run Automation' to begin",
-    });
+
+    toast.success(
+      `${confirmedFiles.length} file${
+        confirmedFiles.length > 1 ? "s" : ""
+      } ready to process`,
+      {
+        description: "Click 'Run Automation' to begin",
+      }
+    );
   };
 
   // Cancel file review
@@ -346,7 +361,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
     try {
       // Build extracted_paths array (simple string array of paths)
-      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!);
+      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!,);
 
       // Prepare consolidation request
       const consolidationData = {
@@ -372,28 +387,57 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       const startTime = Date.now();
 
       while (Date.now() - startTime < maxWaitSeconds * 1000) {
-        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
-        const statusResponse = await apiClient.get(`/api/v1/consolidation/${jobId}`);
+        const statusResponse = await apiClient.get(
+          `/api/v1/consolidation/${jobId}`
+        );
         const job = statusResponse.data;
 
         console.log(`Consolidation status: ${job.status}`);
 
-        if (job.status === 'completed') {
+        if (job.status === "completed") {
           console.log("Consolidation completed successfully!");
           toast.success("Report consolidation complete", {
             description: "Your consolidated reports are ready to download",
           });
           setConsolidationResult(job);
+
+          // Populate trackers data after successful consolidation
+          try {
+            console.log("Populating trackers data...");
+            await apiClient.post(
+              `/api/v1/client/${clientId}/populate/trackers`,
+              null,
+              {
+                params: {
+                  consolidation_job_id: jobId,
+                  ytd_month: ytdMonth,
+                },
+              }
+            );
+            console.log("Trackers data populated successfully!");
+            toast.success("Trackers data populated", {
+              description: "Dashboard trackers data is now available",
+            });
+          } catch (populateError: any) {
+            console.error("Failed to populate trackers:", populateError);
+            toast.warning("Trackers population failed", {
+              description:
+                "Consolidation succeeded but trackers data couldn't be populated",
+            });
+          }
+
           break;
-        } else if (job.status === 'failed') {
+        } else if (job.status === "failed") {
           console.error("Consolidation failed:", job.error_message);
           toast.error("Consolidation failed", {
-            description: job.error_message || "An error occurred during consolidation",
+            description:
+              job.error_message || "An error occurred during consolidation",
           });
           setConsolidationResult({
             error: true,
-            message: job.error_message || "Consolidation failed"
+            message: job.error_message || "Consolidation failed",
           });
           break;
         }
@@ -401,13 +445,16 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       }
     } catch (error: any) {
       console.error("Consolidation error:", error);
-      const errorMessage = error.response?.data?.detail || error.response?.data?.message || "Failed to consolidate reports";
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        "Failed to consolidate reports";
       toast.error("Consolidation error", {
         description: errorMessage,
       });
       setConsolidationResult({
         error: true,
-        message: errorMessage
+        message: errorMessage,
       });
     } finally {
       setIsConsolidating(false);
@@ -416,7 +463,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
   const handleRunAutomation = async () => {
     const marketsToUpload = markets.filter(
-     (m) => m.file !== null && m.marketId !== null
+      (m) => m.file !== null && m.marketId !== null
     );
 
     if (marketsToUpload.length === 0) {
@@ -432,7 +479,10 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     // Prepare files and market codes for batch upload
     const files: File[] = [];
     const marketCodes: string[] = [];
-    const marketMap = new Map<string, { id: number; dbMarketId: number; code: string }>();
+    const marketMap = new Map<
+      string,
+      { id: number; dbMarketId: number; code: string }
+    >();
 
     marketsToUpload.forEach((market) => {
       if (market.file && market.code) {
@@ -467,10 +517,13 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     try {
       // Step 1: Submit batch extraction
       console.log("🚀 Submitting batch extraction...");
-      console.log("📁 Files:", files.map(f => f.name));
+      console.log(
+        "📁 Files:",
+        files.map((f) => f.name)
+      );
       console.log("🌍 Market codes:", marketCodes);
       console.log("🏢 Client:", clientId);
-      
+
       toast.info("Uploading files...", {
         description: `Submitting ${files.length} file(s) for extraction`,
       });
@@ -483,23 +536,28 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
       console.log("📦 Batch job created:", batchResponse);
       console.log("📦 Batch ID:", batchResponse.id);
-      
+
       // Validate response has required ID
       if (!batchResponse.id) {
         throw new Error("Backend did not return a batch ID");
       }
-      
+
       toast.success("Files uploaded successfully", {
         description: `• Processing ${files.length} file(s)`,
       });
 
-      // Update progress to show uploading complete, now processing
+      // Update progress to show uploading complete, now processing with varied percentages
       setUploadProgress((prev) =>
-        prev.map((p) => ({
-          ...p,
-          progress: 50,
-          status: "uploading" as const,
-        }))
+        prev.map((p, index) => {
+          // Generate varied progress (35% to 55%) to feel realistic
+          const variedProgress =
+            35 + ((index * 11 + p.marketCode.charCodeAt(0)) % 21);
+          return {
+            ...p,
+            progress: variedProgress,
+            status: "uploading" as const,
+          };
+        })
       );
 
       // Step 2: Poll for completion
@@ -510,17 +568,22 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
           pollIntervalMs: 2000,
           maxWaitSeconds: 600,
           onProgress: (status: BatchExtractionResponse) => {
-            console.log(`📊 Batch status: ${status.status}, ${status.completed_files}/${status.total_files} completed`);
+            console.log(
+              `📊 Batch status: ${status.status}, ${status.completed_files}/${status.total_files} completed`
+            );
 
-            // Calculate progress percentage
-            const progressPct = status.total_files > 0 
-              ? Math.round((status.completed_files / status.total_files) * 100)
-              : 50;
+            // Calculate base progress percentage for overall batch
+            const batchProgressPct =
+              status.total_files > 0
+                ? Math.round(
+                    (status.completed_files / status.total_files) * 100
+                  )
+                : 0;
 
             // Update progress based on extracted_paths
             if (status.extracted_paths && status.extracted_paths.length > 0) {
               setUploadProgress((prev) =>
-                prev.map((p) => {
+                prev.map((p, index) => {
                   // Find matching path by market code
                   const matchingPath = status.extracted_paths.find(
                     (path) => extractMarketCodeFromPath(path) === p.marketCode
@@ -541,14 +604,27 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                       error: "Extraction failed for this market",
                     };
                   }
-                  // Still processing
-                  return { ...p, progress: progressPct };
+                  // Still processing - show varied progress per file to feel realistic
+                  // Each file gets a unique offset based on its index and market code
+                  const baseProgress = 15 + batchProgressPct * 0.7; // 15% to 85%
+                  const variance =
+                    ((index * 17 + p.marketCode.charCodeAt(0)) % 25) - 12; // -12 to +12 variance
+                  const fileProgress = Math.max(
+                    10,
+                    Math.min(90, Math.round(baseProgress + variance))
+                  );
+                  return { ...p, progress: fileProgress };
                 })
               );
             } else {
-              // No paths yet, just update progress
+              // No paths yet, show varied initial processing progress
               setUploadProgress((prev) =>
-                prev.map((p) => ({ ...p, progress: progressPct }))
+                prev.map((p, index) => {
+                  // Generate varied progress (8% to 25%) for initial state
+                  const initialProgress =
+                    8 + ((index * 13 + p.marketCode.charCodeAt(0)) % 18);
+                  return { ...p, progress: initialProgress };
+                })
               );
             }
           },
@@ -564,7 +640,9 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
         if (successCount > 0) {
           toast.success("Extraction completed", {
-            description: `${successCount} file(s) extracted${failedCount > 0 ? `, ${failedCount} failed` : ""} • Starting consolidation`,
+            description: `${successCount} file(s) extracted${
+              failedCount > 0 ? `, ${failedCount} failed` : ""
+            } • Starting consolidation`,
           });
 
           // Build final progress directly from marketsToUpload and finalStatus
@@ -575,8 +653,10 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
               const matchingPath = finalStatus.extracted_paths?.find(
                 (path) => extractMarketCodeFromPath(path) === market.code
               );
-              const isFailed = finalStatus.failed_markets?.includes(market.code || "");
-              
+              const isFailed = finalStatus.failed_markets?.includes(
+                market.code || ""
+              );
+
               return {
                 id: `${market.id}-final`,
                 marketId: market.id,
@@ -584,7 +664,11 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                 marketCode: market.code || "",
                 fileName: market.file!.name,
                 progress: matchingPath ? 100 : 0,
-                status: matchingPath ? "complete" as const : (isFailed ? "failed" as const : "uploading" as const),
+                status: matchingPath
+                  ? ("complete" as const)
+                  : isFailed
+                  ? ("failed" as const)
+                  : ("uploading" as const),
                 extractedPath: matchingPath,
                 error: isFailed ? "Extraction failed" : undefined,
               };
@@ -595,17 +679,25 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
           // Log for debugging
           console.log("📋 Final progress for consolidation:", finalProgress);
-          console.log("📋 Successful extractions:", finalProgress.filter(p => p.status === "complete" && p.extractedPath));
+          console.log(
+            "📋 Successful extractions:",
+            finalProgress.filter(
+              (p) => p.status === "complete" && p.extractedPath
+            )
+          );
 
           setTimeout(() => handleConsolidation(finalProgress), 500);
         } else {
           toast.error("All extractions failed", {
-            description: finalStatus.error_message || "No files were successfully extracted",
+            description:
+              finalStatus.error_message ||
+              "No files were successfully extracted",
           });
         }
       } else if (finalStatus.status === "failed") {
         toast.error("Batch extraction failed", {
-          description: finalStatus.error_message || "An error occurred during extraction",
+          description:
+            finalStatus.error_message || "An error occurred during extraction",
         });
 
         // Mark all as failed
@@ -643,7 +735,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
   // Legacy single-file extraction (fallback)
   const handleRunAutomationLegacy = async () => {
     const marketsToUpload = markets.filter(
-     (m) => m.file !== null && m.marketId !== null
+      (m) => m.file !== null && m.marketId !== null
     );
 
     if (marketsToUpload.length === 0) {
@@ -663,7 +755,6 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       const uploadId = `${market.id}-${Date.now()}`;
       const marketCode = market.code || "";
       const dbMarketId = market.marketId!; // DB market ID
-
 
       // Add to upload progress
       setUploadProgress((prev) => [
@@ -705,10 +796,10 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
         // Mark as complete with extraction data (mapping API response fields)
         const extractionData = response.data;
-        console.log('✅ Extraction completed for:', market.code);
-        console.log('📦 Full extraction response:', extractionData);
-        console.log('📄 Output file path:', extractionData.output_file);
-        console.log('📥 Download URL:', extractionData.download_url);
+        console.log("✅ Extraction completed for:", market.code);
+        console.log("📦 Full extraction response:", extractionData);
+        console.log("📄 Output file path:", extractionData.output_file);
+        console.log("📥 Download URL:", extractionData.download_url);
 
         setUploadProgress((prev) => {
           const updated = prev.map((p) =>
@@ -727,18 +818,26 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
           );
 
           // Check if all extractions are complete - compare with EXPECTED count
-          const completedCount = updated.filter((p) => p.status === "complete").length;
-          const failedCount = updated.filter((p) => p.status === "failed").length;
+          const completedCount = updated.filter(
+            (p) => p.status === "complete"
+          ).length;
+          const failedCount = updated.filter(
+            (p) => p.status === "failed"
+          ).length;
           const totalProcessed = completedCount + failedCount;
           const expectedTotal = totalMarketsToUploadRef.current;
 
-          console.log(`📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
+          console.log(
+            `📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`
+          );
 
           // Only trigger consolidation when we've processed ALL expected markets
           if (totalProcessed === expectedTotal && completedCount > 0) {
-            console.log('🎯 All extractions done! Triggering consolidation...');
+            console.log("🎯 All extractions done! Triggering consolidation...");
             toast.success("All files processed successfully", {
-              description: `${completedCount} file${completedCount > 1 ? 's' : ''} extracted • Starting consolidation`,
+              description: `${completedCount} file${
+                completedCount > 1 ? "s" : ""
+              } extracted • Starting consolidation`,
             });
             // Trigger consolidation after a short delay to ensure UI updates
             setTimeout(() => handleConsolidation(updated), 500);
@@ -748,7 +847,10 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
         });
       } catch (error: any) {
         console.error("Upload error:", error);
-        const errorMessage = error.response?.data?.message || error.response?.data?.detail || "Upload failed";
+        const errorMessage =
+          error.response?.data?.message ||
+          error.response?.data?.detail ||
+          "Upload failed";
         toast.error("File upload failed", {
           description: `${market.file!.name}: ${errorMessage}`,
         });
@@ -768,16 +870,24 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
           );
 
           // Check if all extractions are complete after failure too
-          const completedCount = updated.filter((p) => p.status === "complete").length;
-          const failedCount = updated.filter((p) => p.status === "failed").length;
+          const completedCount = updated.filter(
+            (p) => p.status === "complete"
+          ).length;
+          const failedCount = updated.filter(
+            (p) => p.status === "failed"
+          ).length;
           const totalProcessed = completedCount + failedCount;
           const expectedTotal = totalMarketsToUploadRef.current;
 
-          console.log(`📊 Progress after error: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`);
+          console.log(
+            `📊 Progress after error: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`
+          );
 
           // Only trigger consolidation when we've processed ALL expected markets
           if (totalProcessed === expectedTotal && completedCount > 0) {
-            console.log('🎯 All extractions done (some failed)! Triggering consolidation...');
+            console.log(
+              "🎯 All extractions done (some failed)! Triggering consolidation..."
+            );
             setTimeout(() => handleConsolidation(updated), 500);
           }
 
@@ -791,19 +901,21 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
     setUploadProgress((prev) => prev.filter((p) => p.id !== uploadId));
   };
 
-  const handleDownloadConsolidation = (type: 'excel' | 'ppt' = 'excel') => {
+  const handleDownloadConsolidation = (type: "excel" | "ppt" = "excel") => {
     if (!consolidationResult || consolidationResult.error) return;
 
     // Check for S3 presigned URL first, then fall back to local path
-    let downloadUrl = type === 'excel'
-      ? consolidationResult.excel_download_url
-      : consolidationResult.ppt_download_url;
+    let downloadUrl =
+      type === "excel"
+        ? consolidationResult.excel_download_url
+        : consolidationResult.ppt_download_url;
 
     // For local storage, construct download URL from path
     if (!downloadUrl) {
-      const filePath = type === 'excel'
-        ? consolidationResult.excel_path
-        : consolidationResult.ppt_path;
+      const filePath =
+        type === "excel"
+          ? consolidationResult.excel_path
+          : consolidationResult.ppt_path;
 
       if (!filePath) {
         console.error(`No ${type} file path in consolidation result`);
@@ -811,12 +923,12 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
       }
 
       // Extract filename from path and construct local download URL
-      const fileName = filePath.split('/').pop();
+      const fileName = filePath.split("/").pop();
       downloadUrl = `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
     }
 
     console.log(`Downloading ${type} file from:`, downloadUrl);
-    window.open(downloadUrl, '_blank');
+    window.open(downloadUrl, "_blank");
   };
 
   // Helper to get download URL (S3 presigned or local endpoint)
@@ -961,7 +1073,9 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     </label>
                     <Select
                       value={clientId}
-                      onValueChange={(value) => setClientId(value as ClientIdString)}
+                      onValueChange={(value) =>
+                        setClientId(value as ClientIdString)
+                      }
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a client" />
@@ -980,10 +1094,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     <label className="block text-sm font-medium text-gray-900 mb-2">
                       YTD Month <span className="text-red-500">*</span>
                     </label>
-                    <Select
-                      value={ytdMonth}
-                      onValueChange={setYtdMonth}
-                    >
+                    <Select value={ytdMonth} onValueChange={setYtdMonth}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select month" />
                       </SelectTrigger>
@@ -1024,7 +1135,7 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Tracker Files <span className="text-red-500">*</span>
                   </label>
-                  
+
                   {/* Dropzone Area - Compact */}
                   <div
                     {...getRootProps()}
@@ -1050,10 +1161,18 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                         </p>
                       </div>
                       <div className="mt-1 flex flex-wrap justify-center gap-1.5 text-xs text-gray-500">
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">.xlsx</span>
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">.xls</span>
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">.csv</span>
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">.zip</span>
+                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                          .xlsx
+                        </span>
+                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                          .xls
+                        </span>
+                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                          .csv
+                        </span>
+                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                          .zip
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1063,7 +1182,8 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-gray-700">
-                          {markets.length} file{markets.length > 1 ? 's' : ''} selected
+                          {markets.length} file{markets.length > 1 ? "s" : ""}{" "}
+                          selected
                         </span>
                         <button
                           onClick={() => setMarkets([])}
@@ -1095,7 +1215,10 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                 </svg>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-900 truncate" title={market.file?.name}>
+                                <p
+                                  className="text-xs font-medium text-gray-900 truncate"
+                                  title={market.file?.name}
+                                >
                                   {market.file?.name}
                                 </p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -1103,7 +1226,14 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                     {market.code}
                                   </span>
                                   <span className="text-xs text-gray-500">
-                                    {market.file ? (market.file.size / 1024 / 1024).toFixed(1) : "0"} MB
+                                    {market.file
+                                      ? (
+                                          market.file.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(1)
+                                      : "0"}{" "}
+                                    MB
                                   </span>
                                 </div>
                               </div>
@@ -1135,86 +1265,99 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
             )}
 
             {/* File Upload Status - Only show files that are uploading */}
-            {uploadProgress.length > 0 && uploadProgress.some(p => p.status === "uploading") && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="space-y-2">
-                  {uploadProgress
-                    .filter(upload => upload.status === "uploading")
-                    .map((upload) => (
-                    <div key={upload.id} className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-blue-100">
-                        <svg
-                          className="w-4 h-4 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+            {uploadProgress.length > 0 &&
+              uploadProgress.some((p) => p.status === "uploading") && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="space-y-2">
+                    {uploadProgress
+                      .filter((upload) => upload.status === "uploading")
+                      .map((upload) => (
+                        <div
+                          key={upload.id}
+                          className="flex items-center gap-3"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                      </div>
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-blue-100">
+                            <svg
+                              className="w-4 h-4 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          </div>
 
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-900">
-                            {upload.fileName}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {upload.progress}%
-                          </span>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-900">
+                                {upload.fileName}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {upload.progress}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div
+                                className="h-1.5 rounded-full transition-all bg-blue-500"
+                                style={{ width: `${upload.progress}%` }}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div
-                            className="h-1.5 rounded-full transition-all bg-blue-500"
-                            style={{ width: `${upload.progress}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Uploaded Files - Show completed uploads */}
-            {uploadProgress.length > 0 && uploadProgress.some(p => p.status === "complete") && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Uploaded Files ({uploadProgress.filter(p => p.status === "complete").length})
-                  </h3>
-                  <button
-                    onClick={() => setUploadProgress([])}
-                    className="text-xs text-gray-600 hover:text-red-600 transition-colors cursor-pointer"
-                  >
-                    Clear
-                  </button>
+            {uploadProgress.length > 0 &&
+              uploadProgress.some((p) => p.status === "complete") && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      Uploaded Files (
+                      {
+                        uploadProgress.filter((p) => p.status === "complete")
+                          .length
+                      }
+                      )
+                    </h3>
+                    <button
+                      onClick={() => setUploadProgress([])}
+                      className="text-xs text-gray-600 hover:text-red-600 transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {uploadProgress
+                      .filter((upload) => upload.status === "complete")
+                      .map((upload) => (
+                        <div
+                          key={upload.id}
+                          className="flex items-center gap-3 p-2 rounded bg-green-50 border border-green-200"
+                        >
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-green-100">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {upload.fileName}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {upload.marketCode} • Uploaded successfully
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {uploadProgress
-                    .filter(upload => upload.status === "complete")
-                    .map((upload) => (
-                    <div key={upload.id} className="flex items-center gap-3 p-2 rounded bg-green-50 border border-green-200">
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-green-100">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {upload.fileName}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {upload.marketCode} • Uploaded successfully
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
 
             {/* Consolidation Status */}
             {isConsolidating && (
@@ -1235,11 +1378,13 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
 
             {/* Consolidation Result */}
             {consolidationResult && (
-              <div className={`rounded-lg p-3 ${
-                consolidationResult.error
-                  ? 'bg-red-50 border border-red-200'
-                  : 'bg-green-50 border border-green-200'
-              }`}>
+              <div
+                className={`rounded-lg p-3 ${
+                  consolidationResult.error
+                    ? "bg-red-50 border border-red-200"
+                    : "bg-green-50 border border-green-200"
+                }`}
+              >
                 <div className="flex items-start gap-2.5">
                   <div className="flex-1">
                     {consolidationResult.error ? (
@@ -1261,7 +1406,12 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                             <p>• Job ID: {consolidationResult.id}</p>
                           )}
                           {consolidationResult.status && (
-                            <p>• Status: <span className="font-semibold capitalize">{consolidationResult.status}</span></p>
+                            <p>
+                              • Status:{" "}
+                              <span className="font-semibold capitalize">
+                                {consolidationResult.status}
+                              </span>
+                            </p>
                           )}
                           {consolidationResult.excel_download_url && (
                             <p>• ✅ Excel file ready for download</p>
@@ -1270,7 +1420,12 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                             <p>• ✅ PowerPoint file ready for download</p>
                           )}
                           {consolidationResult.completed_at && (
-                            <p>• Completed: {new Date(consolidationResult.completed_at).toLocaleString()}</p>
+                            <p>
+                              • Completed:{" "}
+                              {new Date(
+                                consolidationResult.completed_at
+                              ).toLocaleString()}
+                            </p>
                           )}
                         </div>
                       </>
@@ -1289,18 +1444,22 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
             {/* Run Automation / Download Buttons - Only show when files are selected */}
             {(markets.length > 0 || consolidationResult) && (
               <div className="flex justify-end gap-3">
-                {consolidationResult && !consolidationResult.error && (consolidationResult.excel_download_url || consolidationResult.excel_path) ? (
+                {consolidationResult &&
+                !consolidationResult.error &&
+                (consolidationResult.excel_download_url ||
+                  consolidationResult.excel_path) ? (
                   <>
                     <button
-                      onClick={() => handleDownloadConsolidation('excel')}
+                      onClick={() => handleDownloadConsolidation("excel")}
                       className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm"
                     >
                       <Download size={16} />
                       Download Excel
                     </button>
-                    {(consolidationResult.ppt_download_url || consolidationResult.ppt_path) && (
+                    {(consolidationResult.ppt_download_url ||
+                      consolidationResult.ppt_path) && (
                       <button
-                        onClick={() => handleDownloadConsolidation('ppt')}
+                        onClick={() => handleDownloadConsolidation("ppt")}
                         className="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm"
                       >
                         <Download size={16} />
@@ -1308,18 +1467,23 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                       </button>
                     )}
                   </>
-                ) : markets.length > 0 && (
-                  <button
-                    onClick={handleRunAutomation}
-                    disabled={isConsolidating || uploadProgress.some(p => p.status === "uploading")}
-                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                  >
-                    {uploadProgress.some(p => p.status === "uploading")
-                      ? "Extracting..."
-                      : isConsolidating
-                      ? "Consolidating..."
-                      : "Run Automation"}
-                  </button>
+                ) : (
+                  markets.length > 0 && (
+                    <button
+                      onClick={handleRunAutomation}
+                      disabled={
+                        isConsolidating ||
+                        uploadProgress.some((p) => p.status === "uploading")
+                      }
+                      className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {uploadProgress.some((p) => p.status === "uploading")
+                        ? "Extracting..."
+                        : isConsolidating
+                        ? "Consolidating..."
+                        : "Run Automation"}
+                    </button>
+                  )
                 )}
               </div>
             )}
@@ -1410,13 +1574,17 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="text-sm text-gray-600">
-                                    {new Date(item.registered_date).toLocaleDateString()}
+                                    {new Date(
+                                      item.registered_date
+                                    ).toLocaleDateString()}
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="text-sm text-gray-600">
                                     {item.completed_date
-                                      ? new Date(item.completed_date).toLocaleDateString()
+                                      ? new Date(
+                                          item.completed_date
+                                        ).toLocaleDateString()
                                       : "-"}
                                   </div>
                                 </td>
@@ -1428,7 +1596,11 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                     {/* Eye/Details button - shown first if there are trackers */}
                                     {item.trackers.length > 0 && (
                                       <button
-                                        onClick={() => router.push(`/report-automation/history/${item.id}`)}
+                                        onClick={() =>
+                                          router.push(
+                                            `/report-automation/history/${item.id}`
+                                          )
+                                        }
                                         className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
                                         title="View consolidation details"
                                       >
@@ -1454,23 +1626,30 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                       </button>
                                     )}
                                     {/* Dropdown toggle replaces download icon */}
-                                    {item.status === "completed" && canExpand && (
-                                      <button
-                                        onClick={() => toggleHistoryRow(rowKey)}
-                                        className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
-                                        title={isExpanded ? "Hide markets" : "Show markets"}
-                                        aria-expanded={isExpanded}
-                                        aria-controls={`history-row-${rowKey}`}
-                                      >
-                                        <span
-                                          className={`block transition-transform duration-200 ${
-                                            isExpanded ? "rotate-180" : ""
-                                          }`}
+                                    {item.status === "completed" &&
+                                      canExpand && (
+                                        <button
+                                          onClick={() =>
+                                            toggleHistoryRow(rowKey)
+                                          }
+                                          className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                                          title={
+                                            isExpanded
+                                              ? "Hide markets"
+                                              : "Show markets"
+                                          }
+                                          aria-expanded={isExpanded}
+                                          aria-controls={`history-row-${rowKey}`}
                                         >
-                                          <ChevronDown size={16} />
-                                        </span>
-                                      </button>
-                                    )}
+                                          <span
+                                            className={`block transition-transform duration-200 ${
+                                              isExpanded ? "rotate-180" : ""
+                                            }`}
+                                          >
+                                            <ChevronDown size={16} />
+                                          </span>
+                                        </button>
+                                      )}
                                   </div>
                                 </td>
                               </tr>
@@ -1499,33 +1678,44 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                                           <div className="overflow-hidden rounded border border-gray-200 bg-white">
                                             <table className="w-full text-sm text-gray-700">
                                               <tbody>
-                                                {item.trackers.map((tracker, trackerIndex) => (
-                                                  <tr
-                                                    key={`${tracker.market_code}-${tracker.file_name}-${trackerIndex}`}
-                                                    className={`bg-white ${
-                                                      trackerIndex !== 0 ? "border-t border-gray-200" : ""
-                                                    }`}
-                                                  >
-                                                    <td className="w-1/2 px-3 py-2 align-top">
-                                                      <div className="flex items-center gap-2">
-                                                        <span className="inline-flex items-center justify-center rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-blue-700">
-                                                          {tracker.market_code}
+                                                {item.trackers.map(
+                                                  (tracker, trackerIndex) => (
+                                                    <tr
+                                                      key={`${tracker.market_code}-${tracker.file_name}-${trackerIndex}`}
+                                                      className={`bg-white ${
+                                                        trackerIndex !== 0
+                                                          ? "border-t border-gray-200"
+                                                          : ""
+                                                      }`}
+                                                    >
+                                                      <td className="w-1/2 px-3 py-2 align-top">
+                                                        <div className="flex items-center gap-2">
+                                                          <span className="inline-flex items-center justify-center rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-blue-700">
+                                                            {
+                                                              tracker.market_code
+                                                            }
+                                                          </span>
+                                                          <span className="text-sm font-medium text-gray-900">
+                                                            {tracker.market_name ||
+                                                              "-"}
+                                                          </span>
+                                                        </div>
+                                                      </td>
+                                                      <td className="px-3 py-2">
+                                                        <span
+                                                          className="block truncate text-sm text-gray-600"
+                                                          title={formatTrackerFileName(
+                                                            tracker.file_name
+                                                          )}
+                                                        >
+                                                          {formatTrackerFileName(
+                                                            tracker.file_name
+                                                          )}
                                                         </span>
-                                                        <span className="text-sm font-medium text-gray-900">
-                                                          {tracker.market_name || "-"}
-                                                        </span>
-                                                      </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                      <span
-                                                        className="block truncate text-sm text-gray-600"
-                                                        title={formatTrackerFileName(tracker.file_name)}
-                                                      >
-                                                        {formatTrackerFileName(tracker.file_name)}
-                                                      </span>
-                                                    </td>
-                                                  </tr>
-                                                ))}
+                                                      </td>
+                                                    </tr>
+                                                  )
+                                                )}
                                               </tbody>
                                             </table>
                                           </div>
@@ -1549,19 +1739,27 @@ const clientNumberId = clientMap[clientId]; // <-- FIX
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-700">
                         Showing page {historyPagination.page} of{" "}
-                        {historyPagination.totalPages} ({historyPagination.total} total jobs)
+                        {historyPagination.totalPages} (
+                        {historyPagination.total} total jobs)
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handlePageChange(historyPagination.page - 1)}
+                          onClick={() =>
+                            handlePageChange(historyPagination.page - 1)
+                          }
                           disabled={historyPagination.page === 1}
                           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Previous
                         </button>
                         <button
-                          onClick={() => handlePageChange(historyPagination.page + 1)}
-                          disabled={historyPagination.page >= historyPagination.totalPages}
+                          onClick={() =>
+                            handlePageChange(historyPagination.page + 1)
+                          }
+                          disabled={
+                            historyPagination.page >=
+                            historyPagination.totalPages
+                          }
                           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Next
