@@ -25,6 +25,7 @@ import {
 import { applyOthersLogic, checkDataDensity, arlaFieldMappings, analyzeSelectedFields, getFieldType } from './utils/dataProcessing';
 import { DataDensityWarning } from './DataDensityWarning';
 import { GraphModal } from './GraphModal';
+import { DashboardErrorState, DashboardEmptyState } from './ErrorState';
 import {
   fetchSummaryDataFromSelection,
   ConsolidatedSummaryResponse,
@@ -893,8 +894,8 @@ export function VisualizationCanvas({
   };
 
   const renderVisualization = () => {
-    // Show loading state when fetching API data
-    if (isLoadingApiData && dataSource === 'summary' && client === 'Arla') {
+    // Show loading state when fetching API data (for both summary and trackers)
+    if (isLoadingApiData && (dataSource === 'summary' || dataSource === 'trackers') && client === 'Arla') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center px-8">
           <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 mb-4">
@@ -902,45 +903,36 @@ export function VisualizationCanvas({
           </div>
           <h3 className="text-xl font-semibold text-slate-800 mb-2">Loading data...</h3>
           <p className="text-sm text-slate-500 max-w-md">
-            Fetching consolidated summary data from the server
+            Fetching {dataSource === 'trackers' ? 'tracker' : 'consolidated summary'} data from the server
           </p>
         </div>
       );
     }
 
-    // Show error state if API call failed
-    if (apiError && dataSource === 'summary' && client === 'Arla' && getTotalSelected() > 0) {
+    // Show error state if API call failed (for both summary and trackers)
+    if (apiError && (dataSource === 'summary' || dataSource === 'trackers') && client === 'Arla' && getTotalSelected() > 0) {
       return (
-        <div className="flex flex-col items-center justify-center h-full text-center px-8">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-red-100 to-orange-100 mb-4">
-            <BarChart3 className="w-12 h-12 text-red-600" />
-          </div>
-          <h3 className="text-xl font-semibold text-slate-800 mb-2">Failed to load data</h3>
-          <p className="text-sm text-slate-500 max-w-md mb-4">
-            {apiError}
-          </p>
-          <p className="text-xs text-slate-400">
-            Make sure a consolidation job is selected and try again
-          </p>
-        </div>
+        <DashboardErrorState
+          error={new Error(apiError)}
+          title="Failed to load data"
+          description={dataSource === 'trackers'
+            ? 'Could not fetch tracker data. Please ensure you have selected a valid media type.'
+            : 'Make sure a consolidation job is selected and try again.'
+          }
+        />
       );
     }
 
-    // Show "no data" state for Arla summary when fields are selected but no data returned
-    if (client === 'Arla' && dataSource === 'summary' && getTotalSelected() > 0 && !hasData && !isLoadingApiData) {
+    // Show "no data" state when fields are selected but no data returned (for both summary and trackers)
+    if (client === 'Arla' && (dataSource === 'summary' || dataSource === 'trackers') && getTotalSelected() > 0 && !hasData && !isLoadingApiData) {
       return (
-        <div className="flex flex-col items-center justify-center h-full text-center px-8">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-100 to-yellow-100 mb-4">
-            <BarChart3 className="w-12 h-12 text-amber-600" />
-          </div>
-          <h3 className="text-xl font-semibold text-slate-800 mb-2">No data available</h3>
-          <p className="text-sm text-slate-500 max-w-md mb-4">
-            The selected fields returned no data for this consolidation job.
-          </p>
-          <p className="text-xs text-slate-400">
-            Try selecting different fields or ensure the consolidation job has been populated.
-          </p>
-        </div>
+        <DashboardEmptyState
+          title="No data available"
+          description={dataSource === 'trackers'
+            ? 'The selected fields returned no tracker data. Try selecting different fields or media type.'
+            : 'The selected fields returned no data for this consolidation job. Try selecting different fields or ensure the job has been populated.'
+          }
+        />
       );
     }
 

@@ -143,9 +143,9 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
         {/* Bars */}
         {[65, 80, 45, 90, 70, 55].map((height, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-2">
-            <Skeleton 
-              className="w-full rounded-t-lg animate-pulse" 
-              style={{ height: `${height}%` }} 
+            <Skeleton
+              className="w-full rounded-t-lg animate-pulse"
+              style={{ height: `${height}%` }}
             />
             <Skeleton className="h-3 w-8" />
           </div>
@@ -158,8 +158,6 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
 export function DashboardLoadingState({ chartType }: { chartType?: string }) {
   const getSkeletonType = () => {
     switch (chartType) {
-      case 'kpi-card':
-        return 'kpi';
       case 'pie-chart':
         return 'pie';
       case 'line-chart':

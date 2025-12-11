@@ -52,9 +52,9 @@ export function analyzeSelectedFields(selectedFields: Record<string, string[]>):
   const hasAbsoluteValues = metrics.length > 0;
   const hasPercentages = percentages.length > 0;
   const hasIndexes = indexes.length > 0;
-  const hasMixedScales = (hasAbsoluteValues && hasPercentages) || 
-                          (hasAbsoluteValues && hasIndexes) ||
-                          (hasPercentages && hasIndexes);
+  const hasMixedScales = (hasAbsoluteValues && hasPercentages) ||
+    (hasAbsoluteValues && hasIndexes) ||
+    (hasPercentages && hasIndexes);
 
   let scaleWarning: string | undefined;
   if (hasMixedScales) {
@@ -88,9 +88,9 @@ export function getRecommendedCharts(selectedFields: Record<string, string[]>): 
 
   const recommendations: string[] = [];
 
-  // Single metric/percentage - KPI Card or Gauge
+  // Single metric/percentage - Bar chart or Table
   if (numericFields === 1 && dimensions.length === 0) {
-    recommendations.push('kpi-card', 'gauge');
+    recommendations.push('bar-chart', 'table');
   }
 
   // Handle mixed scales - recommend dual-axis or separate charts
@@ -105,7 +105,7 @@ export function getRecommendedCharts(selectedFields: Record<string, string[]>): 
     }
   } else {
     // Non-mixed scales - standard recommendations
-    
+
     // 1 metric - Bar chart is great for comparing across categories
     if (numericFields >= 1) {
       recommendations.push('bar-chart');
@@ -157,14 +157,14 @@ export function applyOthersLogic(
 
   // Sort by value descending
   const sorted = [...data].sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
-  
+
   // Take top items
   const topItems = sorted.slice(0, maxItems);
-  
+
   // Aggregate remaining items
   const remainingItems = sorted.slice(maxItems);
   const othersData: any = { name: 'Others', isOther: true };
-  
+
   // Sum all numeric values
   remainingItems.forEach(item => {
     Object.keys(item).forEach(key => {
@@ -194,7 +194,7 @@ export function checkDataDensity(
   };
 
   const limit = limits[chartType];
-  
+
   if (!limit) return { isHigh: false };
 
   if (dataLength > limit * 2) {
@@ -252,7 +252,7 @@ export function isChartCompatible(
   const allFields = Object.values(selectedFields).flat();
   const fieldTypes = allFields.map(getFieldType);
   const analysis = analyzeSelectedFields(selectedFields);
-  
+
   const hasTime = fieldTypes.includes('time');
   const hasDimension = fieldTypes.includes('dimension');
   const hasMetric = fieldTypes.some(t => t === 'metric' || t === 'percentage' || t === 'index');
