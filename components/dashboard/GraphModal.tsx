@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { X, FileText, Check, Maximize2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { X, FileText, Check, Maximize2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface GraphModalProps {
   isOpen: boolean;
@@ -26,31 +26,33 @@ export function GraphModal({
   slideNumber,
   onUpdateSlideNumber,
 }: GraphModalProps) {
-  const [localSlideNumber, setLocalSlideNumber] = useState<string>(slideNumber?.toString() || '');
+  const [localSlideNumber, setLocalSlideNumber] = useState<string>(
+    slideNumber?.toString() || "",
+  );
 
   // Update local state when slideNumber prop changes
   useEffect(() => {
-    setLocalSlideNumber(slideNumber?.toString() || '');
+    setLocalSlideNumber(slideNumber?.toString() || "");
   }, [slideNumber]);
 
   // Prevent scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
   const handleSlideNumberChange = (value: string) => {
     setLocalSlideNumber(value);
-    
+
     // Parse and update the slide number
     const num = parseInt(value, 10);
-    if (value === '' || value === null) {
+    if (value === "" || value === null) {
       onUpdateSlideNumber(undefined);
     } else if (!isNaN(num) && num > 0) {
       onUpdateSlideNumber(num);
@@ -86,9 +88,10 @@ export function GraphModal({
               onClick={() => onToggleInclude()}
               className={`
                 flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm
-                ${isIncluded
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200'
-                  : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-violet-200'
+                ${
+                  isIncluded
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200"
+                    : "bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-violet-200"
                 }
               `}
             >
@@ -141,9 +144,7 @@ export function GraphModal({
 
         {/* Content */}
         <div className="flex-1 p-8 overflow-auto bg-gradient-to-br from-slate-50 to-slate-100/50">
-          <div className="max-w-6xl mx-auto">
-            {children}
-          </div>
+          <div className="max-w-6xl mx-auto">{children}</div>
         </div>
       </div>
     </div>

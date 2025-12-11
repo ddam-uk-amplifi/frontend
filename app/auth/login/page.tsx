@@ -54,7 +54,7 @@ export default function LoginPage() {
   const demoUser = {
     username: "super",
     password: "Super123",
-  }
+  };
 
   // const adminButton = async () => {
   //   try {

@@ -22,10 +22,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // Helper to get download URL (S3 presigned or local endpoint)
-const getDownloadUrl = (downloadUrl: string | null | undefined, filePath: string | null | undefined): string | null => {
+const getDownloadUrl = (
+  downloadUrl: string | null | undefined,
+  filePath: string | null | undefined,
+): string | null => {
   if (downloadUrl) return downloadUrl;
   if (filePath) {
-    const fileName = filePath.split('/').pop();
+    const fileName = filePath.split("/").pop();
     return `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
   }
   return null;
@@ -41,7 +44,9 @@ export default function ConsolidationDetailPage() {
   const params = useParams();
   const jobId = params.id as string;
 
-  const [jobDetail, setJobDetail] = useState<ConsolidationJobDetail | null>(null);
+  const [jobDetail, setJobDetail] = useState<ConsolidationJobDetail | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +64,9 @@ export default function ConsolidationDetailPage() {
       setJobDetail(data);
     } catch (err: any) {
       console.error("Failed to fetch job detail:", err);
-      setError(err.response?.data?.detail || "Failed to load consolidation details");
+      setError(
+        err.response?.data?.detail || "Failed to load consolidation details",
+      );
     } finally {
       setLoading(false);
     }
@@ -149,7 +156,10 @@ export default function ConsolidationDetailPage() {
   const statusClasses = getStatusColor(jobDetail.status);
   const statusIconElement = getStatusIcon(jobDetail.status);
 
-  const excelUrl = getDownloadUrl(jobDetail.excel_download_url, jobDetail.excel_path);
+  const excelUrl = getDownloadUrl(
+    jobDetail.excel_download_url,
+    jobDetail.excel_path,
+  );
   const pptUrl = getDownloadUrl(jobDetail.ppt_download_url, jobDetail.ppt_path);
   const hasDownloads = Boolean(excelUrl || pptUrl);
 
@@ -160,7 +170,8 @@ export default function ConsolidationDetailPage() {
   const completedDate = jobDetail.completed_date
     ? new Date(jobDetail.completed_date).toLocaleString()
     : null;
-  const analyzedByName = jobDetail.analyzed_by_name || jobDetail.analyzed_by_email;
+  const analyzedByName =
+    jobDetail.analyzed_by_name || jobDetail.analyzed_by_email;
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -176,13 +187,19 @@ export default function ConsolidationDetailPage() {
         <section className="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
-              <h1 className="text-2xl font-semibold text-gray-900">Consolidation Details</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                Consolidation Details
+              </h1>
               <p className="text-sm text-gray-600">
                 {jobDetail.client_name} • {jobDetail.ytd_month}
               </p>
-              <p className="text-xs text-gray-500">Analyzed by {analyzedByName}</p>
+              <p className="text-xs text-gray-500">
+                Analyzed by {analyzedByName}
+              </p>
             </div>
-            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${statusClasses}`}>
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${statusClasses}`}
+            >
               {statusIconElement}
               <span className="capitalize">{jobDetail.status}</span>
             </span>
@@ -190,24 +207,34 @@ export default function ConsolidationDetailPage() {
 
           <dl className="grid grid-cols-1 gap-4 text-sm text-gray-600 sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Registered</dt>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Registered
+              </dt>
               <dd className="mt-1 text-gray-900">{registeredDate}</dd>
             </div>
             {startedDate && (
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Started</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Started
+                </dt>
                 <dd className="mt-1 text-gray-900">{startedDate}</dd>
               </div>
             )}
             {completedDate && (
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Completed</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Completed
+                </dt>
                 <dd className="mt-1 text-gray-900">{completedDate}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Analyzed By</dt>
-              <dd className="mt-1 text-gray-900">{jobDetail.analyzed_by_email}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Analyzed By
+              </dt>
+              <dd className="mt-1 text-gray-900">
+                {jobDetail.analyzed_by_email}
+              </dd>
             </div>
           </dl>
 
@@ -243,11 +270,17 @@ export default function ConsolidationDetailPage() {
 
         <section className="rounded-lg border border-gray-200 bg-white">
           <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Tracker Files</h2>
-            <p className="text-sm text-gray-600">Files processed for this consolidation job.</p>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Tracker Files
+            </h2>
+            <p className="text-sm text-gray-600">
+              Files processed for this consolidation job.
+            </p>
           </div>
           {jobDetail.trackers.length === 0 ? (
-            <p className="px-6 py-10 text-center text-gray-500">No tracker files found.</p>
+            <p className="px-6 py-10 text-center text-gray-500">
+              No tracker files found.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -271,7 +304,10 @@ export default function ConsolidationDetailPage() {
                         </div>
                       </td>
                       <td className="px-6 py-3">
-                        <span className="block truncate" title={formatTrackerFileName(tracker.file_name)}>
+                        <span
+                          className="block truncate"
+                          title={formatTrackerFileName(tracker.file_name)}
+                        >
                           {formatTrackerFileName(tracker.file_name)}
                         </span>
                       </td>

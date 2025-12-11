@@ -70,11 +70,7 @@ export function ProtectedRoute({
     return null; // Will redirect in useEffect
   }
 
-  if (
-    requireSuperuser &&
-    user &&
-    !roleUtils.isSuperuser(user.is_superuser)
-  ) {
+  if (requireSuperuser && user && !roleUtils.isSuperuser(user.is_superuser)) {
     return null; // Will redirect in useEffect
   }
 

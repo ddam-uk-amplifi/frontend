@@ -1,50 +1,61 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { Menu } from 'lucide-react';
-import { toast } from 'sonner';
-import { TopBar } from '@/components/dashboard/TopBar';
-import { QueryBuilderPanel } from '@/components/dashboard/QueryBuilderPanel';
-import { GraphRecommendationsPanel } from '@/components/dashboard/GraphRecommendationsPanel';
-import { VisualizationCanvas } from '@/components/dashboard/VisualizationCanvas';
-import { PPTGenerationBanner } from '@/components/dashboard/PPTGenerationBanner';
-import { PPTConfirmationDialog } from '@/components/dashboard/PPTConfirmationDialog';
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Menu } from "lucide-react";
+import { toast } from "sonner";
+import { TopBar } from "@/components/dashboard/TopBar";
+import { QueryBuilderPanel } from "@/components/dashboard/QueryBuilderPanel";
+import { GraphRecommendationsPanel } from "@/components/dashboard/GraphRecommendationsPanel";
+import { VisualizationCanvas } from "@/components/dashboard/VisualizationCanvas";
+import { PPTGenerationBanner } from "@/components/dashboard/PPTGenerationBanner";
+import { PPTConfirmationDialog } from "@/components/dashboard/PPTConfirmationDialog";
 import {
   fetchLatestJob,
   generateDashboardPPTX,
   captureChartAsBase64,
   type ChartImageForPPT,
-} from '@/lib/api/dashboard';
-import { tokenUtils } from '@/lib/utils/token';
+} from "@/lib/api/dashboard";
+import { tokenUtils } from "@/lib/utils/token";
 
 interface GraphForPPT {
   id: string;
   title: string;
   slideNumber?: number;
-  imageBase64?: string;  // Captured when graph is selected
+  imageBase64?: string; // Captured when graph is selected
 }
 
 // Client ID mapping - used for tracker API calls
 const CLIENT_ID_MAP: Record<string, number> = {
-  'Arla': 1,
-  'Carlsberg': 2,
-  'Kering': 3,
+  Arla: 1,
+  Carlsberg: 2,
+  Kering: 3,
 };
 
 export default function Dashboard() {
-  const [selectedClient, setSelectedClient] = useState('');
-  const [selectedDataSource, setSelectedDataSource] = useState<'summary' | 'trackers' | ''>('');
-  const [selectedMarket, setSelectedMarket] = useState('');
-  const [selectedYtdMonth, setSelectedYtdMonth] = useState('');
-  const [selectedJobId, setSelectedJobId] = useState('');
+  const [selectedClient, setSelectedClient] = useState("");
+  const [selectedDataSource, setSelectedDataSource] = useState<
+    "summary" | "trackers" | ""
+  >("");
+  const [selectedMarket, setSelectedMarket] = useState("");
+  const [selectedYtdMonth, setSelectedYtdMonth] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState("");
   const [isQueryPanelOpen, setIsQueryPanelOpen] = useState(true);
-  const [selectedFields, setSelectedFields] = useState<Record<string, string[]>>({});
-  const [selectedGraphType, setSelectedGraphType] = useState<string | null>(null);
-  const [isRecommendationsPanelOpen, setIsRecommendationsPanelOpen] = useState(false);
-  
+  const [selectedFields, setSelectedFields] = useState<
+    Record<string, string[]>
+  >({});
+  const [selectedGraphType, setSelectedGraphType] = useState<string | null>(
+    null,
+  );
+  const [isRecommendationsPanelOpen, setIsRecommendationsPanelOpen] =
+    useState(false);
+
   // PPT Report State
-  const [selectedGraphsForPPT, setSelectedGraphsForPPT] = useState<Set<string>>(new Set());
-  const [graphsMetadata, setGraphsMetadata] = useState<Map<string, GraphForPPT>>(new Map());
+  const [selectedGraphsForPPT, setSelectedGraphsForPPT] = useState<Set<string>>(
+    new Set(),
+  );
+  const [graphsMetadata, setGraphsMetadata] = useState<
+    Map<string, GraphForPPT>
+  >(new Map());
   const [isPPTDialogOpen, setIsPPTDialogOpen] = useState(false);
   const [isGeneratingPPT, setIsGeneratingPPT] = useState(false);
 
@@ -52,13 +63,15 @@ export default function Dashboard() {
   const chartElementRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   // Get client ID from selected client name
-  const selectedClientId = selectedClient ? CLIENT_ID_MAP[selectedClient] : undefined;
+  const selectedClientId = selectedClient
+    ? CLIENT_ID_MAP[selectedClient]
+    : undefined;
 
   // Fetch latest job when client changes (for summary data source)
   useEffect(() => {
     const fetchJob = async () => {
-      if (!selectedClient || selectedDataSource !== 'summary') {
-        setSelectedJobId('');
+      if (!selectedClient || selectedDataSource !== "summary") {
+        setSelectedJobId("");
         return;
       }
 
@@ -66,9 +79,9 @@ export default function Dashboard() {
         const response = await fetchLatestJob(selectedClient);
         setSelectedJobId(response.consolidation_job_id);
       } catch (error) {
-        console.error('Failed to fetch latest job:', error);
+        console.error("Failed to fetch latest job:", error);
         // Don't show toast - it's expected if no jobs exist
-        setSelectedJobId('');
+        setSelectedJobId("");
       }
     };
 
@@ -100,10 +113,10 @@ export default function Dashboard() {
   };
 
   // When data source changes, clear market selection if switching to summary
-  const handleDataSourceChange = (source: 'summary' | 'trackers' | '') => {
+  const handleDataSourceChange = (source: "summary" | "trackers" | "") => {
     setSelectedDataSource(source);
-    if (source === 'summary' || source === '') {
-      setSelectedMarket(''); // Summary Excel doesn't use market selection
+    if (source === "summary" || source === "") {
+      setSelectedMarket(""); // Summary Excel doesn't use market selection
     }
     // Clear fields when switching data source since field sets are different
     setSelectedFields({});
@@ -111,113 +124,142 @@ export default function Dashboard() {
   };
 
   // PPT Functions - capture base64 immediately when user selects a graph
-  const handleToggleGraphForPPT = useCallback(async (graphId: string, graphTitle: string, element?: HTMLElement) => {
-    // Check if already selected (toggling off)
-    if (selectedGraphsForPPT.has(graphId)) {
-      setSelectedGraphsForPPT(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(graphId);
-        return newSet;
-      });
-      setGraphsMetadata(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(graphId);
-        return newMap;
-      });
-      chartElementRefs.current.delete(graphId);
-      toast.info('Graph removed from PPT report');
-      return;
-    }
-
-    // Adding graph - capture base64 immediately while it's visible
-    if (!element) {
-      console.error('[handleToggleGraphForPPT] No element provided for graph:', graphId);
-      toast.error('Could not capture chart. Please try again.');
-      return;
-    }
-
-    try {
-      console.log('[handleToggleGraphForPPT] Capturing base64 for:', graphId);
-      const imageBase64 = await captureChartAsBase64(element);
-      console.log('[handleToggleGraphForPPT] Captured! Length:', imageBase64.length);
-
-      setSelectedGraphsForPPT(prev => {
-        const newSet = new Set(prev);
-        newSet.add(graphId);
-        return newSet;
-      });
-
-      setGraphsMetadata(prev => {
-        const newMap = new Map(prev);
-        newMap.set(graphId, {
-          id: graphId,
-          title: graphTitle,
-          imageBase64: imageBase64,  // Store the captured image
+  const handleToggleGraphForPPT = useCallback(
+    async (graphId: string, graphTitle: string, element?: HTMLElement) => {
+      // Check if already selected (toggling off)
+      if (selectedGraphsForPPT.has(graphId)) {
+        setSelectedGraphsForPPT((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(graphId);
+          return newSet;
         });
-        return newMap;
-      });
+        setGraphsMetadata((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(graphId);
+          return newMap;
+        });
+        chartElementRefs.current.delete(graphId);
+        toast.info("Graph removed from PPT report");
+        return;
+      }
 
-      chartElementRefs.current.set(graphId, element);
-      toast.success('Graph added to PPT report');
-    } catch (error) {
-      console.error('[handleToggleGraphForPPT] Failed to capture chart:', error);
-      toast.error('Failed to capture chart image. Please try again.');
-    }
-  }, [selectedGraphsForPPT]);
+      // Adding graph - capture base64 immediately while it's visible
+      if (!element) {
+        console.error(
+          "[handleToggleGraphForPPT] No element provided for graph:",
+          graphId,
+        );
+        toast.error("Could not capture chart. Please try again.");
+        return;
+      }
+
+      try {
+        console.log("[handleToggleGraphForPPT] Capturing base64 for:", graphId);
+        const imageBase64 = await captureChartAsBase64(element);
+        console.log(
+          "[handleToggleGraphForPPT] Captured! Length:",
+          imageBase64.length,
+        );
+
+        setSelectedGraphsForPPT((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(graphId);
+          return newSet;
+        });
+
+        setGraphsMetadata((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(graphId, {
+            id: graphId,
+            title: graphTitle,
+            imageBase64: imageBase64, // Store the captured image
+          });
+          return newMap;
+        });
+
+        chartElementRefs.current.set(graphId, element);
+        toast.success("Graph added to PPT report");
+      } catch (error) {
+        console.error(
+          "[handleToggleGraphForPPT] Failed to capture chart:",
+          error,
+        );
+        toast.error("Failed to capture chart image. Please try again.");
+      }
+    },
+    [selectedGraphsForPPT],
+  );
 
   // Register a chart element for later capture
-  const registerChartElement = useCallback((graphId: string, element: HTMLElement | null) => {
-    if (element) {
-      chartElementRefs.current.set(graphId, element);
-    } else {
-      chartElementRefs.current.delete(graphId);
-    }
-  }, []);
-
-  const handleUpdateSlideNumber = useCallback((graphId: string, slideNumber: number | undefined) => {
-    setGraphsMetadata(prev => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(graphId);
-      if (existing) {
-        newMap.set(graphId, { ...existing, slideNumber });
+  const registerChartElement = useCallback(
+    (graphId: string, element: HTMLElement | null) => {
+      if (element) {
+        chartElementRefs.current.set(graphId, element);
+      } else {
+        chartElementRefs.current.delete(graphId);
       }
-      return newMap;
-    });
-  }, []);
+    },
+    [],
+  );
 
-  const getSlideNumber = useCallback((graphId: string) => {
-    return graphsMetadata.get(graphId)?.slideNumber;
-  }, [graphsMetadata]);
+  const handleUpdateSlideNumber = useCallback(
+    (graphId: string, slideNumber: number | undefined) => {
+      setGraphsMetadata((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(graphId);
+        if (existing) {
+          newMap.set(graphId, { ...existing, slideNumber });
+        }
+        return newMap;
+      });
+    },
+    [],
+  );
+
+  const getSlideNumber = useCallback(
+    (graphId: string) => {
+      return graphsMetadata.get(graphId)?.slideNumber;
+    },
+    [graphsMetadata],
+  );
 
   const handleGenerateReport = () => {
     setIsPPTDialogOpen(true);
   };
 
   const handleConfirmGenerate = async () => {
-    console.log('[handleConfirmGenerate] Called!');
-    console.log('[handleConfirmGenerate] selectedGraphsForPPT:', Array.from(selectedGraphsForPPT));
-    console.log('[handleConfirmGenerate] selectedClient:', selectedClient);
-    console.log('[handleConfirmGenerate] graphsMetadata:', Array.from(graphsMetadata.entries()));
-    
+    console.log("[handleConfirmGenerate] Called!");
+    console.log(
+      "[handleConfirmGenerate] selectedGraphsForPPT:",
+      Array.from(selectedGraphsForPPT),
+    );
+    console.log("[handleConfirmGenerate] selectedClient:", selectedClient);
+    console.log(
+      "[handleConfirmGenerate] graphsMetadata:",
+      Array.from(graphsMetadata.entries()),
+    );
+
     if (selectedGraphsForPPT.size === 0) {
-      console.log('[handleConfirmGenerate] No graphs selected, aborting');
-      toast.error('No graphs selected for PPT');
+      console.log("[handleConfirmGenerate] No graphs selected, aborting");
+      toast.error("No graphs selected for PPT");
       return;
     }
 
     if (!selectedClient) {
-      console.log('[handleConfirmGenerate] No client selected, aborting');
-      toast.error('Please select a client first');
+      console.log("[handleConfirmGenerate] No client selected, aborting");
+      toast.error("Please select a client first");
       return;
     }
 
     setIsGeneratingPPT(true);
-    const loadingToast = toast.loading('Generating PowerPoint...');
+    const loadingToast = toast.loading("Generating PowerPoint...");
 
     try {
       // Build chart images from stored base64 (captured when user selected each graph)
       const chartImages: ChartImageForPPT[] = [];
-      console.log('[handleConfirmGenerate] Building chart images from stored base64...');
+      console.log(
+        "[handleConfirmGenerate] Building chart images from stored base64...",
+      );
 
       for (const graphId of selectedGraphsForPPT) {
         console.log(`[handleConfirmGenerate] Processing graphId: ${graphId}`);
@@ -225,7 +267,9 @@ export default function Dashboard() {
         console.log(`[handleConfirmGenerate] - metadata:`, metadata);
 
         if (!metadata?.imageBase64) {
-          console.warn(`[handleConfirmGenerate] No image found for graph ${graphId}, skipping...`);
+          console.warn(
+            `[handleConfirmGenerate] No image found for graph ${graphId}, skipping...`,
+          );
           continue;
         }
 
@@ -234,29 +278,38 @@ export default function Dashboard() {
           image_base64: metadata.imageBase64,
           title: metadata.title || graphId,
         });
-        console.log(`[handleConfirmGenerate] Added to chartImages. Total: ${chartImages.length}`);
+        console.log(
+          `[handleConfirmGenerate] Added to chartImages. Total: ${chartImages.length}`,
+        );
       }
 
-      console.log('[handleConfirmGenerate] Total chartImages:', chartImages.length);
+      console.log(
+        "[handleConfirmGenerate] Total chartImages:",
+        chartImages.length,
+      );
       chartImages.forEach((img, i) => {
-        console.log(`[handleConfirmGenerate] Chart ${i}: slide_index=${img.slide_index}, title=${img.title}, imageSize=${img.image_base64?.length || 0}`);
+        console.log(
+          `[handleConfirmGenerate] Chart ${i}: slide_index=${img.slide_index}, title=${img.title}, imageSize=${img.image_base64?.length || 0}`,
+        );
       });
 
       if (chartImages.length === 0) {
-        console.log('[handleConfirmGenerate] No chart images available, aborting');
+        console.log(
+          "[handleConfirmGenerate] No chart images available, aborting",
+        );
         toast.dismiss(loadingToast);
-        toast.error('No chart images available. Please re-select your charts.');
+        toast.error("No chart images available. Please re-select your charts.");
         setIsGeneratingPPT(false);
         return;
       }
 
       // Call the API to generate PPTX
-      console.log('[handleConfirmGenerate] Calling generateDashboardPPTX...');
+      console.log("[handleConfirmGenerate] Calling generateDashboardPPTX...");
       const response = await generateDashboardPPTX({
         client_name: selectedClient.toLowerCase(),
         charts: chartImages,
       });
-      console.log('[handleConfirmGenerate] API response received:', response);
+      console.log("[handleConfirmGenerate] API response received:", response);
 
       // Dismiss loading toast immediately after response
       toast.dismiss(loadingToast);
@@ -264,51 +317,58 @@ export default function Dashboard() {
       if (response.charts_placed > 0) {
         toast.success(
           `PowerPoint generated successfully! ${response.charts_placed} chart(s) placed.`,
-          { duration: 5000 }
+          { duration: 5000 },
         );
 
         // Download the file with authentication
         if (response.download_url) {
           try {
             // Use fetch with auth token to download the file
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-            const downloadUrl = response.download_url.startsWith('http')
+            const apiUrl =
+              process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+            const downloadUrl = response.download_url.startsWith("http")
               ? response.download_url
               : `${apiUrl}${response.download_url}`;
-            
+
             // Get auth token
             const token = tokenUtils.getAccessToken();
-            
+
             const downloadResponse = await fetch(downloadUrl, {
-              headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
-            
+
             if (downloadResponse.ok) {
               // Create blob and download
               const blob = await downloadResponse.blob();
               const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
+              const a = document.createElement("a");
               a.href = url;
-              a.download = response.output_path.split('/').pop() || 'dashboard_export.pptx';
+              a.download =
+                response.output_path.split("/").pop() ||
+                "dashboard_export.pptx";
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
               window.URL.revokeObjectURL(url);
             } else {
-              console.error('Download failed:', downloadResponse.status);
-              toast.error('Failed to download PowerPoint file');
+              console.error("Download failed:", downloadResponse.status);
+              toast.error("Failed to download PowerPoint file");
             }
           } catch (downloadError) {
-            console.error('Download error:', downloadError);
-            toast.error('Failed to download PowerPoint file');
+            console.error("Download error:", downloadError);
+            toast.error("Failed to download PowerPoint file");
           }
         }
       } else {
-        toast.warning('PowerPoint generated but no charts were placed successfully.');
+        toast.warning(
+          "PowerPoint generated but no charts were placed successfully.",
+        );
       }
 
       if (response.charts_failed > 0) {
-        toast.warning(`${response.charts_failed} chart(s) failed to be placed.`);
+        toast.warning(
+          `${response.charts_failed} chart(s) failed to be placed.`,
+        );
       }
 
       setIsPPTDialogOpen(false);
@@ -317,21 +377,20 @@ export default function Dashboard() {
       setSelectedGraphsForPPT(new Set());
       setGraphsMetadata(new Map());
       chartElementRefs.current.clear();
-
     } catch (error) {
       toast.dismiss(loadingToast);
-      console.error('Failed to generate PowerPoint:', error);
+      console.error("Failed to generate PowerPoint:", error);
       toast.error(
         error instanceof Error
           ? `Failed to generate PowerPoint: ${error.message}`
-          : 'Failed to generate PowerPoint. Please try again.'
+          : "Failed to generate PowerPoint. Please try again.",
       );
     } finally {
       setIsGeneratingPPT(false);
     }
   };
 
-  const selectedGraphsList = Array.from(selectedGraphsForPPT).map(id => {
+  const selectedGraphsList = Array.from(selectedGraphsForPPT).map((id) => {
     const metadata = graphsMetadata.get(id);
     return {
       id,

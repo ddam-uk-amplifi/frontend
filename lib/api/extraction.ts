@@ -30,8 +30,8 @@ export interface BatchExtractionResponse {
   total_files: number;
   completed_files: number;
   failed_files: number;
-  extracted_paths: string[];  // Array of file paths like "extracted/arla/.../file_DK.xlsx"
-  failed_markets: string[];   // Array of market codes that failed
+  extracted_paths: string[]; // Array of file paths like "extracted/arla/.../file_DK.xlsx"
+  failed_markets: string[]; // Array of market codes that failed
   error_message: string | null;
 }
 
@@ -46,9 +46,9 @@ export interface SingleExtractionResponse {
 
 // Helper to extract market code from path like "extracted/arla/.../extracted_uuid_DK.xlsx"
 export function extractMarketCodeFromPath(path: string): string {
-  const filename = path.split('/').pop() || '';
+  const filename = path.split("/").pop() || "";
   const match = filename.match(/_([A-Z]{2})\.xlsx$/);
-  return match ? match[1] : '';
+  return match ? match[1] : "";
 }
 
 // ============================================
@@ -63,7 +63,7 @@ export const extractionApi = {
   async submitBatch(
     files: File[],
     marketCodes: string[],
-    clientName: string
+    clientName: string,
   ): Promise<BatchExtractionResponse> {
     const formData = new FormData();
 
@@ -83,7 +83,7 @@ export const extractionApi = {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      }
+      },
     );
 
     return response.data;
@@ -98,7 +98,7 @@ export const extractionApi = {
     }
     console.log(`[Extraction API] Getting status for batch: ${batchId}`);
     const response = await apiClient.get<BatchExtractionResponse>(
-      `/api/v1/extraction/batch/${batchId}`
+      `/api/v1/extraction/batch/${batchId}`,
     );
     return response.data;
   },
@@ -113,13 +113,13 @@ export const extractionApi = {
       pollIntervalMs?: number;
       maxWaitSeconds?: number;
       onProgress?: (status: BatchExtractionResponse) => void;
-    } = {}
+    } = {},
   ): Promise<BatchExtractionResponse> {
     if (!batchId) {
       throw new Error("Batch ID is required for polling");
     }
     console.log(`[Extraction API] Starting poll for batch: ${batchId}`);
-    
+
     const { pollIntervalMs = 2000, maxWaitSeconds = 600, onProgress } = options;
     const startTime = Date.now();
 
@@ -142,7 +142,7 @@ export const extractionApi = {
     const finalStatus = await this.getBatchStatus(batchId);
     if (finalStatus.status !== "completed" && finalStatus.status !== "failed") {
       throw new Error(
-        `Batch extraction timed out after ${maxWaitSeconds} seconds`
+        `Batch extraction timed out after ${maxWaitSeconds} seconds`,
       );
     }
     return finalStatus;
@@ -155,7 +155,7 @@ export const extractionApi = {
     file: File,
     clientId: number,
     marketId: number,
-    onUploadProgress?: (progress: number) => void
+    onUploadProgress?: (progress: number) => void,
   ): Promise<SingleExtractionResponse> {
     const formData = new FormData();
     formData.append("file", file);
@@ -169,12 +169,12 @@ export const extractionApi = {
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total && onUploadProgress) {
             const progress = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+              (progressEvent.loaded * 100) / progressEvent.total,
             );
             onUploadProgress(progress);
           }
         },
-      }
+      },
     );
 
     return response.data;

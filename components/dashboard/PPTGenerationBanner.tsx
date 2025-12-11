@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { FileText, Download, Sparkles } from 'lucide-react';
+import { FileText, Download, Sparkles } from "lucide-react";
 
 interface PPTGenerationBannerProps {
   selectedCount: number;
@@ -22,9 +22,12 @@ export function PPTGenerationBanner({
           </div>
           <div>
             <span className="font-medium">
-              {selectedCount} graph{selectedCount !== 1 ? 's' : ''} selected for PPT report
+              {selectedCount} graph{selectedCount !== 1 ? "s" : ""} selected for
+              PPT report
             </span>
-            <p className="text-sm text-white/80">Click to preview and arrange slides</p>
+            <p className="text-sm text-white/80">
+              Click to preview and arrange slides
+            </p>
           </div>
         </div>
         <button

@@ -18,7 +18,7 @@ export interface DetectedMarket {
  */
 export const detectMarketFromFilename = (
   fileName: string,
-  availableMarkets: Market[]
+  availableMarkets: Market[],
 ): DetectedMarket => {
   const normalized = fileName.toLowerCase();
 
@@ -81,7 +81,9 @@ export const extractZipFiles = async (zipFile: File): Promise<File[]> => {
     return files;
   } catch (error) {
     console.error("Failed to extract ZIP file:", error);
-    throw new Error("Failed to extract ZIP file. Please ensure it's a valid ZIP archive.");
+    throw new Error(
+      "Failed to extract ZIP file. Please ensure it's a valid ZIP archive.",
+    );
   }
 };
 
@@ -107,7 +109,9 @@ const getFileType = (filename: string): string => {
 /**
  * Validates if a file is acceptable for upload
  */
-export const validateTrackerFile = (file: File): { valid: boolean; error?: string } => {
+export const validateTrackerFile = (
+  file: File,
+): { valid: boolean; error?: string } => {
   // Check file size (max 50MB)
   const maxSize = 50 * 1024 * 1024;
   if (file.size > maxSize) {
@@ -128,13 +132,14 @@ export const validateTrackerFile = (file: File): { valid: boolean; error?: strin
   // Check file extension
   const validExtensions = [".xlsx", ".xls", ".xlsb", ".csv"];
   const hasValidExtension = validExtensions.some((ext) =>
-    file.name.toLowerCase().endsWith(ext)
+    file.name.toLowerCase().endsWith(ext),
   );
 
   if (!hasValidExtension) {
     return {
       valid: false,
-      error: "Invalid file type. Only Excel (.xlsx, .xls, .xlsb) and CSV files are allowed.",
+      error:
+        "Invalid file type. Only Excel (.xlsx, .xls, .xlsb) and CSV files are allowed.",
     };
   }
 

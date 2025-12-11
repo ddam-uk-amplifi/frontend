@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3, TrendingUp, PieChart } from 'lucide-react';
+import { Skeleton } from "@/components/ui/skeleton";
+import { BarChart3, TrendingUp, PieChart } from "lucide-react";
 
 interface ChartSkeletonProps {
-  type?: 'bar' | 'pie' | 'line' | 'kpi' | 'table';
+  type?: "bar" | "pie" | "line" | "kpi" | "table";
 }
 
-export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
-  if (type === 'kpi') {
+export function ChartSkeleton({ type = "bar" }: ChartSkeletonProps) {
+  if (type === "kpi") {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[1, 2, 3].map((i) => (
@@ -28,7 +28,7 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
     );
   }
 
-  if (type === 'pie') {
+  if (type === "pie") {
     return (
       <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -51,7 +51,7 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
     );
   }
 
-  if (type === 'line') {
+  if (type === "line") {
     return (
       <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -92,7 +92,7 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
     );
   }
 
-  if (type === 'table') {
+  if (type === "table") {
     return (
       <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -112,7 +112,10 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
         </div>
         {/* Table rows */}
         {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
-          <div key={row} className="grid grid-cols-5 gap-4 py-3 border-b border-slate-100">
+          <div
+            key={row}
+            className="grid grid-cols-5 gap-4 py-3 border-b border-slate-100"
+          >
             {[1, 2, 3, 4, 5].map((col) => (
               <Skeleton key={col} className="h-4 w-full" />
             ))}
@@ -158,15 +161,15 @@ export function ChartSkeleton({ type = 'bar' }: ChartSkeletonProps) {
 export function DashboardLoadingState({ chartType }: { chartType?: string }) {
   const getSkeletonType = () => {
     switch (chartType) {
-      case 'pie-chart':
-        return 'pie';
-      case 'line-chart':
-      case 'area-chart':
-        return 'line';
-      case 'table':
-        return 'table';
+      case "pie-chart":
+        return "pie";
+      case "line-chart":
+      case "area-chart":
+        return "line";
+      case "table":
+        return "table";
       default:
-        return 'bar';
+        return "bar";
     }
   };
 

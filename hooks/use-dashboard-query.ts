@@ -1,25 +1,28 @@
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef, useEffect } from 'react';
-import { 
-  fetchDashboardData, 
-  fetchFieldGroups, 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useRef, useEffect } from "react";
+import {
+  fetchDashboardData,
+  fetchFieldGroups,
   generatePPTReport,
   getChartRecommendations,
   type QueryParams,
   type ExportPPTRequest,
-} from '@/lib/api/dashboard';
+} from "@/lib/api/dashboard";
 
 // ============================================
 // QUERY KEYS - Centralized for cache management
 // ============================================
 
 export const dashboardKeys = {
-  all: ['dashboard'] as const,
-  data: (params: QueryParams) => [...dashboardKeys.all, 'data', params] as const,
-  fields: (client: string, dataSource: string) => [...dashboardKeys.all, 'fields', client, dataSource] as const,
-  recommendations: (fields: Record<string, string[]>) => [...dashboardKeys.all, 'recommendations', fields] as const,
+  all: ["dashboard"] as const,
+  data: (params: QueryParams) =>
+    [...dashboardKeys.all, "data", params] as const,
+  fields: (client: string, dataSource: string) =>
+    [...dashboardKeys.all, "fields", client, dataSource] as const,
+  recommendations: (fields: Record<string, string[]>) =>
+    [...dashboardKeys.all, "recommendations", fields] as const,
 };
 
 // ============================================
@@ -28,16 +31,16 @@ export const dashboardKeys = {
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedValue(value), delay);
     return () => clearTimeout(timer);
   }, [value, delay]);
-  
+
   return debouncedValue;
 }
 
-import { useState } from 'react';
+import { useState } from "react";
 
 // ============================================
 // HOOKS
@@ -47,17 +50,22 @@ import { useState } from 'react';
  * Hook to fetch dashboard visualization data
  * Includes debouncing, caching, and request cancellation
  */
-export function useDashboardData(params: QueryParams, options?: { enabled?: boolean }) {
+export function useDashboardData(
+  params: QueryParams,
+  options?: { enabled?: boolean },
+) {
   // Debounce the params to avoid too many requests during field selection
   const debouncedParams = useDebounce(params, 300);
-  
+
   // Track if we should fetch
   const hasRequiredParams = Boolean(
-    debouncedParams.client && 
-    debouncedParams.dataSource &&
-    Object.values(debouncedParams.selectedFields).some(arr => arr.length > 0)
+    debouncedParams.client &&
+      debouncedParams.dataSource &&
+      Object.values(debouncedParams.selectedFields).some(
+        (arr) => arr.length > 0,
+      ),
   );
-  
+
   return useQuery({
     queryKey: dashboardKeys.data(debouncedParams),
     queryFn: ({ signal }) => {
@@ -89,10 +97,14 @@ export function useFieldGroups(client: string, dataSource: string) {
 /**
  * Hook to get AI-powered chart recommendations
  */
-export function useChartRecommendations(selectedFields: Record<string, string[]>) {
+export function useChartRecommendations(
+  selectedFields: Record<string, string[]>,
+) {
   const debouncedFields = useDebounce(selectedFields, 500);
-  const hasFields = Object.values(debouncedFields).some(arr => arr.length > 0);
-  
+  const hasFields = Object.values(debouncedFields).some(
+    (arr) => arr.length > 0,
+  );
+
   return useQuery({
     queryKey: dashboardKeys.recommendations(debouncedFields),
     queryFn: () => getChartRecommendations(debouncedFields),
@@ -106,7 +118,7 @@ export function useChartRecommendations(selectedFields: Record<string, string[]>
  */
 export function useGeneratePPT() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (request: ExportPPTRequest) => generatePPTReport(request),
     onSuccess: () => {
@@ -121,15 +133,18 @@ export function useGeneratePPT() {
  */
 export function usePrefetchDashboardData() {
   const queryClient = useQueryClient();
-  
-  const prefetch = useCallback((params: QueryParams) => {
-    queryClient.prefetchQuery({
-      queryKey: dashboardKeys.data(params),
-      queryFn: () => fetchDashboardData(params),
-      staleTime: 2 * 60 * 1000,
-    });
-  }, [queryClient]);
-  
+
+  const prefetch = useCallback(
+    (params: QueryParams) => {
+      queryClient.prefetchQuery({
+        queryKey: dashboardKeys.data(params),
+        queryFn: () => fetchDashboardData(params),
+        staleTime: 2 * 60 * 1000,
+      });
+    },
+    [queryClient],
+  );
+
   return prefetch;
 }
 
@@ -139,7 +154,7 @@ export function usePrefetchDashboardData() {
  */
 export function useInvalidateDashboard() {
   const queryClient = useQueryClient();
-  
+
   return useCallback(() => {
     queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
   }, [queryClient]);

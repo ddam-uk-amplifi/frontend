@@ -75,7 +75,7 @@ export interface ConsolidationHistoryParams {
 export const consolidationApi = {
   // Get consolidation history with pagination and filters
   async getHistory(
-    params: ConsolidationHistoryParams = {}
+    params: ConsolidationHistoryParams = {},
   ): Promise<ConsolidationHistoryResponse> {
     const response = await apiClient.get("/api/v1/consolidation/history", {
       params: {
@@ -100,7 +100,7 @@ export const consolidationApi = {
   // Get detailed consolidation job information
   async getJobDetail(jobId: string): Promise<ConsolidationJobDetail> {
     const response = await apiClient.get(
-      `/api/v1/consolidation/history/${jobId}`
+      `/api/v1/consolidation/history/${jobId}`,
     );
     return response.data;
   },

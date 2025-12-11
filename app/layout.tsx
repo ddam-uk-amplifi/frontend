@@ -28,8 +28,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Productivity",
-  description:
-    "Report automation and validation platform",
+  description: "Report automation and validation platform",
 };
 
 export default function RootLayout({
@@ -45,18 +44,18 @@ export default function RootLayout({
         <QueryProvider>
           <AppLayout>{children}</AppLayout>
         </QueryProvider>
-        <Toaster 
+        <Toaster
           position="top-right"
           expand={false}
           richColors
           duration={4000}
           toastOptions={{
             style: {
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: "500",
             },
-            className: 'toast-custom',
+            className: "toast-custom",
           }}
         />
       </body>

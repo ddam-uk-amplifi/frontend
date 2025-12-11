@@ -251,7 +251,7 @@ function ReportAutomationContent() {
     const filesWithMarkets: FileWithMarket[] = allFiles.map((file) => {
       const detected = detectMarketFromFilename(
         file.name,
-        availableMarkets as MarketUtil[]
+        availableMarkets as MarketUtil[],
       );
       return {
         file,
@@ -286,8 +286,8 @@ function ReportAutomationContent() {
   const handleUpdateMarketInReview = (index: number, marketId: number) => {
     setFilesToReview((prev) =>
       prev.map((item, i) =>
-        i === index ? { ...item, selectedMarketId: marketId } : item
-      )
+        i === index ? { ...item, selectedMarketId: marketId } : item,
+      ),
     );
   };
 
@@ -316,7 +316,7 @@ function ReportAutomationContent() {
       } ready to process`,
       {
         description: "Click 'Run Automation' to begin",
-      }
+      },
     );
   };
 
@@ -348,7 +348,7 @@ function ReportAutomationContent() {
   const handleConsolidation = async (completedUploads: UploadProgress[]) => {
     // Filter only successful extractions
     const successfulExtractions = completedUploads.filter(
-      (p) => p.status === "complete" && p.extractedPath
+      (p) => p.status === "complete" && p.extractedPath,
     );
 
     if (successfulExtractions.length === 0) {
@@ -361,7 +361,7 @@ function ReportAutomationContent() {
 
     try {
       // Build extracted_paths array (simple string array of paths)
-      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!,);
+      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!);
 
       // Prepare consolidation request
       const consolidationData = {
@@ -375,7 +375,7 @@ function ReportAutomationContent() {
 
       const response = await apiClient.post(
         "/api/v1/consolidation",
-        consolidationData
+        consolidationData,
       );
 
       console.log("Consolidation job created:", response.data);
@@ -390,7 +390,7 @@ function ReportAutomationContent() {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
         const statusResponse = await apiClient.get(
-          `/api/v1/consolidation/${jobId}`
+          `/api/v1/consolidation/${jobId}`,
         );
         const job = statusResponse.data;
 
@@ -414,7 +414,7 @@ function ReportAutomationContent() {
                   consolidation_job_id: jobId,
                   ytd_month: ytdMonth,
                 },
-              }
+              },
             );
             console.log("Trackers data populated successfully!");
             toast.success("Trackers data populated", {
@@ -463,7 +463,7 @@ function ReportAutomationContent() {
 
   const handleRunAutomation = async () => {
     const marketsToUpload = markets.filter(
-      (m) => m.file !== null && m.marketId !== null
+      (m) => m.file !== null && m.marketId !== null,
     );
 
     if (marketsToUpload.length === 0) {
@@ -519,7 +519,7 @@ function ReportAutomationContent() {
       console.log("🚀 Submitting batch extraction...");
       console.log(
         "📁 Files:",
-        files.map((f) => f.name)
+        files.map((f) => f.name),
       );
       console.log("🌍 Market codes:", marketCodes);
       console.log("🏢 Client:", clientId);
@@ -531,7 +531,7 @@ function ReportAutomationContent() {
       const batchResponse = await extractionApi.submitBatch(
         files,
         marketCodes,
-        clientId
+        clientId,
       );
 
       console.log("📦 Batch job created:", batchResponse);
@@ -557,7 +557,7 @@ function ReportAutomationContent() {
             progress: variedProgress,
             status: "uploading" as const,
           };
-        })
+        }),
       );
 
       // Step 2: Poll for completion
@@ -569,14 +569,14 @@ function ReportAutomationContent() {
           maxWaitSeconds: 600,
           onProgress: (status: BatchExtractionResponse) => {
             console.log(
-              `📊 Batch status: ${status.status}, ${status.completed_files}/${status.total_files} completed`
+              `📊 Batch status: ${status.status}, ${status.completed_files}/${status.total_files} completed`,
             );
 
             // Calculate base progress percentage for overall batch
             const batchProgressPct =
               status.total_files > 0
                 ? Math.round(
-                    (status.completed_files / status.total_files) * 100
+                    (status.completed_files / status.total_files) * 100,
                   )
                 : 0;
 
@@ -586,7 +586,7 @@ function ReportAutomationContent() {
                 prev.map((p, index) => {
                   // Find matching path by market code
                   const matchingPath = status.extracted_paths.find(
-                    (path) => extractMarketCodeFromPath(path) === p.marketCode
+                    (path) => extractMarketCodeFromPath(path) === p.marketCode,
                   );
                   if (matchingPath) {
                     return {
@@ -611,10 +611,10 @@ function ReportAutomationContent() {
                     ((index * 17 + p.marketCode.charCodeAt(0)) % 25) - 12; // -12 to +12 variance
                   const fileProgress = Math.max(
                     10,
-                    Math.min(90, Math.round(baseProgress + variance))
+                    Math.min(90, Math.round(baseProgress + variance)),
                   );
                   return { ...p, progress: fileProgress };
-                })
+                }),
               );
             } else {
               // No paths yet, show varied initial processing progress
@@ -624,11 +624,11 @@ function ReportAutomationContent() {
                   const initialProgress =
                     8 + ((index * 13 + p.marketCode.charCodeAt(0)) % 18);
                   return { ...p, progress: initialProgress };
-                })
+                }),
               );
             }
           },
-        }
+        },
       );
 
       console.log("✅ Batch extraction completed:", finalStatus);
@@ -651,10 +651,10 @@ function ReportAutomationContent() {
             .filter((m) => m.file && m.code)
             .map((market) => {
               const matchingPath = finalStatus.extracted_paths?.find(
-                (path) => extractMarketCodeFromPath(path) === market.code
+                (path) => extractMarketCodeFromPath(path) === market.code,
               );
               const isFailed = finalStatus.failed_markets?.includes(
-                market.code || ""
+                market.code || "",
               );
 
               return {
@@ -667,8 +667,8 @@ function ReportAutomationContent() {
                 status: matchingPath
                   ? ("complete" as const)
                   : isFailed
-                  ? ("failed" as const)
-                  : ("uploading" as const),
+                    ? ("failed" as const)
+                    : ("uploading" as const),
                 extractedPath: matchingPath,
                 error: isFailed ? "Extraction failed" : undefined,
               };
@@ -682,8 +682,8 @@ function ReportAutomationContent() {
           console.log(
             "📋 Successful extractions:",
             finalProgress.filter(
-              (p) => p.status === "complete" && p.extractedPath
-            )
+              (p) => p.status === "complete" && p.extractedPath,
+            ),
           );
 
           setTimeout(() => handleConsolidation(finalProgress), 500);
@@ -706,7 +706,7 @@ function ReportAutomationContent() {
             ...p,
             status: "failed" as const,
             error: finalStatus.error_message || "Batch extraction failed",
-          }))
+          })),
         );
       }
     } catch (error: any) {
@@ -727,7 +727,7 @@ function ReportAutomationContent() {
           ...p,
           status: "failed" as const,
           error: errorMessage,
-        }))
+        })),
       );
     }
   };
@@ -735,7 +735,7 @@ function ReportAutomationContent() {
   // Legacy single-file extraction (fallback)
   const handleRunAutomationLegacy = async () => {
     const marketsToUpload = markets.filter(
-      (m) => m.file !== null && m.marketId !== null
+      (m) => m.file !== null && m.marketId !== null,
     );
 
     if (marketsToUpload.length === 0) {
@@ -788,10 +788,10 @@ function ReportAutomationContent() {
                 : 0;
 
               setUploadProgress((prev) =>
-                prev.map((p) => (p.id === uploadId ? { ...p, progress } : p))
+                prev.map((p) => (p.id === uploadId ? { ...p, progress } : p)),
               );
             },
-          }
+          },
         );
 
         // Mark as complete with extraction data (mapping API response fields)
@@ -814,21 +814,21 @@ function ReportAutomationContent() {
                   downloadUrl: extractionData.download_url,
                   extractedPath: extractionData.output_file, // Store for consolidation
                 }
-              : p
+              : p,
           );
 
           // Check if all extractions are complete - compare with EXPECTED count
           const completedCount = updated.filter(
-            (p) => p.status === "complete"
+            (p) => p.status === "complete",
           ).length;
           const failedCount = updated.filter(
-            (p) => p.status === "failed"
+            (p) => p.status === "failed",
           ).length;
           const totalProcessed = completedCount + failedCount;
           const expectedTotal = totalMarketsToUploadRef.current;
 
           console.log(
-            `📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`
+            `📊 Progress: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`,
           );
 
           // Only trigger consolidation when we've processed ALL expected markets
@@ -866,27 +866,27 @@ function ReportAutomationContent() {
                     error.response?.data?.detail ||
                     "Upload failed",
                 }
-              : p
+              : p,
           );
 
           // Check if all extractions are complete after failure too
           const completedCount = updated.filter(
-            (p) => p.status === "complete"
+            (p) => p.status === "complete",
           ).length;
           const failedCount = updated.filter(
-            (p) => p.status === "failed"
+            (p) => p.status === "failed",
           ).length;
           const totalProcessed = completedCount + failedCount;
           const expectedTotal = totalMarketsToUploadRef.current;
 
           console.log(
-            `📊 Progress after error: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`
+            `📊 Progress after error: ${completedCount} completed, ${failedCount} failed, ${totalProcessed}/${expectedTotal} total`,
           );
 
           // Only trigger consolidation when we've processed ALL expected markets
           if (totalProcessed === expectedTotal && completedCount > 0) {
             console.log(
-              "🎯 All extractions done (some failed)! Triggering consolidation..."
+              "🎯 All extractions done (some failed)! Triggering consolidation...",
             );
             setTimeout(() => handleConsolidation(updated), 500);
           }
@@ -1423,7 +1423,7 @@ function ReportAutomationContent() {
                             <p>
                               • Completed:{" "}
                               {new Date(
-                                consolidationResult.completed_at
+                                consolidationResult.completed_at,
                               ).toLocaleString()}
                             </p>
                           )}
@@ -1480,8 +1480,8 @@ function ReportAutomationContent() {
                       {uploadProgress.some((p) => p.status === "uploading")
                         ? "Extracting..."
                         : isConsolidating
-                        ? "Consolidating..."
-                        : "Run Automation"}
+                          ? "Consolidating..."
+                          : "Run Automation"}
                     </button>
                   )
                 )}
@@ -1575,7 +1575,7 @@ function ReportAutomationContent() {
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="text-sm text-gray-600">
                                     {new Date(
-                                      item.registered_date
+                                      item.registered_date,
                                     ).toLocaleDateString()}
                                   </div>
                                 </td>
@@ -1583,7 +1583,7 @@ function ReportAutomationContent() {
                                   <div className="text-sm text-gray-600">
                                     {item.completed_date
                                       ? new Date(
-                                          item.completed_date
+                                          item.completed_date,
                                         ).toLocaleDateString()
                                       : "-"}
                                   </div>
@@ -1598,7 +1598,7 @@ function ReportAutomationContent() {
                                       <button
                                         onClick={() =>
                                           router.push(
-                                            `/report-automation/history/${item.id}`
+                                            `/report-automation/history/${item.id}`,
                                           )
                                         }
                                         className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
@@ -1705,16 +1705,16 @@ function ReportAutomationContent() {
                                                         <span
                                                           className="block truncate text-sm text-gray-600"
                                                           title={formatTrackerFileName(
-                                                            tracker.file_name
+                                                            tracker.file_name,
                                                           )}
                                                         >
                                                           {formatTrackerFileName(
-                                                            tracker.file_name
+                                                            tracker.file_name,
                                                           )}
                                                         </span>
                                                       </td>
                                                     </tr>
-                                                  )
+                                                  ),
                                                 )}
                                               </tbody>
                                             </table>

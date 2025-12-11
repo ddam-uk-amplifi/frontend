@@ -173,7 +173,7 @@ export default function AdminPage() {
       setDeleteDialog(null);
     } catch (error: any) {
       alert(
-        error.response?.data?.detail || `Failed to delete ${deleteDialog.type}`
+        error.response?.data?.detail || `Failed to delete ${deleteDialog.type}`,
       );
     }
   };
@@ -380,7 +380,7 @@ export default function AdminPage() {
                   <div className="divide-y">
                     {(markets || []).map((market) => {
                       const client = clients.find(
-                        (c) => c.id === market.client_id
+                        (c) => c.id === market.client_id,
                       );
                       return (
                         <div

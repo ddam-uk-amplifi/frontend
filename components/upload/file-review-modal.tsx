@@ -66,7 +66,9 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <div>
-                <p className="font-medium">Market not detected for some files</p>
+                <p className="font-medium">
+                  Market not detected for some files
+                </p>
                 <p className="text-amber-700">
                   Please manually select the market for highlighted files below.
                 </p>
@@ -77,9 +79,12 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
             <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <div>
-                <p className="font-medium">Please verify auto-detected markets</p>
+                <p className="font-medium">
+                  Please verify auto-detected markets
+                </p>
                 <p className="text-blue-700">
-                  Some markets were detected with low confidence. Please confirm they are correct.
+                  Some markets were detected with low confidence. Please confirm
+                  they are correct.
                 </p>
               </div>
             </div>
@@ -91,7 +96,7 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
           <div className="space-y-3">
             {files.map((fileItem, index) => {
               const market = availableMarkets.find(
-                (m) => m.id === fileItem.selectedMarketId
+                (m) => m.id === fileItem.selectedMarketId,
               );
 
               return (
@@ -101,8 +106,8 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
                     fileItem.confidence === "none"
                       ? "border-amber-300 bg-amber-50"
                       : fileItem.confidence === "low"
-                      ? "border-blue-200 bg-blue-50"
-                      : "border-gray-200 bg-white"
+                        ? "border-blue-200 bg-blue-50"
+                        : "border-gray-200 bg-white"
                   }`}
                 >
                   <div className="flex items-start gap-4">
@@ -130,7 +135,9 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
                         {fileItem.confidence === "high" && (
                           <div className="flex items-center gap-1 text-green-600">
                             <CheckCircle size={16} />
-                            <span className="text-xs font-medium">Auto-detected</span>
+                            <span className="text-xs font-medium">
+                              Auto-detected
+                            </span>
                           </div>
                         )}
                         {fileItem.confidence === "low" && (
@@ -142,7 +149,9 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
                         {fileItem.confidence === "none" && (
                           <div className="flex items-center gap-1 text-amber-600">
                             <AlertCircle size={16} />
-                            <span className="text-xs font-medium">Required</span>
+                            <span className="text-xs font-medium">
+                              Required
+                            </span>
                           </div>
                         )}
                       </div>
@@ -207,7 +216,8 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
               disabled={!allMarketsSelected}
               className="cursor-pointer bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Confirm & Upload {files.length} File{files.length !== 1 ? "s" : ""}
+              Confirm & Upload {files.length} File
+              {files.length !== 1 ? "s" : ""}
             </Button>
           </div>
         </div>

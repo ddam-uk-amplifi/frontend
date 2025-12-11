@@ -50,12 +50,19 @@ export default function Home() {
           </p>
           <div className="flex items-center justify-center space-x-4">
             <Link href="/auth/register">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 px-8 cursor-pointer">
+              <Button
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700 px-8 cursor-pointer"
+              >
                 Get Started
               </Button>
             </Link>
             <Link href="/auth/login">
-              <Button size="lg" variant="outline" className="px-8 cursor-pointer">
+              <Button
+                size="lg"
+                variant="outline"
+                className="px-8 cursor-pointer"
+              >
                 Log In
               </Button>
             </Link>
