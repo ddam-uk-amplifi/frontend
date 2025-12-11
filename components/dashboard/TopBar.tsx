@@ -34,15 +34,45 @@ export function TopBar({
   const clients = ["Arla", "Carlsberg", "Kering"];
 
   // Markets available per client (for Trackers data source)
-  const marketsByClient: Record<string, string[]> = {
-    Arla: ["Denmark", "Sweden", "UK", "Germany", "Finland"],
-    Carlsberg: ["Denmark", "Poland", "Russia", "China", "UK"],
-    Kering: ["France", "Italy", "UK", "US", "China", "Japan"],
+  // Format: { code: displayName }
+  const marketsByClient: Record<string, Record<string, string>> = {
+    Arla: {
+      DK: "Denmark",
+      SE: "Sweden",
+      UK: "United Kingdom",
+      DE: "Germany",
+      FI: "Finland",
+      NL: "Netherlands",
+      PL: "Poland",
+      ES: "Spain",
+      NZ: "New Zealand",
+      DO: "Dominican Republic",
+    },
+    Carlsberg: {
+      DK: "Denmark",
+      PL: "Poland",
+      RU: "Russia",
+      CN: "China",
+      UK: "United Kingdom",
+    },
+    Kering: {
+      FR: "France",
+      IT: "Italy",
+      UK: "United Kingdom",
+      US: "United States",
+      CN: "China",
+      JP: "Japan",
+    },
   };
 
   const availableMarkets = selectedClient
-    ? marketsByClient[selectedClient] || []
-    : [];
+    ? marketsByClient[selectedClient] || {}
+    : {};
+
+  // Get display name for selected market code
+  const selectedMarketName = selectedMarket
+    ? availableMarkets[selectedMarket] || selectedMarket
+    : "";
 
   // When data source changes, reset market if switching to summary
   const handleDataSourceChange = (source: DataSource) => {
@@ -134,12 +164,12 @@ export function TopBar({
                     value={selectedMarket}
                     onChange={(e) => onMarketChange(e.target.value)}
                     disabled={!selectedClient}
-                    className={`${selectBaseClass} min-w-[130px]`}
+                    className={`${selectBaseClass} min-w-[150px]`}
                   >
                     <option value="">All Markets</option>
-                    {availableMarkets.map((market) => (
-                      <option key={market} value={market}>
-                        {market}
+                    {Object.entries(availableMarkets).map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name} ({code})
                       </option>
                     ))}
                   </select>
@@ -167,7 +197,7 @@ export function TopBar({
                 <span className="text-sm text-slate-300">
                   {selectedDataSource === "summary"
                     ? "Summary"
-                    : selectedMarket || "Trackers"}
+                    : selectedMarketName || "All Markets"}
                 </span>
                 {selectedYtdMonth && (
                   <>
