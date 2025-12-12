@@ -436,10 +436,11 @@ function PPTConfirmationDialogContent({
             </button>
             <button
               onClick={onConfirm}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all font-medium shadow-lg shadow-emerald-200 hover:shadow-xl hover:scale-[1.02]"
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all font-medium shadow-lg shadow-emerald-200 hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <Sparkles className="w-4 h-4" />
-              Generate PowerPoint
+              {isGenerating ? "Generating..." : "Generate PowerPoint"}
             </button>
           </div>
         </div>

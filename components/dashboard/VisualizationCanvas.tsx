@@ -132,9 +132,9 @@ export function VisualizationCanvas({
     // Small delay to ensure DOM is ready after render
     const timer = setTimeout(() => {
       setIsChartReady(!!chartOnlyRef.current);
-    }, 100);
+    }, 300); // Increased timeout to ensure chart renders
     return () => clearTimeout(timer);
-  }, [selectedGraphType, client, market, period]); // Re-check when these change
+  }, [selectedGraphType, client, market, period, apiData, trackerData, trackerSummaryData, isLoadingApiData]); // Re-check when these change
 
   // Handle toggle with element ref - uses chartOnlyRef for clean capture without buttons
   const handleToggleForPPT = useCallback(() => {
@@ -149,9 +149,15 @@ export function VisualizationCanvas({
     // If already included, allow removal without element
     const isCurrentlyIncluded = selectedGraphsForPPT.has(graphId);
 
+    // Double-check if ref is available now (fallback if isChartReady state is stale)
     if (!isCurrentlyIncluded && !chartOnlyRef.current) {
       console.warn("[VisualizationCanvas] Cannot add to PPT - chart not ready");
       return;
+    }
+
+    // Update isChartReady if it was false but ref is now available
+    if (!isChartReady && chartOnlyRef.current) {
+      setIsChartReady(true);
     }
 
     if (onToggleGraphForPPT) {

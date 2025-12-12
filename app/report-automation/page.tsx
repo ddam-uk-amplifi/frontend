@@ -133,6 +133,9 @@ function ReportAutomationContent() {
   const [expandedHistoryRows, setExpandedHistoryRows] = useState<
     Record<string, boolean>
   >({});
+  const [downloadingFile, setDownloadingFile] = useState<
+    "excel" | "ppt" | null
+  >(null);
 
   // Fetch available markets on mount
   useEffect(() => {
@@ -552,7 +555,7 @@ function ReportAutomationContent() {
         batchResponse.id,
         {
           pollIntervalMs: 2000,
-          maxWaitSeconds: 600,
+          maxWaitSeconds: 1800,
           onProgress: (status: BatchExtractionResponse) => {
             console.log(
               `📊 Batch status: ${status.status}, ${status.completed_files}/${status.total_files} completed`,
@@ -885,34 +888,53 @@ function ReportAutomationContent() {
     setUploadProgress((prev) => prev.filter((p) => p.id !== uploadId));
   };
 
-  const handleDownloadConsolidation = (type: "excel" | "ppt" = "excel") => {
+  const handleDownloadConsolidation = async (
+    type: "excel" | "ppt" = "excel",
+  ) => {
     if (!consolidationResult || consolidationResult.error) return;
 
-    // Check for S3 presigned URL first, then fall back to local path
-    let downloadUrl =
-      type === "excel"
-        ? consolidationResult.excel_download_url
-        : consolidationResult.ppt_download_url;
+    setDownloadingFile(type);
 
-    // For local storage, construct download URL from path
-    if (!downloadUrl) {
-      const filePath =
+    try {
+      // Check for S3 presigned URL first, then fall back to local path
+      let downloadUrl =
         type === "excel"
-          ? consolidationResult.excel_path
-          : consolidationResult.ppt_path;
+          ? consolidationResult.excel_download_url
+          : consolidationResult.ppt_download_url;
 
-      if (!filePath) {
-        console.error(`No ${type} file path in consolidation result`);
-        return;
+      // For local storage, construct download URL from path
+      if (!downloadUrl) {
+        const filePath =
+          type === "excel"
+            ? consolidationResult.excel_path
+            : consolidationResult.ppt_path;
+
+        if (!filePath) {
+          console.error(`No ${type} file path in consolidation result`);
+          return;
+        }
+
+        // Extract filename from path and construct local download URL
+        const fileName = filePath.split("/").pop();
+        downloadUrl = `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
       }
 
-      // Extract filename from path and construct local download URL
-      const fileName = filePath.split("/").pop();
-      downloadUrl = `${API_BASE_URL}/api/v1/consolidation/download/${fileName}`;
-    }
+      console.log(`Downloading ${type} file from:`, downloadUrl);
 
-    console.log(`Downloading ${type} file from:`, downloadUrl);
-    window.open(downloadUrl, "_blank");
+      // Create a hidden anchor element and trigger download
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = ""; // This triggers download instead of navigation
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Small delay to show loading state for UX
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    } finally {
+      setDownloadingFile(null);
+    }
   };
 
   // Helper to get download URL (S3 presigned or local endpoint)
@@ -1430,19 +1452,39 @@ function ReportAutomationContent() {
                   <>
                     <button
                       onClick={() => handleDownloadConsolidation("excel")}
-                      className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm"
+                      disabled={downloadingFile !== null}
+                      className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Download size={16} />
-                      Download Excel
+                      {downloadingFile === "excel" ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Download Excel
+                        </>
+                      )}
                     </button>
                     {(consolidationResult.ppt_download_url ||
                       consolidationResult.ppt_path) && (
                         <button
                           onClick={() => handleDownloadConsolidation("ppt")}
-                          className="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm"
+                          disabled={downloadingFile !== null}
+                          className="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Download size={16} />
-                          Download PowerPoint
+                          {downloadingFile === "ppt" ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Downloading...
+                            </>
+                          ) : (
+                            <>
+                              <Download size={16} />
+                              Download PowerPoint
+                            </>
+                          )}
                         </button>
                       )}
                   </>
