@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, TrendingUp, PieChart } from "lucide-react";
+import { BarChart3, PieChart } from "lucide-react";
 
 interface ChartSkeletonProps {
   type?: "bar" | "pie" | "line" | "kpi" | "table";

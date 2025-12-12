@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Download, Sparkles } from "lucide-react";
+import { FileText, Sparkles } from "lucide-react";
 
 interface PPTGenerationBannerProps {
   selectedCount: number;

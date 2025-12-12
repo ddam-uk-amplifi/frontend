@@ -14,7 +14,6 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
-  X,
 } from "lucide-react";
 import {
   isChartCompatible,
@@ -106,16 +105,6 @@ export function GraphRecommendationsPanel({
       supportedFields: ["1 dimension + 2+ metrics (same scale)"],
       tooltip:
         "Compare 2-3 metrics side by side (e.g., Spend vs Savings vs Budget). Works best when metrics have the same scale.",
-    },
-    {
-      id: "dual-axis-bar",
-      name: "Dual-Axis Bar",
-      icon: BarChart3,
-      color: "#7C3AED",
-      description: "Compare different scales",
-      supportedFields: ["Percentage + Absolute value metrics"],
-      tooltip:
-        "Perfect for comparing metrics with different scales (e.g., Spend in millions vs Savings %). Uses two Y-axes for accurate comparison.",
     },
     {
       id: "stacked-bar",
@@ -290,12 +279,11 @@ export function GraphRecommendationsPanel({
                 onMouseLeave={() => setHoveredGraph(null)}
                 className={`
                   w-full p-3 rounded-xl border text-left transition-all relative
-                  ${
-                    selectedGraphType === graph.id
-                      ? "border-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 shadow-md shadow-violet-100"
-                      : isDisabled
-                        ? "border-slate-100 bg-slate-50/50 opacity-40 cursor-not-allowed"
-                        : "border-slate-200/60 hover:border-violet-300 hover:shadow-md bg-white cursor-pointer"
+                  ${selectedGraphType === graph.id
+                    ? "border-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 shadow-md shadow-violet-100"
+                    : isDisabled
+                      ? "border-slate-100 bg-slate-50/50 opacity-40 cursor-not-allowed"
+                      : "border-slate-200/60 hover:border-violet-300 hover:shadow-md bg-white cursor-pointer"
                   }
                 `}
               >

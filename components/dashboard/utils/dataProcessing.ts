@@ -65,7 +65,7 @@ export function analyzeSelectedFields(
     if (hasAbsoluteValues) scaleTypes.push("absolute values (spend)");
     if (hasPercentages) scaleTypes.push("percentages (0-100%)");
     if (hasIndexes) scaleTypes.push("index values");
-    scaleWarning = `Mixed scales detected: ${scaleTypes.join(" and ")}. Consider using separate charts or a dual-axis chart for accurate comparison.`;
+    scaleWarning = `Mixed scales detected: ${scaleTypes.join(" and ")}. Consider using separate charts for accurate comparison.`;
   }
 
   return {
@@ -86,14 +86,7 @@ export function getRecommendedCharts(
   selectedFields: Record<string, string[]>,
 ): string[] {
   const analysis = analyzeSelectedFields(selectedFields);
-  const {
-    dimensions,
-    metrics,
-    percentages,
-    indexes,
-    totalFields,
-    hasMixedScales,
-  } = analysis;
+  const { dimensions, metrics, percentages, indexes, totalFields } = analysis;
   const numericFields = metrics.length + percentages.length + indexes.length;
 
   if (totalFields === 0) return [];
@@ -105,38 +98,24 @@ export function getRecommendedCharts(
     recommendations.push("bar-chart", "table");
   }
 
-  // Handle mixed scales - recommend dual-axis or separate charts
-  if (hasMixedScales) {
-    // Dual-axis bar chart is ideal for comparing different scales
-    recommendations.push("dual-axis-bar");
-    // Table is always safe for mixed data
-    recommendations.push("table");
-    // If only 2 numeric fields with mixed scales, still allow grouped bar with warning
-    if (numericFields === 2) {
-      recommendations.push("grouped-bar");
-    }
-  } else {
-    // Non-mixed scales - standard recommendations
+  // 1 metric - Bar chart is great for comparing across categories
+  if (numericFields >= 1) {
+    recommendations.push("bar-chart");
+  }
 
-    // 1 metric - Bar chart is great for comparing across categories
-    if (numericFields >= 1) {
-      recommendations.push("bar-chart");
-    }
+  // Multiple metrics (2+) of same type - Grouped bar for comparison
+  if (numericFields >= 2) {
+    recommendations.push("grouped-bar", "scatter");
+  }
 
-    // Multiple metrics (2+) of same type - Grouped bar for comparison
-    if (numericFields >= 2) {
-      recommendations.push("grouped-bar", "scatter");
-    }
+  // Percentage fields work great with pie charts (showing composition)
+  if (percentages.length >= 1 && numericFields <= 2) {
+    recommendations.push("pie-chart");
+  }
 
-    // Percentage fields work great with pie charts (showing composition)
-    if (percentages.length >= 1 && numericFields <= 2) {
-      recommendations.push("pie-chart");
-    }
-
-    // Multiple dimensions + metric - Stacked bar or Heatmap
-    if (dimensions.length >= 2 && numericFields >= 1) {
-      recommendations.push("stacked-bar", "heatmap");
-    }
+  // Multiple dimensions + metric - Stacked bar or Heatmap
+  if (dimensions.length >= 2 && numericFields >= 1) {
+    recommendations.push("stacked-bar", "heatmap");
   }
 
   // Many fields - Table is always safe
@@ -144,10 +123,8 @@ export function getRecommendedCharts(
     recommendations.push("table");
   }
 
-  // Line/Area charts for trends (when we have time dimension)
-  // Note: Arla data structure has market/media dimensions, not time
-  // But if showing across markets, line can still work
-  if (numericFields >= 1 && totalFields >= 2 && !hasMixedScales) {
+  // Line/Area charts for trends
+  if (numericFields >= 1 && totalFields >= 2) {
     recommendations.push("line-chart", "area-chart");
   }
 
@@ -388,30 +365,6 @@ export function isChartCompatible(
         });
       }
       return { compatible: true, score: metricCount >= 2 ? 95 : 70 };
-
-    case "dual-axis-bar":
-      if (metricCount < 2) {
-        return {
-          compatible: false,
-          reason:
-            "Dual-axis bar chart needs 2+ numeric fields with different scales.",
-        };
-      }
-      if (!analysis.hasMixedScales) {
-        return {
-          compatible: true,
-          score: 60,
-          reason:
-            "Dual-axis works best when fields have different scales (e.g., % vs spend). Use Grouped Bar for same-scale metrics.",
-        };
-      }
-      // Perfect fit for mixed scales
-      return {
-        compatible: true,
-        score: 100,
-        reason:
-          "Ideal for comparing metrics with different scales (percentages on right axis, values on left).",
-      };
 
     case "stacked-bar":
       if (metricCount === 0) {

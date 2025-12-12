@@ -682,6 +682,49 @@ export function QueryBuilderPanel({
     );
   };
 
+  // Determine locked scale type based on currently selected fields
+  // If percentage fields are selected, lock to percentage. If absolute values are selected, lock to absolute.
+  const lockedScaleType = useMemo(() => {
+    const allSelectedFieldIds = Object.values(selectedFields).flat();
+    if (allSelectedFieldIds.length === 0) return null; // No lock when nothing selected
+
+    let hasPercentage = false;
+    let hasAbsolute = false;
+
+    for (const fieldId of allSelectedFieldIds) {
+      const fieldType = getFieldType(fieldId);
+      if (fieldType === 'percentage') {
+        hasPercentage = true;
+      } else if (fieldType === 'metric' || fieldType === 'index') {
+        hasAbsolute = true;
+      }
+    }
+
+    // Lock to first type selected
+    if (hasPercentage && !hasAbsolute) return 'percentage';
+    if (hasAbsolute && !hasPercentage) return 'absolute';
+
+    // If mixed (shouldn't happen with this UI), no additional locking
+    return null;
+  }, [selectedFields]);
+
+  // Helper to check if a field is disabled due to scale type locking
+  const isFieldDisabled = (fieldId: string): boolean => {
+    if (!lockedScaleType) return false;
+
+    const fieldType = getFieldType(fieldId);
+
+    if (lockedScaleType === 'percentage') {
+      // Only allow percentage fields when locked to percentage
+      return fieldType === 'metric' || fieldType === 'index';
+    } else if (lockedScaleType === 'absolute') {
+      // Only allow metric/index fields when locked to absolute
+      return fieldType === 'percentage';
+    }
+
+    return false;
+  };
+
   const renderFieldGroup = (group: FieldGroup, depth: number = 0) => {
     const isExpanded = expandedGroups.includes(group.id);
     const groupSelections = selectedFields[group.id] || [];
@@ -737,16 +780,20 @@ export function QueryBuilderPanel({
                 const isSelected =
                   selectedFields[group.id]?.includes(field.id) || false;
                 const fieldType = getFieldType(field.id);
+                const isDisabled = isFieldDisabled(field.id);
 
                 return (
                   <button
                     key={field.id}
-                    onClick={() => onFieldToggle(group.id, field.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
-                      isSelected
-                        ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
+                    onClick={() => !isDisabled && onFieldToggle(group.id, field.id)}
+                    disabled={isDisabled}
+                    title={isDisabled ? `Cannot mix ${lockedScaleType === 'percentage' ? 'absolute values' : 'percentages'} with ${lockedScaleType === 'percentage' ? 'percentages' : 'absolute values'}. Clear selection first.` : undefined}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${isSelected
+                      ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
+                      : isDisabled
+                        ? "bg-slate-100 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-50"
                         : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
-                    }`}
+                      }`}
                   >
                     <span className="text-sm">{field.label}</span>
                     <FieldTypeIndicator type={fieldType} />

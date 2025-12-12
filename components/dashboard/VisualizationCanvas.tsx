@@ -32,9 +32,6 @@ import {
 import {
   applyOthersLogic,
   checkDataDensity,
-  arlaFieldMappings,
-  analyzeSelectedFields,
-  getFieldType,
 } from "./utils/dataProcessing";
 import { DataDensityWarning } from "./DataDensityWarning";
 import { GraphModal } from "./GraphModal";
@@ -42,14 +39,11 @@ import { DashboardErrorState, DashboardEmptyState } from "./ErrorState";
 import {
   fetchSummaryDataFromSelection,
   ConsolidatedSummaryResponse,
-  BACKEND_TO_FRONTEND_FIELD_MAP,
-  getSheetTypeFromFields,
   fetchTrackerComplete,
   fetchTrackerSummaryData,
   TrackerCompleteResponse,
   TrackerSummaryItem,
   TrackerMediaType,
-  TRACKER_BACKEND_TO_DISPLAY_MAP,
   getTrackerMediaTypeFromFields,
 } from "@/lib/api/dashboard";
 
@@ -94,7 +88,6 @@ export function VisualizationCanvas({
   registerChartElement,
 }: VisualizationCanvasProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [autoSwitchedToTable, setAutoSwitchedToTable] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isChartReady, setIsChartReady] = useState(false);
 
@@ -139,9 +132,9 @@ export function VisualizationCanvas({
     // Small delay to ensure DOM is ready after render
     const timer = setTimeout(() => {
       setIsChartReady(!!chartOnlyRef.current);
-    }, 100);
+    }, 300); // Increased timeout to ensure chart renders
     return () => clearTimeout(timer);
-  }, [selectedGraphType, client, market, period]); // Re-check when these change
+  }, [selectedGraphType, client, market, period, apiData, trackerData, trackerSummaryData, isLoadingApiData]); // Re-check when these change
 
   // Handle toggle with element ref - uses chartOnlyRef for clean capture without buttons
   const handleToggleForPPT = useCallback(() => {
@@ -156,9 +149,15 @@ export function VisualizationCanvas({
     // If already included, allow removal without element
     const isCurrentlyIncluded = selectedGraphsForPPT.has(graphId);
 
+    // Double-check if ref is available now (fallback if isChartReady state is stale)
     if (!isCurrentlyIncluded && !chartOnlyRef.current) {
       console.warn("[VisualizationCanvas] Cannot add to PPT - chart not ready");
       return;
+    }
+
+    // Update isChartReady if it was false but ref is now available
+    if (!isChartReady && chartOnlyRef.current) {
+      setIsChartReady(true);
     }
 
     if (onToggleGraphForPPT) {
@@ -500,105 +499,8 @@ export function VisualizationCanvas({
     });
   }, [trackerSummaryData]);
 
-  // Static demo data for Arla + Trackers when no API data is available
-  const arlaTrackerDemoData = useMemo(
-    () => [
-      {
-        name: "TV",
-        total_net_net_spend: 4850000,
-        total_addressable_spend: 3420000,
-        total_non_addressable_spend: 1430000,
-        measured_spend: 4120000,
-        measured_spend_pct: 85.0,
-        benchmark_equivalent_net_net_spend: 4650000,
-        value_loss: 200000,
-        value_loss_pct: 4.1,
-        savings_value: 425000,
-        savings_pct: 8.7,
-        inflation_pct: 3.2,
-        index: 104.3,
-      },
-      {
-        name: "Digital",
-        total_net_net_spend: 3250000,
-        total_addressable_spend: 2890000,
-        total_non_addressable_spend: 360000,
-        measured_spend: 3050000,
-        measured_spend_pct: 93.8,
-        benchmark_equivalent_net_net_spend: 3100000,
-        value_loss: 150000,
-        value_loss_pct: 4.6,
-        savings_value: 312000,
-        savings_pct: 9.6,
-        inflation_pct: 2.8,
-        index: 105.2,
-      },
-      {
-        name: "Radio",
-        total_net_net_spend: 1420000,
-        total_addressable_spend: 980000,
-        total_non_addressable_spend: 440000,
-        measured_spend: 1180000,
-        measured_spend_pct: 83.1,
-        benchmark_equivalent_net_net_spend: 1380000,
-        value_loss: 40000,
-        value_loss_pct: 2.8,
-        savings_value: 142000,
-        savings_pct: 10.0,
-        inflation_pct: 1.5,
-        index: 102.9,
-      },
-      {
-        name: "OOH",
-        total_net_net_spend: 1890000,
-        total_addressable_spend: 1450000,
-        total_non_addressable_spend: 440000,
-        measured_spend: 1650000,
-        measured_spend_pct: 87.3,
-        benchmark_equivalent_net_net_spend: 1820000,
-        value_loss: 70000,
-        value_loss_pct: 3.7,
-        savings_value: 183000,
-        savings_pct: 9.7,
-        inflation_pct: 2.1,
-        index: 103.8,
-      },
-      {
-        name: "Print",
-        total_net_net_spend: 980000,
-        total_addressable_spend: 620000,
-        total_non_addressable_spend: 360000,
-        measured_spend: 780000,
-        measured_spend_pct: 79.6,
-        benchmark_equivalent_net_net_spend: 950000,
-        value_loss: 30000,
-        value_loss_pct: 3.1,
-        savings_value: 88000,
-        savings_pct: 9.0,
-        inflation_pct: 0.8,
-        index: 103.2,
-      },
-      {
-        name: "Cinema",
-        total_net_net_spend: 420000,
-        total_addressable_spend: 350000,
-        total_non_addressable_spend: 70000,
-        measured_spend: 380000,
-        measured_spend_pct: 90.5,
-        benchmark_equivalent_net_net_spend: 410000,
-        value_loss: 10000,
-        value_loss_pct: 2.4,
-        savings_value: 42000,
-        savings_pct: 10.0,
-        inflation_pct: 1.2,
-        index: 102.4,
-      },
-    ],
-    [],
-  );
-
   // Get real Arla data based on data source selection
-  // Uses API data when available, falls back to static demo data for trackers
+  // Only returns actual API data, no static fallbacks
   const getArlaData = useMemo(() => {
     if (client !== "Arla") return null;
 
@@ -621,8 +523,8 @@ export function VisualizationCanvas({
       if (getTrackerChartData && getTrackerChartData.length > 0) {
         return getTrackerChartData;
       }
-      // Fall back to static demo data for trackers
-      return arlaTrackerDemoData;
+      // No data available - return null (no static fallback)
+      return null;
     }
 
     // No fallback for summary - return null if no API data
@@ -633,12 +535,10 @@ export function VisualizationCanvas({
     getApiChartData,
     getTrackerChartData,
     getTrackerSummaryChartData,
-    arlaTrackerDemoData,
   ]);
 
-  // Get chart data - only returns real data, no sample/mock data for Arla
+  // Get chart data - only returns real data, no sample/mock data
   const getChartData = () => {
-    // For Arla, only return real API data
     // For Arla summary data
     if (client === "Arla" && dataSource === "summary") {
       if (getArlaData && getArlaData.length > 0) {
@@ -657,47 +557,9 @@ export function VisualizationCanvas({
       return [];
     }
 
-    // For non-Arla clients, can still use sample data (for demo purposes)
-    const mediaTypes = ["TV", "Digital", "Radio", "OOH", "Print", "Cinema"];
-    const markets = ["Germany", "UK", "France", "Spain", "Italy"];
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-
-    // Check which fields are selected
-    const hasMedia = selectedFields["media"]?.length > 0;
-    const hasGeography = selectedFields["geography"]?.length > 0;
-    const hasTime = selectedFields["time"]?.length > 0;
-
-    // Default to media data if nothing specific is selected
-    if (hasTime) {
-      return months.map((month) => ({
-        name: month,
-        spend: 2000 + Math.random() * 1000,
-        savings: 150 + Math.random() * 100,
-        inflation: 2 + Math.random() * 2,
-        index: 95 + Math.random() * 15,
-      }));
-    }
-
-    if (hasGeography) {
-      return markets.map((market) => ({
-        name: market,
-        spend: 5000 + Math.random() * 3000,
-        savings: 300 + Math.random() * 200,
-        savingsPct: 5 + Math.random() * 5,
-        index: 95 + Math.random() * 15,
-      }));
-    }
-
-    // Default data structure (media-based)
-    return mediaTypes.map((media) => ({
-      name: media,
-      spend: 3000 + Math.random() * 2000,
-      savings: 200 + Math.random() * 150,
-      savingsPct: 5 + Math.random() * 5,
-      cpu: 5 + Math.random() * 3,
-      benchmark: 100 + Math.random() * 20,
-      index: 95 + Math.random() * 15,
-    }));
+    // For non-Arla clients - return empty array (no mock/random data)
+    // Real data should be fetched from API when implemented
+    return [];
   };
 
   const rawData = getChartData();
@@ -804,7 +666,6 @@ export function VisualizationCanvas({
       "pie-chart": 9,
       "bar-chart": 20,
       "grouped-bar": 15,
-      "dual-axis-bar": 15,
       "stacked-bar": 12,
       "line-chart": 25,
       "area-chart": 20,
@@ -1172,6 +1033,29 @@ export function VisualizationCanvas({
       );
     }
 
+    // Show message if trackers is selected but no market
+    if (dataSource === 'trackers' && !market) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-8">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 mb-5">
+            <BarChart3 className="w-14 h-14 text-amber-600" />
+          </div>
+          <h3 className="text-2xl font-semibold text-slate-800 mb-3">
+            Select a Market
+          </h3>
+          <p className="text-sm text-slate-500 max-w-md mb-6">
+            Trackers data requires a specific market to be selected. Please choose a market from the top bar to continue.
+          </p>
+          <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-sm text-amber-700 font-medium">
+              Market selection required for Trackers data
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     // Show welcome/empty state if no client or data source selected
     if (!client || !dataSource) {
       return (
@@ -1335,13 +1219,12 @@ export function VisualizationCanvas({
       <button
         onClick={handleToggleForPPT}
         disabled={!isChartReady && !isIncludedInReport}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-          isIncludedInReport
-            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
-            : !isChartReady
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-              : "bg-slate-100 hover:bg-slate-200 text-slate-600"
-        }`}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isIncludedInReport
+          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
+          : !isChartReady
+            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+            : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+          }`}
         title={
           isIncludedInReport
             ? "Remove from PPT"
@@ -1533,7 +1416,7 @@ export function VisualizationCanvas({
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
-                  layout="horizontal"
+                  layout="vertical"
                   onClick={(e: any) =>
                     e &&
                     e.activePayload &&
@@ -1906,24 +1789,32 @@ export function VisualizationCanvas({
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
               <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                CPU vs Benchmark
+                {graphTitle}
               </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis
                     type="number"
-                    dataKey="cpu"
-                    name="CPU"
+                    dataKey={dataKeys.spend}
+                    name="Spend"
                     tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}K`}
                   />
                   <YAxis
                     type="number"
-                    dataKey="benchmark"
-                    name="Benchmark"
+                    dataKey={dataKeys.savings}
+                    name="Savings"
                     tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}K`}
                   />
-                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                  <Tooltip
+                    cursor={{ strokeDasharray: "3 3" }}
+                    formatter={(value: number, name: string) => [
+                      `€${value.toLocaleString()}`,
+                      name,
+                    ]}
+                  />
                   <Scatter name="Media" data={sampleData} fill="#7C3AED" />
                 </ScatterChart>
               </ResponsiveContainer>
@@ -2026,8 +1917,8 @@ export function VisualizationCanvas({
             message={densityCheck.message}
             severity={densityCheck.suggestedChart ? "warning" : "info"}
             suggestedChart={densityCheck.suggestedChart}
-            onSwitchChart={(chartType) => {
-              setAutoSwitchedToTable(true);
+            onSwitchChart={() => {
+              // Auto-switching removed
             }}
           />
         )}

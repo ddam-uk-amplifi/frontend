@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Menu } from "lucide-react";
 import { toast } from "sonner";
 import { TopBar } from "@/components/dashboard/TopBar";
@@ -16,12 +16,13 @@ import {
   type ChartImageForPPT,
 } from "@/lib/api/dashboard";
 import { tokenUtils } from "@/lib/utils/token";
+import { usePPTStore } from "@/lib/stores/usePPTStore";
 
-interface GraphForPPT {
-  id: string;
-  title: string;
-  slideNumber?: number;
-  imageBase64?: string; // Captured when graph is selected
+interface GraphTitleDialogState {
+  isOpen: boolean;
+  graphId: string;
+  defaultTitle: string;
+  element?: HTMLElement;
 }
 
 // Client ID mapping - used for tracker API calls
@@ -49,15 +50,25 @@ export default function Dashboard() {
   const [isRecommendationsPanelOpen, setIsRecommendationsPanelOpen] =
     useState(false);
 
-  // PPT Report State
-  const [selectedGraphsForPPT, setSelectedGraphsForPPT] = useState<Set<string>>(
-    new Set(),
-  );
-  const [graphsMetadata, setGraphsMetadata] = useState<
-    Map<string, GraphForPPT>
-  >(new Map());
+  // PPT Report State - Using Zustand for persistence
+  const {
+    selectedGraphsForPPT,
+    addGraph,
+    removeGraph,
+    updateSlideNumber: updateSlideNumberInStore,
+    getGraph,
+    getAllGraphs,
+    isGraphSelected,
+  } = usePPTStore();
+
   const [isPPTDialogOpen, setIsPPTDialogOpen] = useState(false);
   const [isGeneratingPPT, setIsGeneratingPPT] = useState(false);
+  const [graphTitleDialog, setGraphTitleDialog] = useState<GraphTitleDialogState>({
+    isOpen: false,
+    graphId: "",
+    defaultTitle: "",
+  });
+  const [isAddingGraph, setIsAddingGraph] = useState(false);
 
   // Ref to store chart element references for image capture
   const chartElementRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -127,23 +138,14 @@ export default function Dashboard() {
   const handleToggleGraphForPPT = useCallback(
     async (graphId: string, graphTitle: string, element?: HTMLElement) => {
       // Check if already selected (toggling off)
-      if (selectedGraphsForPPT.has(graphId)) {
-        setSelectedGraphsForPPT((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(graphId);
-          return newSet;
-        });
-        setGraphsMetadata((prev) => {
-          const newMap = new Map(prev);
-          newMap.delete(graphId);
-          return newMap;
-        });
+      if (isGraphSelected(graphId)) {
+        removeGraph(graphId);
         chartElementRefs.current.delete(graphId);
         toast.info("Graph removed from PPT report");
         return;
       }
 
-      // Adding graph - capture base64 immediately while it's visible
+      // Adding graph - show title input dialog first
       if (!element) {
         console.error(
           "[handleToggleGraphForPPT] No element provided for graph:",
@@ -153,41 +155,65 @@ export default function Dashboard() {
         return;
       }
 
+      // Open dialog to ask for custom title
+      setGraphTitleDialog({
+        isOpen: true,
+        graphId,
+        defaultTitle: graphTitle,
+        element,
+      });
+    },
+    [isGraphSelected, removeGraph],
+  );
+
+  // Actually add the graph to PPT after user confirms title and slide number
+  const handleConfirmGraphTitle = useCallback(
+    async (customTitle: string, slideNumber?: number) => {
+      const { graphId, element } = graphTitleDialog;
+
+      if (!element) {
+        toast.error("Could not capture chart. Please try again.");
+        setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
+        return;
+      }
+
+      setIsAddingGraph(true);
+
       try {
-        console.log("[handleToggleGraphForPPT] Capturing base64 for:", graphId);
+        console.log("[handleConfirmGraphTitle] Capturing base64 for:", graphId);
         const imageBase64 = await captureChartAsBase64(element);
         console.log(
-          "[handleToggleGraphForPPT] Captured! Length:",
+          "[handleConfirmGraphTitle] Captured! Length:",
           imageBase64.length,
         );
 
-        setSelectedGraphsForPPT((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(graphId);
-          return newSet;
-        });
-
-        setGraphsMetadata((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(graphId, {
-            id: graphId,
-            title: graphTitle,
-            imageBase64: imageBase64, // Store the captured image
-          });
-          return newMap;
+        // Add to Zustand store
+        addGraph(graphId, {
+          id: graphId,
+          title: customTitle,
+          slideNumber: slideNumber,
+          imageBase64: imageBase64,
         });
 
         chartElementRefs.current.set(graphId, element);
-        toast.success("Graph added to PPT report");
+        toast.success(
+          slideNumber
+            ? `Graph added to PPT report (Slide ${slideNumber})`
+            : "Graph added to PPT report"
+        );
+        setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
       } catch (error) {
         console.error(
-          "[handleToggleGraphForPPT] Failed to capture chart:",
+          "[handleConfirmGraphTitle] Failed to capture chart:",
           error,
         );
         toast.error("Failed to capture chart image. Please try again.");
+        setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
+      } finally {
+        setIsAddingGraph(false);
       }
     },
-    [selectedGraphsForPPT],
+    [graphTitleDialog, addGraph],
   );
 
   // Register a chart element for later capture
@@ -204,23 +230,16 @@ export default function Dashboard() {
 
   const handleUpdateSlideNumber = useCallback(
     (graphId: string, slideNumber: number | undefined) => {
-      setGraphsMetadata((prev) => {
-        const newMap = new Map(prev);
-        const existing = newMap.get(graphId);
-        if (existing) {
-          newMap.set(graphId, { ...existing, slideNumber });
-        }
-        return newMap;
-      });
+      updateSlideNumberInStore(graphId, slideNumber);
     },
-    [],
+    [updateSlideNumberInStore],
   );
 
   const getSlideNumber = useCallback(
     (graphId: string) => {
-      return graphsMetadata.get(graphId)?.slideNumber;
+      return getGraph(graphId)?.slideNumber;
     },
-    [graphsMetadata],
+    [getGraph],
   );
 
   const handleGenerateReport = () => {
@@ -234,10 +253,6 @@ export default function Dashboard() {
       Array.from(selectedGraphsForPPT),
     );
     console.log("[handleConfirmGenerate] selectedClient:", selectedClient);
-    console.log(
-      "[handleConfirmGenerate] graphsMetadata:",
-      Array.from(graphsMetadata.entries()),
-    );
 
     if (selectedGraphsForPPT.size === 0) {
       console.log("[handleConfirmGenerate] No graphs selected, aborting");
@@ -263,7 +278,7 @@ export default function Dashboard() {
 
       for (const graphId of selectedGraphsForPPT) {
         console.log(`[handleConfirmGenerate] Processing graphId: ${graphId}`);
-        const metadata = graphsMetadata.get(graphId);
+        const metadata = getGraph(graphId);
         console.log(`[handleConfirmGenerate] - metadata:`, metadata);
 
         if (!metadata?.imageBase64) {
@@ -374,8 +389,7 @@ export default function Dashboard() {
       setIsPPTDialogOpen(false);
 
       // Clear the selection after successful generation
-      setSelectedGraphsForPPT(new Set());
-      setGraphsMetadata(new Map());
+      usePPTStore.getState().clearAll();
       chartElementRefs.current.clear();
     } catch (error) {
       toast.dismiss(loadingToast);
@@ -390,14 +404,11 @@ export default function Dashboard() {
     }
   };
 
-  const selectedGraphsList = Array.from(selectedGraphsForPPT).map((id) => {
-    const metadata = graphsMetadata.get(id);
-    return {
-      id,
-      title: metadata?.title || id,
-      slideNumber: metadata?.slideNumber,
-    };
-  });
+  const selectedGraphsList = getAllGraphs().map((metadata) => ({
+    id: metadata.id,
+    title: metadata.title,
+    slideNumber: metadata.slideNumber,
+  }));
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100/50">
@@ -481,6 +492,136 @@ export default function Dashboard() {
         onUpdateSlideNumber={handleUpdateSlideNumber}
         isGenerating={isGeneratingPPT}
       />
+
+      {/* Graph Title Input Dialog */}
+      {graphTitleDialog.isOpen && (
+        <GraphTitleInputDialog
+          isOpen={graphTitleDialog.isOpen}
+          defaultTitle={graphTitleDialog.defaultTitle}
+          onConfirm={handleConfirmGraphTitle}
+          onCancel={() => !isAddingGraph && setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" })}
+          isLoading={isAddingGraph}
+        />
+      )}
+    </div>
+  );
+}
+
+// Graph Title Input Dialog Component
+function GraphTitleInputDialog({
+  isOpen,
+  defaultTitle,
+  onConfirm,
+  onCancel,
+  isLoading = false,
+}: {
+  isOpen: boolean;
+  defaultTitle: string;
+  onConfirm: (title: string, slideNumber?: number) => void;
+  onCancel: () => void;
+  isLoading?: boolean;
+}) {
+  const [title, setTitle] = useState(defaultTitle);
+  const [slideNumber, setSlideNumber] = useState<string>("");
+
+  // Reset fields when dialog opens with new default
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(defaultTitle);
+      setSlideNumber("");
+    }
+  }, [isOpen, defaultTitle]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (title.trim() && !isLoading) {
+      const slideNum = slideNumber ? parseInt(slideNumber, 10) : undefined;
+      onConfirm(title.trim(), slideNum);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => !isLoading && onCancel()}
+      />
+
+      {/* Dialog */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 border border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-800 mb-2">
+          Add Graph to PowerPoint
+        </h3>
+        <p className="text-sm text-slate-500 mb-4">
+          Customize the graph title and optionally assign it to a specific slide
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          {/* Title Input */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Graph Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., Q4 Media Spend by Channel"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-slate-800 placeholder:text-slate-400"
+              autoFocus
+              disabled={isLoading}
+            />
+          </div>
+
+          {/* Slide Number Input */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Slide Number <span className="text-slate-400">(Optional)</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={slideNumber}
+              onChange={(e) => setSlideNumber(e.target.value)}
+              placeholder="e.g., 3"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-slate-800 placeholder:text-slate-400"
+              disabled={isLoading}
+            />
+            <p className="text-xs text-slate-500 mt-1.5">
+              Leave empty to add at the end of the presentation
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isLoading}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!title.trim() || isLoading}
+              className="px-6 py-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-700 hover:to-purple-700 transition-all font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Adding...
+                </>
+              ) : (
+                "Add to PPT"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

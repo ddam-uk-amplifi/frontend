@@ -2,7 +2,6 @@
 
 import {
   X,
-  Download,
   Eye,
   BarChart3,
   GripVertical,
@@ -58,9 +57,8 @@ function DraggableGraphCard({ graph, slideNumber }: DraggableGraphCardProps) {
   return (
     <div
       ref={ref}
-      className={`text-center cursor-move transition-opacity ${
-        isDragging ? "opacity-40" : "opacity-100"
-      }`}
+      className={`text-center cursor-move transition-opacity ${isDragging ? "opacity-40" : "opacity-100"
+        }`}
     >
       <div className="flex items-center justify-center mb-2 relative">
         <GripVertical className="w-4 h-4 text-violet-500 absolute -left-2 top-0" />
@@ -110,10 +108,9 @@ function DroppableSlide({
       className={`
         relative border-2 rounded-xl p-3 aspect-[4/3] flex flex-col items-center justify-center
         transition-all
-        ${
-          hasGraphs
-            ? "border-violet-400 bg-gradient-to-br from-violet-50 to-purple-50 hover:shadow-lg"
-            : "border-slate-200 bg-slate-50"
+        ${hasGraphs
+          ? "border-violet-400 bg-gradient-to-br from-violet-50 to-purple-50 hover:shadow-lg"
+          : "border-slate-200 bg-slate-50"
         }
         ${isActive ? "border-cyan-500 bg-cyan-50 scale-105 shadow-lg" : ""}
         ${canDrop && !isActive ? "border-dashed border-violet-300" : ""}
@@ -123,11 +120,10 @@ function DroppableSlide({
       <div
         className={`
         absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm
-        ${
-          hasGraphs
+        ${hasGraphs
             ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white"
             : "bg-slate-300 text-white"
-        }
+          }
         ${isActive ? "bg-gradient-to-br from-cyan-500 to-blue-600" : ""}
       `}
       >
@@ -190,9 +186,8 @@ function DraggableUnassignedGraph({
   return (
     <li
       ref={ref}
-      className={`flex items-center gap-2 text-sm text-amber-800 cursor-move transition-all hover:bg-amber-100 p-2.5 rounded-lg ${
-        isDragging ? "opacity-40" : "opacity-100"
-      }`}
+      className={`flex items-center gap-2 text-sm text-amber-800 cursor-move transition-all hover:bg-amber-100 p-2.5 rounded-lg ${isDragging ? "opacity-40" : "opacity-100"
+        }`}
     >
       <GripVertical className="w-4 h-4 text-amber-500" />
       <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-medium shadow-sm">
@@ -294,21 +289,19 @@ function PPTConfirmationDialogContent({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode("preview")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                viewMode === "preview"
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === "preview"
                   ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-sm"
                   : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-              }`}
+                }`}
             >
               Slide Preview
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                viewMode === "list"
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === "list"
                   ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-sm"
                   : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-              }`}
+                }`}
             >
               List View
             </button>
@@ -443,10 +436,11 @@ function PPTConfirmationDialogContent({
             </button>
             <button
               onClick={onConfirm}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all font-medium shadow-lg shadow-emerald-200 hover:shadow-xl hover:scale-[1.02]"
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all font-medium shadow-lg shadow-emerald-200 hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <Sparkles className="w-4 h-4" />
-              Generate PowerPoint
+              {isGenerating ? "Generating..." : "Generate PowerPoint"}
             </button>
           </div>
         </div>

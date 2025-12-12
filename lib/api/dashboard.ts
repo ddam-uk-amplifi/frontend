@@ -948,6 +948,7 @@ export interface ChartImageForPPT {
 
 export interface DashboardToPPTXRequest {
   client_name: string;
+  presentation_title?: string;
   charts: ChartImageForPPT[];
 }
 
