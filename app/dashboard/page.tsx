@@ -9,6 +9,7 @@ import { GraphRecommendationsPanel } from "@/components/dashboard/GraphRecommend
 import { VisualizationCanvas } from "@/components/dashboard/VisualizationCanvas";
 import { PPTGenerationBanner } from "@/components/dashboard/PPTGenerationBanner";
 import { PPTConfirmationDialog } from "@/components/dashboard/PPTConfirmationDialog";
+import { TableDashboardView } from "@/components/dashboard/TableDashboardView";
 import {
   fetchLatestJob,
   generateDashboardPPTX,
@@ -45,10 +46,11 @@ export default function Dashboard() {
     Record<string, string[]>
   >({});
   const [selectedGraphType, setSelectedGraphType] = useState<string | null>(
-    null,
+    null
   );
   const [isRecommendationsPanelOpen, setIsRecommendationsPanelOpen] =
     useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "visualization">("table");
 
   // PPT Report State - Using Zustand for persistence
   const {
@@ -63,11 +65,12 @@ export default function Dashboard() {
 
   const [isPPTDialogOpen, setIsPPTDialogOpen] = useState(false);
   const [isGeneratingPPT, setIsGeneratingPPT] = useState(false);
-  const [graphTitleDialog, setGraphTitleDialog] = useState<GraphTitleDialogState>({
-    isOpen: false,
-    graphId: "",
-    defaultTitle: "",
-  });
+  const [graphTitleDialog, setGraphTitleDialog] =
+    useState<GraphTitleDialogState>({
+      isOpen: false,
+      graphId: "",
+      defaultTitle: "",
+    });
   const [isAddingGraph, setIsAddingGraph] = useState(false);
 
   // Ref to store chart element references for image capture
@@ -137,8 +140,21 @@ export default function Dashboard() {
   // PPT Functions - capture base64 immediately when user selects a graph
   const handleToggleGraphForPPT = useCallback(
     async (graphId: string, graphTitle: string, element?: HTMLElement) => {
+      console.log("=== [handleToggleGraphForPPT] CALLED ===");
+      console.log("[handleToggleGraphForPPT] Graph ID:", graphId);
+      console.log("[handleToggleGraphForPPT] Graph Title:", graphTitle);
+      console.log("[handleToggleGraphForPPT] Element provided:", !!element);
+      console.log("[handleToggleGraphForPPT] Element details:", {
+        tagName: element?.tagName,
+        className: element?.className,
+        id: element?.id,
+        offsetWidth: element?.offsetWidth,
+        offsetHeight: element?.offsetHeight,
+      });
+
       // Check if already selected (toggling off)
       if (isGraphSelected(graphId)) {
+        console.log("[handleToggleGraphForPPT] Graph already selected, removing...");
         removeGraph(graphId);
         chartElementRefs.current.delete(graphId);
         toast.info("Graph removed from PPT report");
@@ -148,22 +164,24 @@ export default function Dashboard() {
       // Adding graph - show title input dialog first
       if (!element) {
         console.error(
-          "[handleToggleGraphForPPT] No element provided for graph:",
-          graphId,
+          "[handleToggleGraphForPPT] ERROR: No element provided for graph:",
+          graphId
         );
         toast.error("Could not capture chart. Please try again.");
         return;
       }
 
       // Open dialog to ask for custom title
+      console.log("[handleToggleGraphForPPT] Opening title dialog...");
       setGraphTitleDialog({
         isOpen: true,
         graphId,
         defaultTitle: graphTitle,
         element,
       });
+      console.log("=== [handleToggleGraphForPPT] END ===");
     },
-    [isGraphSelected, removeGraph],
+    [isGraphSelected, removeGraph]
   );
 
   // Actually add the graph to PPT after user confirms title and slide number
@@ -180,14 +198,28 @@ export default function Dashboard() {
       setIsAddingGraph(true);
 
       try {
-        console.log("[handleConfirmGraphTitle] Capturing base64 for:", graphId);
+        console.log("=== [handleConfirmGraphTitle] START ===");
+        console.log("[handleConfirmGraphTitle] Graph ID:", graphId);
+        console.log("[handleConfirmGraphTitle] Custom Title:", customTitle);
+        console.log("[handleConfirmGraphTitle] Slide Number:", slideNumber);
+        console.log("[handleConfirmGraphTitle] Element:", {
+          tagName: element?.tagName,
+          className: element?.className,
+          id: element?.id,
+        });
+
+        if (!element) {
+          throw new Error("Element is undefined or null");
+        }
+
+        console.log("[handleConfirmGraphTitle] Calling captureChartAsBase64...");
         const imageBase64 = await captureChartAsBase64(element);
-        console.log(
-          "[handleConfirmGraphTitle] Captured! Length:",
-          imageBase64.length,
-        );
+        console.log("[handleConfirmGraphTitle] Capture successful!");
+        console.log("[handleConfirmGraphTitle] Image length:", imageBase64.length);
+        console.log("[handleConfirmGraphTitle] Image prefix:", imageBase64.substring(0, 50));
 
         // Add to Zustand store
+        console.log("[handleConfirmGraphTitle] Adding to store...");
         addGraph(graphId, {
           id: graphId,
           title: customTitle,
@@ -196,24 +228,38 @@ export default function Dashboard() {
         });
 
         chartElementRefs.current.set(graphId, element);
+        console.log("[handleConfirmGraphTitle] Graph added successfully!");
+
         toast.success(
           slideNumber
             ? `Graph added to PPT report (Slide ${slideNumber})`
             : "Graph added to PPT report"
         );
         setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
-      } catch (error) {
-        console.error(
-          "[handleConfirmGraphTitle] Failed to capture chart:",
-          error,
-        );
-        toast.error("Failed to capture chart image. Please try again.");
+        console.log("=== [handleConfirmGraphTitle] SUCCESS ===");
+      } catch (error: any) {
+        console.error("=== [handleConfirmGraphTitle] ERROR ===");
+        console.error("[handleConfirmGraphTitle] Error type:", error?.constructor?.name);
+        console.error("[handleConfirmGraphTitle] Error message:", error?.message);
+        console.error("[handleConfirmGraphTitle] Error stack:", error?.stack);
+        console.error("[handleConfirmGraphTitle] Full error:", error);
+        console.error("=== [handleConfirmGraphTitle] END ERROR ===");
+
+        // Show detailed error to user
+        const errorMessage = error?.message
+          ? `Failed to capture chart: ${error.message}`
+          : "Failed to capture chart image. Please try again.";
+
+        toast.error(errorMessage, {
+          duration: 5000,
+          description: "Check console for detailed error logs"
+        });
         setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
       } finally {
         setIsAddingGraph(false);
       }
     },
-    [graphTitleDialog, addGraph],
+    [graphTitleDialog, addGraph]
   );
 
   // Register a chart element for later capture
@@ -225,21 +271,21 @@ export default function Dashboard() {
         chartElementRefs.current.delete(graphId);
       }
     },
-    [],
+    []
   );
 
   const handleUpdateSlideNumber = useCallback(
     (graphId: string, slideNumber: number | undefined) => {
       updateSlideNumberInStore(graphId, slideNumber);
     },
-    [updateSlideNumberInStore],
+    [updateSlideNumberInStore]
   );
 
   const getSlideNumber = useCallback(
     (graphId: string) => {
       return getGraph(graphId)?.slideNumber;
     },
-    [getGraph],
+    [getGraph]
   );
 
   const handleGenerateReport = () => {
@@ -250,7 +296,7 @@ export default function Dashboard() {
     console.log("[handleConfirmGenerate] Called!");
     console.log(
       "[handleConfirmGenerate] selectedGraphsForPPT:",
-      Array.from(selectedGraphsForPPT),
+      Array.from(selectedGraphsForPPT)
     );
     console.log("[handleConfirmGenerate] selectedClient:", selectedClient);
 
@@ -273,7 +319,7 @@ export default function Dashboard() {
       // Build chart images from stored base64 (captured when user selected each graph)
       const chartImages: ChartImageForPPT[] = [];
       console.log(
-        "[handleConfirmGenerate] Building chart images from stored base64...",
+        "[handleConfirmGenerate] Building chart images from stored base64..."
       );
 
       for (const graphId of selectedGraphsForPPT) {
@@ -283,7 +329,7 @@ export default function Dashboard() {
 
         if (!metadata?.imageBase64) {
           console.warn(
-            `[handleConfirmGenerate] No image found for graph ${graphId}, skipping...`,
+            `[handleConfirmGenerate] No image found for graph ${graphId}, skipping...`
           );
           continue;
         }
@@ -294,23 +340,25 @@ export default function Dashboard() {
           title: metadata.title || graphId,
         });
         console.log(
-          `[handleConfirmGenerate] Added to chartImages. Total: ${chartImages.length}`,
+          `[handleConfirmGenerate] Added to chartImages. Total: ${chartImages.length}`
         );
       }
 
       console.log(
         "[handleConfirmGenerate] Total chartImages:",
-        chartImages.length,
+        chartImages.length
       );
       chartImages.forEach((img, i) => {
         console.log(
-          `[handleConfirmGenerate] Chart ${i}: slide_index=${img.slide_index}, title=${img.title}, imageSize=${img.image_base64?.length || 0}`,
+          `[handleConfirmGenerate] Chart ${i}: slide_index=${
+            img.slide_index
+          }, title=${img.title}, imageSize=${img.image_base64?.length || 0}`
         );
       });
 
       if (chartImages.length === 0) {
         console.log(
-          "[handleConfirmGenerate] No chart images available, aborting",
+          "[handleConfirmGenerate] No chart images available, aborting"
         );
         toast.dismiss(loadingToast);
         toast.error("No chart images available. Please re-select your charts.");
@@ -332,57 +380,80 @@ export default function Dashboard() {
       if (response.charts_placed > 0) {
         toast.success(
           `PowerPoint generated successfully! ${response.charts_placed} chart(s) placed.`,
-          { duration: 5000 },
+          { duration: 5000 }
         );
 
-        // Download the file with authentication
-        if (response.download_url) {
+        // Download the file
+        if (response.download_url || response.output_path) {
           try {
-            // Use fetch with auth token to download the file
-            const apiUrl =
-              process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-            const downloadUrl = response.download_url.startsWith("http")
-              ? response.download_url
-              : `${apiUrl}${response.download_url}`;
+            console.log("[handleConfirmGenerate] Starting download...");
+            console.log("[handleConfirmGenerate] Download URL:", response.download_url);
+            console.log("[handleConfirmGenerate] Output path:", response.output_path);
 
-            // Get auth token
-            const token = tokenUtils.getAccessToken();
+            // If it's an S3 URL, just open it directly (browser will handle download)
+            // The presigned URL already has auth built-in
+            if (response.download_url && response.download_url.startsWith("https://")) {
+              console.log("[handleConfirmGenerate] Using direct S3 download");
 
-            const downloadResponse = await fetch(downloadUrl, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
-
-            if (downloadResponse.ok) {
-              // Create blob and download
-              const blob = await downloadResponse.blob();
-              const url = window.URL.createObjectURL(blob);
+              // Create a temporary anchor element to trigger download
               const a = document.createElement("a");
-              a.href = url;
-              a.download =
-                response.output_path.split("/").pop() ||
-                "dashboard_export.pptx";
+              a.href = response.download_url;
+              a.download = response.output_path.split("/").pop() || "dashboard_export.pptx";
+
+              // Some browsers require the element to be in the DOM
               document.body.appendChild(a);
               a.click();
-              document.body.removeChild(a);
-              window.URL.revokeObjectURL(url);
+
+              // Clean up
+              setTimeout(() => {
+                document.body.removeChild(a);
+              }, 100);
+
+              console.log("[handleConfirmGenerate] Download triggered successfully");
             } else {
-              console.error("Download failed:", downloadResponse.status);
-              toast.error("Failed to download PowerPoint file");
+              // Fallback: proxy through backend
+              console.log("[handleConfirmGenerate] Using backend proxy download");
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+              const downloadUrl = response.download_url?.startsWith("http")
+                ? response.download_url
+                : `${apiUrl}${response.download_url || response.output_path}`;
+
+              const token = tokenUtils.getAccessToken();
+
+              const downloadResponse = await fetch(downloadUrl, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              });
+
+              if (downloadResponse.ok) {
+                const blob = await downloadResponse.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = response.output_path.split("/").pop() || "dashboard_export.pptx";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                console.log("[handleConfirmGenerate] Download completed via proxy");
+              } else {
+                console.error("[handleConfirmGenerate] Download failed:", downloadResponse.status);
+                toast.error("Failed to download PowerPoint file");
+              }
             }
-          } catch (downloadError) {
-            console.error("Download error:", downloadError);
-            toast.error("Failed to download PowerPoint file");
+          } catch (downloadError: any) {
+            console.error("[handleConfirmGenerate] Download error:", downloadError);
+            toast.error(`Failed to download: ${downloadError.message || 'Unknown error'}`);
           }
         }
       } else {
         toast.warning(
-          "PowerPoint generated but no charts were placed successfully.",
+          "PowerPoint generated but no charts were placed successfully."
         );
       }
 
       if (response.charts_failed > 0) {
         toast.warning(
-          `${response.charts_failed} chart(s) failed to be placed.`,
+          `${response.charts_failed} chart(s) failed to be placed.`
         );
       }
 
@@ -397,7 +468,7 @@ export default function Dashboard() {
       toast.error(
         error instanceof Error
           ? `Failed to generate PowerPoint: ${error.message}`
-          : "Failed to generate PowerPoint. Please try again.",
+          : "Failed to generate PowerPoint. Please try again."
       );
     } finally {
       setIsGeneratingPPT(false);
@@ -429,60 +500,102 @@ export default function Dashboard() {
         onMarketChange={setSelectedMarket}
         onYtdMonthChange={setSelectedYtdMonth}
       />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Query Builder Toggle Button (when collapsed) */}
-        {!isQueryPanelOpen && (
-          <div className="bg-white/80 backdrop-blur-sm border-r border-slate-200/60 p-4">
-            <button
-              onClick={() => setIsQueryPanelOpen(true)}
-              className="p-3 hover:bg-slate-100 rounded-xl transition-colors"
-              title="Open Query Builder"
-            >
-              <Menu className="w-6 h-6 text-slate-600" />
-            </button>
-          </div>
-        )}
-
-        {/* Query Builder Panel */}
-        <QueryBuilderPanel
-          isOpen={isQueryPanelOpen}
-          onClose={() => setIsQueryPanelOpen(false)}
-          selectedFields={selectedFields}
-          onFieldToggle={handleFieldToggle}
-          onClearAll={handleClearAll}
-          dataSource={selectedDataSource}
-          selectedClient={selectedClient}
-        />
-
-        {/* Visualization Canvas */}
-        <VisualizationCanvas
-          selectedFields={selectedFields}
-          selectedGraphType={selectedGraphType}
-          client={selectedClient}
-          market={selectedMarket}
-          period={selectedYtdMonth}
-          dataSource={selectedDataSource}
-          jobId={selectedJobId}
-          clientId={selectedClientId}
-          selectedGraphsForPPT={selectedGraphsForPPT}
-          onToggleGraphForPPT={handleToggleGraphForPPT}
-          onUpdateSlideNumber={handleUpdateSlideNumber}
-          getSlideNumber={getSlideNumber}
-          registerChartElement={registerChartElement}
-        />
-
-        {/* Graph Recommendations Panel */}
-        <GraphRecommendationsPanel
-          selectedFields={selectedFields}
-          onSelectGraph={setSelectedGraphType}
-          selectedGraphType={selectedGraphType}
-          isOpen={isRecommendationsPanelOpen}
-          onOpenChange={setIsRecommendationsPanelOpen}
-        />
+      {/* View Mode Toggle */}
+      <div className="border-b border-slate-200 bg-white px-6">
+        <div className="flex items-center gap-8">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`relative py-3 text-sm font-medium transition-colors ${
+              viewMode === "table"
+                ? "text-slate-900"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Table View
+            {viewMode === "table" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setViewMode("visualization")}
+            className={`relative py-3 text-sm font-medium transition-colors ${
+              viewMode === "visualization"
+                ? "text-slate-900"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Query Graph Builder
+            {viewMode === "visualization" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full" />
+            )}
+          </button>
+        </div>
       </div>
 
+      {/* Main Content Area */}
+      {viewMode === "table" ? (
+        <div className="flex-1 overflow-hidden">
+          <TableDashboardView
+            selectedClient={selectedClient}
+            selectedGraphsForPPT={selectedGraphsForPPT}
+            onToggleGraphForPPT={handleToggleGraphForPPT}
+            onUpdateSlideNumber={handleUpdateSlideNumber}
+            getSlideNumber={getSlideNumber}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Query Builder Toggle Button (when collapsed) */}
+          {!isQueryPanelOpen && (
+            <div className="bg-white/80 backdrop-blur-sm border-r border-slate-200/60 p-4">
+              <button
+                onClick={() => setIsQueryPanelOpen(true)}
+                className="p-3 hover:bg-slate-100 rounded-xl transition-colors"
+                title="Open Query Builder"
+              >
+                <Menu className="w-6 h-6 text-slate-600" />
+              </button>
+            </div>
+          )}
+
+          {/* Query Builder Panel */}
+          <QueryBuilderPanel
+            isOpen={isQueryPanelOpen}
+            onClose={() => setIsQueryPanelOpen(false)}
+            selectedFields={selectedFields}
+            onFieldToggle={handleFieldToggle}
+            onClearAll={handleClearAll}
+            dataSource={selectedDataSource}
+            selectedClient={selectedClient}
+          />
+
+          {/* Visualization Canvas */}
+          <VisualizationCanvas
+            selectedFields={selectedFields}
+            selectedGraphType={selectedGraphType}
+            client={selectedClient}
+            market={selectedMarket}
+            period={selectedYtdMonth}
+            dataSource={selectedDataSource}
+            jobId={selectedJobId}
+            clientId={selectedClientId}
+            selectedGraphsForPPT={selectedGraphsForPPT}
+            onToggleGraphForPPT={handleToggleGraphForPPT}
+            onUpdateSlideNumber={handleUpdateSlideNumber}
+            getSlideNumber={getSlideNumber}
+            registerChartElement={registerChartElement}
+          />
+
+          {/* Graph Recommendations Panel */}
+          <GraphRecommendationsPanel
+            selectedFields={selectedFields}
+            onSelectGraph={setSelectedGraphType}
+            selectedGraphType={selectedGraphType}
+            isOpen={isRecommendationsPanelOpen}
+            onOpenChange={setIsRecommendationsPanelOpen}
+          />
+        </div>
+      )}
       {/* PPT Confirmation Dialog */}
       <PPTConfirmationDialog
         isOpen={isPPTDialogOpen}
@@ -499,7 +612,14 @@ export default function Dashboard() {
           isOpen={graphTitleDialog.isOpen}
           defaultTitle={graphTitleDialog.defaultTitle}
           onConfirm={handleConfirmGraphTitle}
-          onCancel={() => !isAddingGraph && setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" })}
+          onCancel={() =>
+            !isAddingGraph &&
+            setGraphTitleDialog({
+              isOpen: false,
+              graphId: "",
+              defaultTitle: "",
+            })
+          }
           isLoading={isAddingGraph}
         />
       )}

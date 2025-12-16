@@ -1021,38 +1021,94 @@ export async function generateDashboardPPTX(
 export async function captureChartAsBase64(
   element: HTMLElement,
 ): Promise<string> {
-  console.log("[captureChartAsBase64] Starting capture...");
-  console.log(
-    "[captureChartAsBase64] Element:",
-    element.tagName,
-    element.className,
-  );
-  console.log(
-    "[captureChartAsBase64] Element dimensions:",
-    element.offsetWidth,
-    "x",
-    element.offsetHeight,
-  );
+  console.log("=== [captureChartAsBase64] START ===");
+  console.log("[captureChartAsBase64] Timestamp:", new Date().toISOString());
 
-  // Use html2canvas-pro which supports modern CSS color functions (lab, oklch, lch)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const html2canvas = (await import("html2canvas-pro" as any)).default;
-  console.log("[captureChartAsBase64] html2canvas-pro loaded");
+  try {
+    // Log element details
+    console.log("[captureChartAsBase64] Element details:", {
+      tagName: element.tagName,
+      className: element.className,
+      id: element.id,
+      offsetWidth: element.offsetWidth,
+      offsetHeight: element.offsetHeight,
+      scrollWidth: element.scrollWidth,
+      scrollHeight: element.scrollHeight,
+      display: window.getComputedStyle(element).display,
+      visibility: window.getComputedStyle(element).visibility,
+    });
 
-  const canvas = await html2canvas(element, {
-    backgroundColor: "#ffffff",
-    scale: 2, // Higher quality
-    logging: false,
-    useCORS: true,
-  });
-  console.log(
-    "[captureChartAsBase64] Canvas created:",
-    canvas.width,
-    "x",
-    canvas.height,
-  );
+    // Check if element is visible
+    if (element.offsetWidth === 0 || element.offsetHeight === 0) {
+      throw new Error(
+        `Element has zero dimensions: ${element.offsetWidth}x${element.offsetHeight}`
+      );
+    }
 
-  const dataUrl = canvas.toDataURL("image/png");
-  console.log("[captureChartAsBase64] DataURL length:", dataUrl.length);
-  return dataUrl;
+    // Check if element is in the DOM
+    if (!document.body.contains(element)) {
+      throw new Error("Element is not attached to the DOM");
+    }
+
+    // Load html2canvas-pro
+    console.log("[captureChartAsBase64] Loading html2canvas-pro...");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const html2canvas = (await import("html2canvas-pro" as any)).default;
+
+    if (!html2canvas) {
+      throw new Error("html2canvas-pro failed to load or has no default export");
+    }
+
+    console.log("[captureChartAsBase64] html2canvas-pro loaded successfully");
+    console.log("[captureChartAsBase64] html2canvas type:", typeof html2canvas);
+
+    // Create canvas
+    console.log("[captureChartAsBase64] Creating canvas with options:", {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      logging: false,
+      useCORS: true,
+    });
+
+    const canvas = await html2canvas(element, {
+      backgroundColor: "#ffffff",
+      scale: 2, // Higher quality
+      logging: false,
+      useCORS: true,
+    });
+
+    if (!canvas) {
+      throw new Error("html2canvas returned null or undefined");
+    }
+
+    console.log("[captureChartAsBase64] Canvas created successfully:", {
+      width: canvas.width,
+      height: canvas.height,
+      type: Object.prototype.toString.call(canvas),
+    });
+
+    // Convert to data URL
+    console.log("[captureChartAsBase64] Converting canvas to data URL...");
+    const dataUrl = canvas.toDataURL("image/png");
+
+    if (!dataUrl || !dataUrl.startsWith("data:image")) {
+      throw new Error(`Invalid data URL generated: ${dataUrl?.substring(0, 50)}...`);
+    }
+
+    console.log("[captureChartAsBase64] Data URL created successfully:", {
+      length: dataUrl.length,
+      prefix: dataUrl.substring(0, 30),
+    });
+
+    console.log("=== [captureChartAsBase64] SUCCESS ===");
+    return dataUrl;
+  } catch (error: any) {
+    console.error("=== [captureChartAsBase64] ERROR ===");
+    console.error("[captureChartAsBase64] Error type:", error?.constructor?.name);
+    console.error("[captureChartAsBase64] Error message:", error?.message);
+    console.error("[captureChartAsBase64] Error stack:", error?.stack);
+    console.error("[captureChartAsBase64] Full error object:", error);
+    console.error("=== [captureChartAsBase64] END ERROR ===");
+    throw error;
+  }
 }
