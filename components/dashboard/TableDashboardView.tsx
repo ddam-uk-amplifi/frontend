@@ -53,9 +53,11 @@ export function TableDashboardView({ selectedClient }: TableDashboardViewProps) 
   }
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50">
+    <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50 isolate">
       {/* Data Table */}
-      <DataTableView onDataChange={handleDataChange} />
+      <div className="overflow-hidden">
+        <DataTableView selectedClient={selectedClient} onDataChange={handleDataChange} />
+      </div>
 
       {/* Visualization Section - Always Visible Below Table */}
       <ChartGridView columns={selectedColumns} rows={selectedRows} />

@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Settings2, Eye, EyeOff } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Settings2, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { apiClient } from "@/lib/api/client";
+import { toast } from "sonner";
 
-// Define table structure
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 interface TableColumn {
   id: string;
   label: string;
@@ -14,6 +19,7 @@ interface TableColumn {
   align?: "left" | "right" | "center";
   visible: boolean;
   order: number;
+  frozen?: boolean; // For sticky columns
 }
 
 interface TableRow {
@@ -26,10 +32,33 @@ interface TableRow {
   data: Record<string, any>;
 }
 
-// Sample columns matching the reference image
+interface ApiDataItem {
+  media_type: string;
+  net_net: number | null;
+  addressable: number | null;
+  non_addressable: number | null;
+  [key: string]: any;
+}
+
+interface DataTableViewProps {
+  selectedClient?: string;
+  onVisualizationRequest?: (columns: string[], rows: TableRow[]) => void;
+  onDataChange?: (columns: string[], rows: TableRow[]) => void;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const CLIENT_ID_MAP: Record<string, number> = {
+  Arla: 1,
+  Carlsberg: 2,
+  Kering: 3,
+};
+
 const DEFAULT_COLUMNS: TableColumn[] = [
-  { id: "mediaType", label: "Media Type", type: "text", align: "left", visible: true, order: 0 },
-  { id: "type", label: "Type", type: "text", align: "left", visible: true, order: 1 },
+  { id: "mediaType", label: "Media Type", type: "text", align: "left", visible: true, order: 0, frozen: true },
+  { id: "type", label: "Type", type: "text", align: "left", visible: true, order: 1, frozen: true },
   { id: "mediaNet", label: "Media Net", type: "currency", align: "right", visible: true, order: 2 },
   { id: "netNet", label: "Net Net", type: "currency", align: "right", visible: true, order: 3 },
   { id: "shareOfSpend", label: "Share of Spend %", type: "percentage", align: "right", visible: true, order: 4 },
@@ -38,335 +67,206 @@ const DEFAULT_COLUMNS: TableColumn[] = [
   { id: "auditShare", label: "Audit Share %", type: "percentage", align: "right", visible: true, order: 7 },
   { id: "audited", label: "Audited", type: "currency", align: "right", visible: true, order: 8 },
   { id: "nonAudited", label: "Non Audited", type: "currency", align: "right", visible: true, order: 9 },
-  { id: "netAddressable", label: "Net Addressable (Audited)", type: "currency", align: "right", visible: true, order: 10 },
-  { id: "netNonAddressable", label: "Net Non Addressable (Audited)", type: "currency", align: "right", visible: true, order: 11 },
+  { id: "netAddressable", label: "Net Addressable", type: "currency", align: "right", visible: true, order: 10 },
+  { id: "netNonAddressable", label: "Net Non Addressable", type: "currency", align: "right", visible: true, order: 11 },
   { id: "gNetNet", label: "G Net Net", type: "currency", align: "right", visible: true, order: 12 },
 ];
 
-// Sample data matching the structure
-const SAMPLE_DATA: TableRow[] = [
-  {
-    id: "tv-actual",
-    mediaType: "TV",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 39.1,
-      addressable: 600723238.88,
-      nonAddressable: 600963998.10,
-      auditShare: 100,
-      audited: 600243648.88,
-      nonAudited: 0.00,
-      netAddressable: 600723238.88,
-      netNonAddressable: 600963998.10,
-      mediaNet: 1201447.00,
-      netNet: 1201447.00,
-      gNetNet: 1201447.00,
-    },
-  },
-  {
-    id: "tv-planned",
-    mediaType: "TV",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 38.5,
-      addressable: 595000000.00,
-      nonAddressable: 595000000.00,
-      auditShare: 100,
-      audited: 595000000.00,
-      nonAudited: 0.00,
-      netAddressable: 595000000.00,
-      netNonAddressable: 595000000.00,
-      mediaNet: 1190000.00,
-      netNet: 1190000.00,
-      gNetNet: 1190000.00,
-    },
-  },
-  {
-    id: "digital-actual",
-    mediaType: "Digital",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 44.3,
-      addressable: 600372068.96,
-      nonAddressable: 600372068.96,
-      auditShare: 100,
-      audited: 600372068.96,
-      nonAudited: 0.00,
-      netAddressable: 600372068.96,
-      netNonAddressable: 600372068.96,
-      mediaNet: 1201373.00,
-      netNet: 1201373.00,
-      gNetNet: 1201373.00,
-    },
-  },
-  {
-    id: "digital-planned",
-    mediaType: "Digital",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 45.0,
-      addressable: 610000000.00,
-      nonAddressable: 610000000.00,
-      auditShare: 100,
-      audited: 610000000.00,
-      nonAudited: 0.00,
-      netAddressable: 610000000.00,
-      netNonAddressable: 610000000.00,
-      mediaNet: 1220000.00,
-      netNet: 1220000.00,
-      gNetNet: 1220000.00,
-    },
-  },
-  {
-    id: "ooh-actual",
-    mediaType: "OOH",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 9.9,
-      addressable: 600152679.11,
-      nonAddressable: 600152679.11,
-      auditShare: 100,
-      audited: 600152679.11,
-      nonAudited: 0.00,
-      netAddressable: 600152679.11,
-      netNonAddressable: 600152679.11,
-      mediaNet: 1201305.00,
-      netNet: 1201305.00,
-      gNetNet: 1201305.00,
-    },
-  },
-  {
-    id: "ooh-planned",
-    mediaType: "OOH",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 9.5,
-      addressable: 145000000.00,
-      nonAddressable: 145000000.00,
-      auditShare: 100,
-      audited: 145000000.00,
-      nonAudited: 0.00,
-      netAddressable: 145000000.00,
-      netNonAddressable: 145000000.00,
-      mediaNet: 290000.00,
-      netNet: 290000.00,
-      gNetNet: 290000.00,
-    },
-  },
-  {
-    id: "radio-actual",
-    mediaType: "Radio",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 3.6,
-      addressable: 60053179.83,
-      nonAddressable: 60053179.83,
-      auditShare: 100,
-      audited: 60053179.83,
-      nonAudited: 0.00,
-      netAddressable: 60053179.83,
-      netNonAddressable: 60053179.83,
-      mediaNet: 120107.00,
-      netNet: 120107.00,
-      gNetNet: 120107.00,
-    },
-  },
-  {
-    id: "radio-planned",
-    mediaType: "Radio",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 3.5,
-      addressable: 55000000.00,
-      nonAddressable: 55000000.00,
-      auditShare: 100,
-      audited: 55000000.00,
-      nonAudited: 0.00,
-      netAddressable: 55000000.00,
-      netNonAddressable: 55000000.00,
-      mediaNet: 110000.00,
-      netNet: 110000.00,
-      gNetNet: 110000.00,
-    },
-  },
-  {
-    id: "print-actual",
-    mediaType: "Print",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 2.1,
-      addressable: 60052488.80,
-      nonAddressable: 60052488.80,
-      auditShare: 100,
-      audited: 60052488.80,
-      nonAudited: 0.00,
-      netAddressable: 60052488.80,
-      netNonAddressable: 60052488.80,
-      mediaNet: 120105.00,
-      netNet: 120105.00,
-      gNetNet: 120105.00,
-    },
-  },
-  {
-    id: "print-planned",
-    mediaType: "Print",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 2.0,
-      addressable: 30000000.00,
-      nonAddressable: 30000000.00,
-      auditShare: 100,
-      audited: 30000000.00,
-      nonAudited: 0.00,
-      netAddressable: 30000000.00,
-      netNonAddressable: 30000000.00,
-      mediaNet: 60000.00,
-      netNet: 60000.00,
-      gNetNet: 60000.00,
-    },
-  },
-  {
-    id: "cinema-actual",
-    mediaType: "Cinema",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 0.5,
-      addressable: 8000000.00,
-      nonAddressable: 8000000.00,
-      auditShare: 100,
-      audited: 8000000.00,
-      nonAudited: 0.00,
-      netAddressable: 8000000.00,
-      netNonAddressable: 8000000.00,
-      mediaNet: 16000.00,
-      netNet: 16000.00,
-      gNetNet: 16000.00,
-    },
-  },
-  {
-    id: "cinema-planned",
-    mediaType: "Cinema",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 0.5,
-      addressable: 7500000.00,
-      nonAddressable: 7500000.00,
-      auditShare: 100,
-      audited: 7500000.00,
-      nonAudited: 0.00,
-      netAddressable: 7500000.00,
-      netNonAddressable: 7500000.00,
-      mediaNet: 15000.00,
-      netNet: 15000.00,
-      gNetNet: 15000.00,
-    },
-  },
-  {
-    id: "online-search-actual",
-    mediaType: "Online Search",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 0.5,
-      addressable: 600716368.89,
-      nonAddressable: 600716368.89,
-      auditShare: 100,
-      audited: 600716368.89,
-      nonAudited: 0.00,
-      netAddressable: 600716368.89,
-      netNonAddressable: 600716368.89,
-      mediaNet: 1201433.00,
-      netNet: 1201433.00,
-      gNetNet: 1201433.00,
-    },
-  },
-  {
-    id: "online-search-planned",
-    mediaType: "Online Search",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 0.5,
-      addressable: 8000000.00,
-      nonAddressable: 8000000.00,
-      auditShare: 100,
-      audited: 8000000.00,
-      nonAudited: 0.00,
-      netAddressable: 8000000.00,
-      netNonAddressable: 8000000.00,
-      mediaNet: 16000.00,
-      netNet: 16000.00,
-      gNetNet: 16000.00,
-    },
-  },
-  {
-    id: "total-actual",
-    mediaType: "Total",
-    type: "Actual",
-    level: 0,
-    data: {
-      shareOfSpend: 100,
-      addressable: 6007340485.87,
-      nonAddressable: 6006204229.00,
-      auditShare: 100,
-      audited: 6007340485.87,
-      nonAudited: 0.00,
-      netAddressable: 6007340485.87,
-      netNonAddressable: 6006204229.00,
-      mediaNet: 12014681.00,
-      netNet: 12014681.00,
-      gNetNet: 12014681.00,
-    },
-  },
-  {
-    id: "total-planned",
-    mediaType: "Total",
-    type: "Planned",
-    level: 0,
-    data: {
-      shareOfSpend: 100,
-      addressable: 1535500000.00,
-      nonAddressable: 1535500000.00,
-      auditShare: 100,
-      audited: 1535500000.00,
-      nonAudited: 0.00,
-      netAddressable: 1535500000.00,
-      netNonAddressable: 1535500000.00,
-      mediaNet: 3071000.00,
-      netNet: 3071000.00,
-      gNetNet: 3071000.00,
-    },
-  },
-];
+// ============================================================================
+// Data Transformation Utilities
+// ============================================================================
 
-interface DataTableViewProps {
-  onVisualizationRequest?: (columns: string[], rows: TableRow[]) => void;
-  onDataChange?: (columns: string[], rows: TableRow[]) => void;
+function createEmptyRowData(): Record<string, any> {
+  return {
+    netNet: null,
+    addressable: null,
+    nonAddressable: null,
+    mediaNet: null,
+    shareOfSpend: null,
+    auditShare: null,
+    audited: null,
+    nonAudited: null,
+    netAddressable: null,
+    netNonAddressable: null,
+    gNetNet: null,
+  };
 }
 
-export function DataTableView({ onVisualizationRequest, onDataChange }: DataTableViewProps) {
+function transformApiDataToRows(apiData: { data?: ApiDataItem[] }): TableRow[] {
+  if (!apiData.data || apiData.data.length === 0) {
+    return [];
+  }
+
+  const transformedRows: TableRow[] = [];
+  const mediaTypeMap: Record<string, ApiDataItem[]> = {};
+
+  // Group data by media type
+  apiData.data.forEach((item: ApiDataItem) => {
+    if (!mediaTypeMap[item.media_type]) {
+      mediaTypeMap[item.media_type] = [];
+    }
+    mediaTypeMap[item.media_type].push(item);
+  });
+
+  // Create rows for each media type (Actual + Planned)
+  Object.entries(mediaTypeMap).forEach(([mediaType, items]) => {
+    // Aggregate totals from all periods for this media type
+    const totals = items.reduce(
+      (acc, item) => ({
+        netNet: (acc.netNet || 0) + (item.net_net || 0),
+        addressable: (acc.addressable || 0) + (item.addressable || 0),
+        nonAddressable: (acc.nonAddressable || 0) + (item.non_addressable || 0),
+      }),
+      { netNet: 0, addressable: 0, nonAddressable: 0 }
+    );
+
+    // Actual row (from API data)
+    transformedRows.push({
+      id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-actual`,
+      mediaType,
+      type: "Actual",
+      level: 0,
+      data: {
+        ...createEmptyRowData(),
+        netNet: totals.netNet,
+        addressable: totals.addressable,
+        nonAddressable: totals.nonAddressable,
+      },
+    });
+
+    // Planned row (null data - API doesn't provide planned yet)
+    transformedRows.push({
+      id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-planned`,
+      mediaType,
+      type: "Planned",
+      level: 0,
+      data: createEmptyRowData(),
+    });
+  });
+
+  // Calculate and add Total rows
+  const totalActual = transformedRows
+    .filter((row) => row.type === "Actual")
+    .reduce(
+      (acc, row) => ({
+        netNet: (acc.netNet || 0) + (row.data.netNet || 0),
+        addressable: (acc.addressable || 0) + (row.data.addressable || 0),
+        nonAddressable: (acc.nonAddressable || 0) + (row.data.nonAddressable || 0),
+      }),
+      { netNet: 0, addressable: 0, nonAddressable: 0 }
+    );
+
+  transformedRows.push(
+    {
+      id: "total-actual",
+      mediaType: "Total",
+      type: "Actual",
+      level: 0,
+      data: {
+        ...createEmptyRowData(),
+        netNet: totalActual.netNet,
+        addressable: totalActual.addressable,
+        nonAddressable: totalActual.nonAddressable,
+      },
+    },
+    {
+      id: "total-planned",
+      mediaType: "Total",
+      type: "Planned",
+      level: 0,
+      data: createEmptyRowData(),
+    }
+  );
+
+  return transformedRows;
+}
+
+// ============================================================================
+// Value Formatting
+// ============================================================================
+
+function formatCellValue(value: any, type: string): string {
+  if (value === null || value === undefined) return "—";
+
+  switch (type) {
+    case "currency":
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    case "percentage":
+      return `${value.toFixed(1)}%`;
+    case "number":
+      return value.toLocaleString("en-US");
+    default:
+      return String(value);
+  }
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function DataTableView({ selectedClient, onDataChange }: DataTableViewProps) {
   const [columns, setColumns] = useState<TableColumn[]>(DEFAULT_COLUMNS);
-  const [rows] = useState<TableRow[]>(SAMPLE_DATA);
+  const [rows, setRows] = useState<TableRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [showColumnControl, setShowColumnControl] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Get visible columns sorted by order
-  const visibleColumns = useMemo(() => {
-    return columns.filter((col) => col.visible).sort((a, b) => a.order - b.order);
-  }, [columns]);
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    if (!selectedClient) {
+      setRows([]);
+      return;
+    }
 
-  // Toggle column visibility
+    const clientId = CLIENT_ID_MAP[selectedClient];
+    if (!clientId) {
+      console.error("Unknown client:", selectedClient);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await apiClient.get(
+        `/api/v1/client/${selectedClient.toLowerCase()}/default-table`,
+        { params: { client_id: clientId } }
+      );
+
+      const transformedRows = transformApiDataToRows(response.data);
+      setRows(transformedRows);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Failed to fetch default table data:", error);
+      toast.error("Failed to load table data");
+      setRows([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedClient]);
+
+  // Fetch on client change
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Column visibility helpers
+  const visibleColumns = useMemo(
+    () => columns.filter((col) => col.visible).sort((a, b) => a.order - b.order),
+    [columns]
+  );
+
+  const frozenColumns = useMemo(
+    () => visibleColumns.filter((col) => col.frozen),
+    [visibleColumns]
+  );
+
+  const scrollableColumns = useMemo(
+    () => visibleColumns.filter((col) => !col.frozen),
+    [visibleColumns]
+  );
+
   const handleToggleColumn = (columnId: string) => {
     setColumns((prev) =>
       prev.map((col) =>
@@ -375,48 +275,9 @@ export function DataTableView({ onVisualizationRequest, onDataChange }: DataTabl
     );
   };
 
-  // Format cell value based on type
-  const formatValue = (value: any, type: string) => {
-    if (value === null || value === undefined) return "—";
-
-    switch (type) {
-      case "currency":
-        return `USD ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      case "percentage":
-        return `${value.toFixed(1)}%`;
-      case "number":
-        return value.toLocaleString("en-US");
-      default:
-        return value;
-    }
-  };
-
-  // Filter rows based on expansion state
+  // Row filtering
   const visibleRows = useMemo(() => {
-    const result: TableRow[] = [];
-    const processedIds = new Set<string>();
-
-    rows.forEach((row) => {
-      // Only add parent rows or standalone rows
-      if (row.level === 0) {
-        result.push(row);
-        processedIds.add(row.id);
-
-        // If row has children and is expanded, show children
-        if (row.hasChildren && row.isExpanded) {
-          // Find direct child rows
-          const childRows = rows.filter(
-            (r) => r.id.startsWith(row.id + "-") && r.level === row.level + 1 && !processedIds.has(r.id)
-          );
-          childRows.forEach((child) => {
-            result.push(child);
-            processedIds.add(child.id);
-          });
-        }
-      }
-    });
-
-    return result;
+    return rows.filter((row) => row.level === 0);
   }, [rows]);
 
   // Notify parent of data changes
@@ -427,53 +288,95 @@ export function DataTableView({ onVisualizationRequest, onDataChange }: DataTabl
     }
   }, [visibleColumns, visibleRows, onDataChange]);
 
+  // Get cell value
+  const getCellValue = (row: TableRow, columnId: string): any => {
+    if (columnId === "mediaType") return row.mediaType;
+    if (columnId === "type") return row.type;
+    return row.data[columnId];
+  };
+
+  // Row styling
+  const getRowStyles = (row: TableRow) => {
+    const isTotal = row.mediaType === "Total";
+    const isPlanned = row.type === "Planned";
+    const isActual = row.type === "Actual";
+
+    if (isTotal) return "bg-slate-100 font-semibold";
+    if (isPlanned) return "bg-slate-50/50";
+    if (isActual) return "bg-white";
+    return "bg-white";
+  };
+
   return (
-    <div className="bg-white border-b border-slate-200">
-      {/* Table Controls Header */}
+    <div className="bg-white border-b border-slate-200 overflow-hidden">
+      {/* Header */}
       <div className="border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
         <div>
-          <h2 className="text-slate-900 font-semibold">Data Overview</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Comprehensive media spend analysis • {visibleRows.length} rows × {visibleColumns.length} columns
+          <h2 className="text-slate-900 font-semibold">Default Table</h2>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Media spend overview by type
+            {visibleRows.length > 0 && (
+              <span className="ml-2 text-slate-400">
+                • {visibleRows.length} rows
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* Refresh Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchData}
+            disabled={isLoading}
+            className="text-slate-600"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+
+          {/* Column Control */}
           <Popover open={showColumnControl} onOpenChange={setShowColumnControl}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <Settings2 className="w-4 h-4 mr-2" />
-                Columns ({visibleColumns.length}/{columns.length})
+                Columns
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
-              <div className="space-y-4">
+            <PopoverContent className="w-72" align="end">
+              <div className="space-y-3">
                 <div>
-                  <h4 className="text-sm font-medium text-slate-900 mb-3">Manage Columns</h4>
-                  <p className="text-xs text-slate-500 mb-3">
-                    Toggle visibility of columns
+                  <h4 className="text-sm font-medium text-slate-900">Manage Columns</h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Toggle column visibility
                   </p>
                 </div>
-                <div className="max-h-80 overflow-y-auto space-y-2">
+                <div className="max-h-64 overflow-y-auto space-y-1">
                   {columns.map((column) => (
                     <div
                       key={column.id}
-                      className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg"
+                      className="flex items-center gap-3 py-1.5 px-2 hover:bg-slate-50 rounded"
                     >
                       <Checkbox
                         id={column.id}
                         checked={column.visible}
                         onCheckedChange={() => handleToggleColumn(column.id)}
+                        disabled={column.frozen}
                       />
                       <label
                         htmlFor={column.id}
-                        className="flex-1 text-sm cursor-pointer select-none"
+                        className={`flex-1 text-sm cursor-pointer select-none ${
+                          column.frozen ? "text-slate-400" : ""
+                        }`}
                       >
                         {column.label}
+                        {column.frozen && (
+                          <span className="ml-1 text-xs text-slate-400">(fixed)</span>
+                        )}
                       </label>
                       {column.visible ? (
-                        <Eye className="w-4 h-4 text-slate-400" />
+                        <Eye className="w-3.5 h-3.5 text-slate-400" />
                       ) : (
-                        <EyeOff className="w-4 h-4 text-slate-400" />
+                        <EyeOff className="w-3.5 h-3.5 text-slate-300" />
                       )}
                     </div>
                   ))}
@@ -484,83 +387,140 @@ export function DataTableView({ onVisualizationRequest, onDataChange }: DataTabl
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="max-h-[600px] overflow-auto">
-        <table className="w-full border-collapse">
-          <thead className="sticky top-0 z-10">
-            <tr>
-              {visibleColumns.map((column) => (
-                <th
-                  key={column.id}
-                  className={`px-4 py-3 text-sm ${
-                    column.align === "right"
-                      ? "text-right"
-                      : column.align === "center"
-                      ? "text-center"
-                      : "text-left"
-                  } bg-slate-100 border-b border-r border-slate-300 font-medium text-slate-700`}
-                >
-                  {column.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => {
-              const isTotal = row.mediaType === "Total";
-              const isPlanned = row.type === "Planned";
-              const bgColor = isTotal
-                ? "bg-violet-50"
-                : isPlanned
-                ? "bg-purple-50"
-                : "bg-white";
-
-              return (
-                <tr
-                  key={row.id}
-                  className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${bgColor}`}
-                >
-                  {visibleColumns.map((column) => {
-                    let value;
-                    if (column.id === "mediaType") {
-                      value = row.mediaType;
-                    } else if (column.id === "type") {
-                      value = row.type;
-                    } else {
-                      value = row.data[column.id];
-                    }
-
-                    return (
-                      <td
-                        key={`${row.id}-${column.id}`}
-                        className={`px-4 py-3 text-sm border-r border-slate-200 ${
-                          column.align === "right"
-                            ? "text-right"
-                            : column.align === "center"
-                            ? "text-center"
-                            : "text-left"
-                        } ${isTotal ? "font-semibold" : ""}`}
-                      >
-                        {formatValue(value, column.type)}
-                      </td>
-                    );
-                  })}
+      {/* Table Container */}
+      <div className="relative overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-slate-600 mx-auto mb-3" />
+              <p className="text-sm text-slate-500">Loading data...</p>
+            </div>
+          </div>
+        ) : visibleRows.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <p className="text-sm text-slate-500">
+                {selectedClient
+                  ? "No data available for this client"
+                  : "Select a client to view data"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto overflow-y-auto max-h-[600px] isolate">
+            <table className="w-full border-collapse min-w-max">
+              {/* Header */}
+              <thead className="sticky top-0 z-20">
+                <tr>
+                  {/* Frozen columns */}
+                  {frozenColumns.map((column, idx) => (
+                    <th
+                      key={column.id}
+                      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 bg-slate-100 border-b border-slate-200 text-left sticky z-30 ${
+                        idx === 0 ? "left-0" : "left-[120px]"
+                      }`}
+                      style={{
+                        minWidth: idx === 0 ? "120px" : "80px",
+                        boxShadow: idx === frozenColumns.length - 1 ? "2px 0 4px -2px rgba(0,0,0,0.1)" : undefined,
+                      }}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                  {/* Scrollable columns */}
+                  {scrollableColumns.map((column) => (
+                    <th
+                      key={column.id}
+                      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 bg-slate-100 border-b border-slate-200 whitespace-nowrap ${
+                        column.align === "right" ? "text-right" : "text-left"
+                      }`}
+                      style={{ minWidth: "130px" }}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+
+              {/* Body */}
+              <tbody>
+                {visibleRows.map((row) => {
+                  const rowStyles = getRowStyles(row);
+                  const isTotal = row.mediaType === "Total";
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-slate-100 hover:bg-slate-50/80 transition-colors ${rowStyles}`}
+                    >
+                      {/* Frozen columns */}
+                      {frozenColumns.map((column, idx) => {
+                        const value = getCellValue(row, column.id);
+                        return (
+                          <td
+                            key={`${row.id}-${column.id}`}
+                            className={`px-4 py-3 text-sm sticky z-10 ${
+                              idx === 0 ? "left-0" : "left-[120px]"
+                            } ${rowStyles} ${isTotal ? "font-semibold" : ""}`}
+                            style={{
+                              minWidth: idx === 0 ? "120px" : "80px",
+                              boxShadow: idx === frozenColumns.length - 1 ? "2px 0 4px -2px rgba(0,0,0,0.1)" : undefined,
+                            }}
+                          >
+                            {column.id === "type" ? (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                  value === "Actual"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {value}
+                              </span>
+                            ) : (
+                              <span className={isTotal ? "text-slate-900" : "text-slate-700"}>
+                                {value}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      {/* Scrollable columns */}
+                      {scrollableColumns.map((column) => {
+                        const value = getCellValue(row, column.id);
+                        return (
+                          <td
+                            key={`${row.id}-${column.id}`}
+                            className={`px-4 py-3 text-sm whitespace-nowrap ${
+                              column.align === "right" ? "text-right" : "text-left"
+                            } ${isTotal ? "font-semibold text-slate-900" : "text-slate-600"}`}
+                          >
+                            {formatCellValue(value, column.type)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Footer Stats */}
-      <div className="border-t border-slate-200 bg-slate-50 px-6 py-3 flex items-center justify-between text-sm text-slate-600">
-        <div>
-          Showing {visibleRows.length} rows with {visibleColumns.length} visible columns
+      {/* Footer */}
+      {visibleRows.length > 0 && (
+        <div className="border-t border-slate-100 bg-slate-50/50 px-6 py-2.5 flex items-center justify-between text-xs text-slate-500">
+          <span>
+            {visibleRows.length} rows • {scrollableColumns.length + frozenColumns.length} columns
+          </span>
+          {lastUpdated && (
+            <span>
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-4">
-          <span>Data is read-only • Last updated: Dec 15, 2025</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -27,6 +27,16 @@ interface PPTStoreState {
   isGraphSelected: (graphId: string) => boolean;
 }
 
+// Helper to clear corrupted store data
+export const clearPPTStore = () => {
+  try {
+    localStorage.removeItem('ppt-graph-storage');
+    console.log('[usePPTStore] Store cleared successfully');
+  } catch (error) {
+    console.error('[usePPTStore] Failed to clear store:', error);
+  }
+};
+
 export const usePPTStore = create<PPTStoreState>()(
   persist(
     (set, get) => ({
@@ -99,31 +109,69 @@ export const usePPTStore = create<PPTStoreState>()(
       name: "ppt-graph-storage",
       storage: createJSONStorage(() => ({
         getItem: (name) => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
+          try {
+            const str = localStorage.getItem(name);
+            if (!str) return null;
 
-          const { state } = JSON.parse(str);
-          return JSON.stringify({
-            state: {
-              ...state,
-              selectedGraphsForPPT: new Set(state.selectedGraphsForPPT || []),
-              graphsMetadata: new Map(
-                Object.entries(state.graphsMetadata || {})
-              ),
-            },
-          });
+            const { state } = JSON.parse(str);
+
+            // Convert Array to Set
+            const selectedGraphsSet = Array.isArray(state.selectedGraphsForPPT)
+              ? new Set(state.selectedGraphsForPPT)
+              : new Set();
+
+            // Convert Object to Map
+            let graphsMetadataMap = new Map();
+            if (state.graphsMetadata && typeof state.graphsMetadata === 'object') {
+              graphsMetadataMap = new Map(Object.entries(state.graphsMetadata));
+            }
+
+            return JSON.stringify({
+              state: {
+                ...state,
+                selectedGraphsForPPT: selectedGraphsSet,
+                graphsMetadata: graphsMetadataMap,
+              },
+            });
+          } catch (error) {
+            console.error('[usePPTStore] getItem error:', error);
+            return null;
+          }
         },
         setItem: (name, value) => {
-          const parsed = JSON.parse(value);
-          const state = parsed.state;
-          const serialized = JSON.stringify({
-            state: {
-              ...state,
-              selectedGraphsForPPT: Array.from(state.selectedGraphsForPPT),
-              graphsMetadata: Object.fromEntries(state.graphsMetadata),
-            },
-          });
-          localStorage.setItem(name, serialized);
+          try {
+            const parsed = JSON.parse(value);
+            const state = parsed.state;
+
+            // Convert Set to Array
+            const selectedGraphsArray = state.selectedGraphsForPPT
+              ? Array.from(state.selectedGraphsForPPT)
+              : [];
+
+            // Convert Map to Object
+            let graphsMetadataObj = {};
+            if (state.graphsMetadata) {
+              if (state.graphsMetadata instanceof Map) {
+                // It's a Map, convert it
+                graphsMetadataObj = Object.fromEntries(state.graphsMetadata);
+              } else if (typeof state.graphsMetadata === 'object') {
+                // It's already an object, use as is
+                graphsMetadataObj = state.graphsMetadata;
+              }
+            }
+
+            const serialized = JSON.stringify({
+              state: {
+                ...state,
+                selectedGraphsForPPT: selectedGraphsArray,
+                graphsMetadata: graphsMetadataObj,
+              },
+            });
+            localStorage.setItem(name, serialized);
+          } catch (error) {
+            console.error('[usePPTStore] setItem error:', error);
+            // Don't throw - just log the error to prevent breaking the app
+          }
         },
         removeItem: (name) => localStorage.removeItem(name),
       })),
