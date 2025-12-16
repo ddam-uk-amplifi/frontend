@@ -534,7 +534,15 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       {viewMode === "table" ? (
-        <TableDashboardView selectedClient={selectedClient} />
+        <div className="flex-1 overflow-hidden">
+          <TableDashboardView
+            selectedClient={selectedClient}
+            selectedGraphsForPPT={selectedGraphsForPPT}
+            onToggleGraphForPPT={handleToggleGraphForPPT}
+            onUpdateSlideNumber={handleUpdateSlideNumber}
+            getSlideNumber={getSlideNumber}
+          />
+        </div>
       ) : (
         <div className="flex-1 flex overflow-hidden">
           {/* Query Builder Toggle Button (when collapsed) */}

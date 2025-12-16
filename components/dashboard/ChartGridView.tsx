@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Maximize2, X } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Maximize2, X, FileText, Check } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import {
@@ -56,6 +56,14 @@ interface TableRow {
 interface ChartGridViewProps {
   columns: string[];
   rows: TableRow[];
+  selectedGraphsForPPT?: Set<string>;
+  onToggleGraphForPPT?: (
+    graphId: string,
+    graphTitle: string,
+    element?: HTMLElement
+  ) => void;
+  onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
+  getSlideNumber?: (graphId: string) => number | undefined;
 }
 
 // Define the 10 chart types
@@ -209,10 +217,37 @@ const DUMMY_SAMPLE_DATA = {
   ],
 };
 
-export function ChartGridView({ columns, rows }: ChartGridViewProps) {
+export function ChartGridView({
+  columns,
+  rows,
+  selectedGraphsForPPT = new Set(),
+  onToggleGraphForPPT,
+  onUpdateSlideNumber,
+  getSlideNumber,
+}: ChartGridViewProps) {
   const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [fullScreenChart, setFullScreenChart] = useState<ChartConfig | null>(null);
   const [selectedCharts, setSelectedCharts] = useState<Set<string>>(new Set());
+
+  // Refs for chart elements (for PPT capture)
+  const chartRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const fullScreenChartRef = useRef<HTMLDivElement | null>(null);
+
+  // Handle PPT toggle for a chart
+  const handleToggleForPPT = useCallback(
+    (chartId: string, chartTitle: string, element?: HTMLElement) => {
+      if (onToggleGraphForPPT) {
+        onToggleGraphForPPT(chartId, chartTitle, element);
+      }
+    },
+    [onToggleGraphForPPT]
+  );
+
+  // Check if a chart is included in PPT
+  const isChartInPPT = useCallback(
+    (chartId: string) => selectedGraphsForPPT.has(chartId),
+    [selectedGraphsForPPT]
+  );
 
   // Initialize charts on mount
   useEffect(() => {
@@ -542,7 +577,7 @@ export function ChartGridView({ columns, rows }: ChartGridViewProps) {
   };
 
   return (
-    <div className="bg-white border-t border-slate-200">
+    <div className="bg-white border-t border-slate-200 max-w-full overflow-hidden">
       {/* Section Header */}
       <div className="px-6 py-4 border-b border-slate-200">
         <h3 className="text-slate-900 font-semibold">Chart Visualizations</h3>
@@ -552,8 +587,8 @@ export function ChartGridView({ columns, rows }: ChartGridViewProps) {
       </div>
 
       {/* Chart Grid - 5 columns × 2 rows */}
-      <div className="p-6">
-        <div className="grid grid-cols-5 gap-4">
+      <div className="p-6 overflow-x-auto">
+        <div className="grid grid-cols-5 gap-4 min-w-[1000px]">
           {charts.map((chart) => {
             const isSelected = selectedCharts.has(chart.id);
             return (
@@ -581,26 +616,64 @@ export function ChartGridView({ columns, rows }: ChartGridViewProps) {
                   >
                     {chart.title}
                   </h5>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFullScreenChart(chart);
-                    }}
-                    className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
-                      isSelected ? "hover:bg-violet-700" : "hover:bg-slate-200"
-                    }`}
-                    title="Expand to full screen"
-                  >
-                    <Maximize2
-                      className={`w-4 h-4 ${
-                        isSelected ? "text-white" : "text-slate-600"
+                  <div className="flex items-center gap-1">
+                    {/* Add to PPT Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const chartElement = chartRefs.current.get(chart.id);
+                        handleToggleForPPT(
+                          `table-${chart.id}`,
+                          chart.title,
+                          chartElement || undefined
+                        );
+                      }}
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
+                        isChartInPPT(`table-${chart.id}`)
+                          ? "bg-emerald-500 opacity-100"
+                          : isSelected
+                            ? "hover:bg-violet-700"
+                            : "hover:bg-slate-200"
                       }`}
-                    />
-                  </button>
+                      title={isChartInPPT(`table-${chart.id}`) ? "Remove from PPT" : "Add to PPT"}
+                    >
+                      {isChartInPPT(`table-${chart.id}`) ? (
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      ) : (
+                        <FileText
+                          className={`w-3.5 h-3.5 ${
+                            isSelected ? "text-white" : "text-slate-600"
+                          }`}
+                        />
+                      )}
+                    </button>
+                    {/* Expand Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFullScreenChart(chart);
+                      }}
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
+                        isSelected ? "hover:bg-violet-700" : "hover:bg-slate-200"
+                      }`}
+                      title="Expand to full screen"
+                    >
+                      <Maximize2
+                        className={`w-4 h-4 ${
+                          isSelected ? "text-white" : "text-slate-600"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Chart Content */}
-                <div className="p-4 bg-white h-48">
+                <div
+                  ref={(el) => {
+                    chartRefs.current.set(chart.id, el);
+                  }}
+                  className="p-4 bg-white h-48"
+                >
                   {renderChart(chart, 160)}
                 </div>
               </Card>
@@ -609,28 +682,111 @@ export function ChartGridView({ columns, rows }: ChartGridViewProps) {
         </div>
       </div>
 
-      {/* Full-Screen Chart Modal */}
+      {/* Full-Screen Chart Modal - positioned within main content area */}
       {fullScreenChart && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8">
-          <div className="bg-white rounded-lg shadow-2xl w-full h-full flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setFullScreenChart(null)}
+          />
+
+          {/* Modal - constrained to not overlap sidebar */}
+          <div className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-slate-200/60">
             {/* Modal Header */}
-            <div className="px-8 py-6 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-slate-900 font-semibold">
-                {fullScreenChart.title}
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setFullScreenChart(null)}
-                className="h-10 w-10 p-0"
-              >
-                <X className="w-5 h-5" />
-              </Button>
+            <div className="px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                  <Maximize2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    {fullScreenChart.title}
+                  </h3>
+                  <p className="text-sm text-slate-500">Expanded view</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Add to PPT Button */}
+                <button
+                  onClick={() => {
+                    const element = fullScreenChartRef.current;
+                    handleToggleForPPT(
+                      `table-${fullScreenChart.id}`,
+                      fullScreenChart.title,
+                      element || undefined
+                    );
+                  }}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${
+                    isChartInPPT(`table-${fullScreenChart.id}`)
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200"
+                      : "bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-violet-200"
+                  }`}
+                >
+                  {isChartInPPT(`table-${fullScreenChart.id}`) ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Added to PPT</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4" />
+                      <span>Add to PPT Report</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setFullScreenChart(null)}
+                  className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="flex-1 p-8 overflow-auto">
-              {renderChart(fullScreenChart, window.innerHeight - 200)}
+            {/* Slide Number Configuration - visible when included in PPT */}
+            {isChartInPPT(`table-${fullScreenChart.id}`) && (
+              <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-slate-700">
+                      Target Slide:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={getSlideNumber?.(`table-${fullScreenChart.id}`) || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const num = value ? parseInt(value, 10) : undefined;
+                        onUpdateSlideNumber?.(`table-${fullScreenChart.id}`, num);
+                      }}
+                      placeholder="Auto"
+                      className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm bg-white"
+                    />
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    Leave empty for auto-placement
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Content - Chart for PPT capture */}
+            <div className="flex-1 p-8 overflow-auto min-h-0 bg-gradient-to-br from-slate-50 to-slate-100/50">
+              <div
+                ref={fullScreenChartRef}
+                className="bg-white rounded-xl p-6 shadow-sm max-w-4xl mx-auto"
+              >
+                <h4 className="text-lg font-semibold text-slate-800 mb-4">
+                  {fullScreenChart.title}
+                </h4>
+                <div style={{ height: "calc(85vh - 280px)", minHeight: "400px" }}>
+                  {renderChart(fullScreenChart, Math.max(400, window.innerHeight - 350))}
+                </div>
+              </div>
             </div>
           </div>
         </div>

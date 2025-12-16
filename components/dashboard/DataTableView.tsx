@@ -308,7 +308,7 @@ export function DataTableView({ selectedClient, onDataChange }: DataTableViewPro
   };
 
   return (
-    <div className="bg-white border-b border-slate-200 overflow-hidden">
+    <div className="bg-white border-b border-slate-200 overflow-hidden max-w-full">
       {/* Header */}
       <div className="border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
         <div>
@@ -407,7 +407,7 @@ export function DataTableView({ selectedClient, onDataChange }: DataTableViewPro
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[600px] isolate">
+          <div className="overflow-x-auto overflow-y-auto max-h-[600px] isolate max-w-full relative">
             <table className="w-full border-collapse min-w-max">
               {/* Header */}
               <thead className="sticky top-0 z-20">

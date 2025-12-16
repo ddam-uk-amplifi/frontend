@@ -17,9 +17,23 @@ interface TableRow {
 
 interface TableDashboardViewProps {
   selectedClient: string;
+  selectedGraphsForPPT?: Set<string>;
+  onToggleGraphForPPT?: (
+    graphId: string,
+    graphTitle: string,
+    element?: HTMLElement
+  ) => void;
+  onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
+  getSlideNumber?: (graphId: string) => number | undefined;
 }
 
-export function TableDashboardView({ selectedClient }: TableDashboardViewProps) {
+export function TableDashboardView({
+  selectedClient,
+  selectedGraphsForPPT = new Set(),
+  onToggleGraphForPPT,
+  onUpdateSlideNumber,
+  getSlideNumber,
+}: TableDashboardViewProps) {
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<TableRow[]>([]);
 
@@ -31,7 +45,7 @@ export function TableDashboardView({ selectedClient }: TableDashboardViewProps) 
   // Show empty state when no client is selected
   if (!selectedClient) {
     return (
-      <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50">
+      <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50 max-w-full">
         {/* Empty State Message */}
         <div className="bg-white border-b border-slate-200 py-12">
           <div className="text-center max-w-md mx-auto px-6">
@@ -47,20 +61,38 @@ export function TableDashboardView({ selectedClient }: TableDashboardViewProps) 
         </div>
 
         {/* Show Chart Placeholders with Empty State */}
-        <ChartGridView columns={[]} rows={[]} />
+        <div className="overflow-hidden max-w-full">
+          <ChartGridView
+            columns={[]}
+            rows={[]}
+            selectedGraphsForPPT={selectedGraphsForPPT}
+            onToggleGraphForPPT={onToggleGraphForPPT}
+            onUpdateSlideNumber={onUpdateSlideNumber}
+            getSlideNumber={getSlideNumber}
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50 isolate">
+    <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50 isolate max-w-full">
       {/* Data Table */}
-      <div className="overflow-hidden">
+      <div className="overflow-hidden max-w-full">
         <DataTableView selectedClient={selectedClient} onDataChange={handleDataChange} />
       </div>
 
       {/* Visualization Section - Always Visible Below Table */}
-      <ChartGridView columns={selectedColumns} rows={selectedRows} />
+      <div className="overflow-hidden max-w-full">
+        <ChartGridView
+          columns={selectedColumns}
+          rows={selectedRows}
+          selectedGraphsForPPT={selectedGraphsForPPT}
+          onToggleGraphForPPT={onToggleGraphForPPT}
+          onUpdateSlideNumber={onUpdateSlideNumber}
+          getSlideNumber={getSlideNumber}
+        />
+      </div>
     </div>
   );
 }
