@@ -326,6 +326,13 @@ export function DataTableView({
     }
   }, [selectedDataSource]);
 
+  // Auto-select January when trackers is selected and market is chosen
+  useEffect(() => {
+    if (selectedDataSource === "trackers" && selectedMarket && !selectedPeriod) {
+      setSelectedPeriod("Jan");
+    }
+  }, [selectedDataSource, selectedMarket, selectedPeriod]);
+
   // Query: Fetch latest job ID (for summary)
   const { data: latestJob } = useQuery({
     queryKey: tableDataKeys.latestJob(selectedClient || ""),
