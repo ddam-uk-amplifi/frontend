@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Building2,
-  Database,
-  MapPin,
-  ChevronDown,
-} from "lucide-react";
+import { Building2, Database, MapPin, ChevronDown } from "lucide-react";
 
 export type DataSource = "summary" | "trackers" | "";
 

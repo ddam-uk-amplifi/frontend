@@ -30,7 +30,17 @@ import {
 // Types
 // ============================================================================
 
-type ChartType = "bar" | "pie" | "donut" | "line" | "area" | "stacked-bar" | "horizontal-bar" | "combo" | "radar" | "grouped-bar";
+type ChartType =
+  | "bar"
+  | "pie"
+  | "donut"
+  | "line"
+  | "area"
+  | "stacked-bar"
+  | "horizontal-bar"
+  | "combo"
+  | "radar"
+  | "grouped-bar";
 
 interface ChartConfig {
   id: string;
@@ -52,19 +62,35 @@ interface ChartGridViewProps {
   columns: string[];
   rows: TableRow[];
   selectedGraphsForPPT?: Set<string> | string[];
-  onToggleGraphForPPT?: (graphId: string, graphTitle: string, element?: HTMLElement) => void;
-  onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
+  onToggleGraphForPPT?: (
+    graphId: string,
+    graphTitle: string,
+    element?: HTMLElement,
+    chartData?: Array<{ name: string; [key: string]: any }>,
+    dataKeys?: string[],
+  ) => void;
+  onUpdateSlideNumber?: (
+    graphId: string,
+    slideNumber: number | undefined,
+  ) => void;
   getSlideNumber?: (graphId: string) => number | undefined;
 }
-
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 const CHART_COLORS = [
-  "#8B5CF6", "#A78BFA", "#C4B5FD", "#7C3AED", "#6D28D9",
-  "#5B21B6", "#4C1D95", "#DDD6FE", "#EDE9FE", "#F5F3FF",
+  "#8B5CF6",
+  "#A78BFA",
+  "#C4B5FD",
+  "#7C3AED",
+  "#6D28D9",
+  "#5B21B6",
+  "#4C1D95",
+  "#DDD6FE",
+  "#EDE9FE",
+  "#F5F3FF",
 ];
 
 const COLUMN_LABELS: Record<string, string> = {
@@ -250,7 +276,6 @@ function generateChartConfigs(columns: string[]): ChartConfig[] {
   return charts.slice(0, 10);
 }
 
-
 // ============================================================================
 // Value Formatting
 // ============================================================================
@@ -275,8 +300,9 @@ export function ChartGridView({
   onUpdateSlideNumber,
   getSlideNumber,
 }: ChartGridViewProps) {
-  const [fullScreenChart, setFullScreenChart] = useState<ChartConfig | null>(null);
-  const chartRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const [fullScreenChart, setFullScreenChart] = useState<ChartConfig | null>(
+    null,
+  );
   const fullScreenChartRef = useRef<HTMLDivElement | null>(null);
 
   // Generate charts based on visible columns
@@ -297,25 +323,43 @@ export function ChartGridView({
   const isChartInPPT = useCallback(
     (chartId: string) => {
       if (!selectedGraphsForPPT) return false;
-      if (selectedGraphsForPPT instanceof Set) return selectedGraphsForPPT.has(chartId);
-      if (Array.isArray(selectedGraphsForPPT)) return selectedGraphsForPPT.includes(chartId);
+      if (selectedGraphsForPPT instanceof Set)
+        return selectedGraphsForPPT.has(chartId);
+      if (Array.isArray(selectedGraphsForPPT))
+        return selectedGraphsForPPT.includes(chartId);
       return false;
     },
-    [selectedGraphsForPPT]
+    [selectedGraphsForPPT],
   );
 
   const handleToggleForPPT = useCallback(
-    (chartId: string, chartTitle: string, element?: HTMLElement) => {
+    (
+      chartId: string,
+      chartTitle: string,
+      element?: HTMLElement,
+      chartConfig?: ChartConfig,
+    ) => {
       if (onToggleGraphForPPT) {
-        onToggleGraphForPPT(chartId, chartTitle, element);
+        // Pass chart data and data keys for the table
+        onToggleGraphForPPT(
+          chartId,
+          chartTitle,
+          element,
+          chartData,
+          chartConfig?.dataKeys,
+        );
       }
     },
-    [onToggleGraphForPPT]
+    [onToggleGraphForPPT, chartData],
   );
 
   // Render individual chart
   // showLabels: true for full-screen view, false for thumbnail grid
-  const renderChart = (chart: ChartConfig, height: number = 160, showLabels: boolean = false) => {
+  const renderChart = (
+    chart: ChartConfig,
+    height: number = 160,
+    showLabels: boolean = false,
+  ) => {
     if (!chartData || chartData.length === 0) {
       return (
         <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded">
@@ -332,21 +376,45 @@ export function ChartGridView({
       case "bar":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+            <BarChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 10,
+                left: 10,
+                bottom: showLabels ? 30 : 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
-                tick={showLabels ? { fontSize: tickFontSize } : false} 
-                axisLine={{ stroke: '#E2E8F0' }}
+              <XAxis
+                dataKey="name"
+                tick={showLabels ? { fontSize: tickFontSize } : false}
+                axisLine={{ stroke: "#E2E8F0" }}
                 interval={0}
               />
-              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
-              <Tooltip 
+              <YAxis
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+                width={55}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 labelFormatter={(label) => label}
                 contentStyle={{ fontSize: fontSize }}
               />
-              <Bar dataKey={chart.dataKeys[0]} fill={chart.colors[0]} radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey={chart.dataKeys[0]}
+                fill={chart.colors[0]}
+                radius={[4, 4, 0, 0]}
+                label={
+                  {
+                    position: "top",
+                    fontSize: showLabels ? 10 : 8,
+                    fill: "#475569",
+                    formatter: (v: any) => formatValue(v, isPercentage),
+                  } as any
+                }
+              />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -354,79 +422,129 @@ export function ChartGridView({
       case "horizontal-bar":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 10, left: showLabels ? 80 : 50, bottom: 10 }}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{
+                top: 10,
+                right: 30,
+                left: showLabels ? 80 : 50,
+                bottom: 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis type="number" tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: tickFontSize }} width={showLabels ? 70 : 45} />
-              <Tooltip 
+              <XAxis
+                type="number"
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+              />
+              <YAxis
+                dataKey="name"
+                type="category"
+                tick={{ fontSize: tickFontSize }}
+                width={showLabels ? 70 : 45}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
-              <Bar dataKey={chart.dataKeys[0]} fill={chart.colors[0]} radius={[0, 4, 4, 0]} />
+              <Bar
+                dataKey={chart.dataKeys[0]}
+                fill={chart.colors[0]}
+                radius={[0, 4, 4, 0]}
+                label={
+                  {
+                    position: "right",
+                    fontSize: showLabels ? 10 : 8,
+                    fill: "#475569",
+                    formatter: (v: any) => formatValue(v, isPercentage),
+                  } as any
+                }
+              />
             </BarChart>
           </ResponsiveContainer>
         );
 
       case "pie":
+        // Filter out zero/null values for pie chart
+        const pieData = chartData.filter((d) => {
+          const val = d[chart.dataKeys[0]];
+          return val !== null && val !== undefined && val !== 0;
+        });
+        // Custom label renderer with lines pointing to slices
+        const renderPieLabel = (props: any) => {
+          const { name, value } = props;
+          if (!value || value === 0) return null;
+          return `${name}: ${formatValue(value, isPercentage)}`;
+        };
         return (
           <ResponsiveContainer width="100%" height={height}>
             <RechartsPieChart>
               <Pie
-                data={chartData}
+                data={pieData}
                 cx="50%"
-                cy="45%"
-                outerRadius={showLabels ? height * 0.32 : Math.min(height * 0.35, 55)}
+                cy="50%"
+                outerRadius={showLabels ? Math.min(height * 0.32, 140) : Math.min(height * 0.38, 55)}
                 dataKey={chart.dataKeys[0]}
-                label={showLabels ? ({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(0)}%` : false}
+                label={showLabels ? renderPieLabel : false}
                 labelLine={showLabels}
               >
-                {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={chart.colors[index % chart.colors.length]} />
+                {pieData.map((_, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={chart.colors[index % chart.colors.length]}
+                  />
                 ))}
               </Pie>
-              <Tooltip 
-                formatter={(v: number) => formatValue(v, isPercentage)}
+              <Tooltip
+                formatter={(v: number, name: string) => [
+                  formatValue(v, isPercentage),
+                  name,
+                ]}
                 contentStyle={{ fontSize: fontSize }}
               />
-              {!showLabels && (
-                <Legend 
-                  wrapperStyle={{ fontSize: 9 }}
-                  layout="horizontal"
-                  align="center"
-                  verticalAlign="bottom"
-                />
-              )}
             </RechartsPieChart>
           </ResponsiveContainer>
         );
 
       case "donut":
+        // Filter out zero/null values for donut chart
+        const donutData = chartData.filter((d) => {
+          const val = d[chart.dataKeys[0]];
+          return val !== null && val !== undefined && val !== 0;
+        });
+        // Custom label renderer with lines pointing to slices
+        const renderDonutLabel = (props: any) => {
+          const { name, value } = props;
+          if (!value || value === 0) return null;
+          return `${name}: ${formatValue(value, isPercentage)}`;
+        };
         return (
           <ResponsiveContainer width="100%" height={height}>
             <RechartsPieChart>
               <Pie
-                data={chartData}
+                data={donutData}
                 cx="50%"
-                cy="45%"
-                innerRadius={showLabels ? height * 0.18 : Math.min(height * 0.18, 30)}
-                outerRadius={showLabels ? height * 0.32 : Math.min(height * 0.35, 55)}
+                cy="50%"
+                innerRadius={showLabels ? Math.min(height * 0.18, 70) : Math.min(height * 0.2, 25)}
+                outerRadius={showLabels ? Math.min(height * 0.32, 140) : Math.min(height * 0.38, 55)}
                 dataKey={chart.dataKeys[0]}
-                label={showLabels ? ({ percent }: any) => `${((percent || 0) * 100).toFixed(0)}%` : false}
+                label={showLabels ? renderDonutLabel : false}
                 labelLine={showLabels}
               >
-                {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={chart.colors[index % chart.colors.length]} />
+                {donutData.map((_, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={chart.colors[index % chart.colors.length]}
+                  />
                 ))}
               </Pie>
-              <Tooltip 
-                formatter={(v: number) => formatValue(v, isPercentage)}
+              <Tooltip
+                formatter={(v: number, name: string) => [
+                  formatValue(v, isPercentage),
+                  name,
+                ]}
                 contentStyle={{ fontSize: fontSize }}
-              />
-              <Legend 
-                wrapperStyle={{ fontSize: showLabels ? 11 : 9 }}
-                layout="horizontal"
-                align="center"
-                verticalAlign="bottom"
               />
             </RechartsPieChart>
           </ResponsiveContainer>
@@ -435,20 +553,46 @@ export function ChartGridView({
       case "line":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <RechartsLineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+            <RechartsLineChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 10,
+                left: 10,
+                bottom: showLabels ? 30 : 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
-                tick={showLabels ? { fontSize: tickFontSize } : false} 
-                axisLine={{ stroke: '#E2E8F0' }}
+              <XAxis
+                dataKey="name"
+                tick={showLabels ? { fontSize: tickFontSize } : false}
+                axisLine={{ stroke: "#E2E8F0" }}
                 interval={0}
               />
-              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
-              <Tooltip 
+              <YAxis
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+                width={55}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
-              <Line type="monotone" dataKey={chart.dataKeys[0]} stroke={chart.colors[0]} strokeWidth={2} dot={{ r: showLabels ? 5 : 3 }} />
+              <Line
+                type="monotone"
+                dataKey={chart.dataKeys[0]}
+                stroke={chart.colors[0]}
+                strokeWidth={2}
+                dot={{ r: showLabels ? 5 : 3 }}
+                label={
+                  {
+                    position: "top",
+                    fontSize: showLabels ? 11 : 9,
+                    fill: "#475569",
+                    formatter: (v: any) => formatValue(v, isPercentage),
+                  } as any
+                }
+              />
             </RechartsLineChart>
           </ResponsiveContainer>
         );
@@ -456,20 +600,46 @@ export function ChartGridView({
       case "area":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+            <AreaChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 10,
+                left: 10,
+                bottom: showLabels ? 30 : 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
-                tick={showLabels ? { fontSize: tickFontSize } : false} 
-                axisLine={{ stroke: '#E2E8F0' }}
+              <XAxis
+                dataKey="name"
+                tick={showLabels ? { fontSize: tickFontSize } : false}
+                axisLine={{ stroke: "#E2E8F0" }}
                 interval={0}
               />
-              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
-              <Tooltip 
+              <YAxis
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+                width={55}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
-              <Area type="monotone" dataKey={chart.dataKeys[0]} stroke={chart.colors[0]} fill={chart.colors[0]} fillOpacity={0.3} />
+              <Area
+                type="monotone"
+                dataKey={chart.dataKeys[0]}
+                stroke={chart.colors[0]}
+                fill={chart.colors[0]}
+                fillOpacity={0.3}
+                label={
+                  {
+                    position: "top",
+                    fontSize: showLabels ? 11 : 9,
+                    fill: "#475569",
+                    formatter: (v: any) => formatValue(v, isPercentage),
+                  } as any
+                }
+              />
             </AreaChart>
           </ResponsiveContainer>
         );
@@ -477,22 +647,59 @@ export function ChartGridView({
       case "stacked-bar":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+            <BarChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 10,
+                left: 10,
+                bottom: showLabels ? 30 : 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
-                tick={showLabels ? { fontSize: tickFontSize } : false} 
-                axisLine={{ stroke: '#E2E8F0' }}
+              <XAxis
+                dataKey="name"
+                tick={showLabels ? { fontSize: tickFontSize } : false}
+                axisLine={{ stroke: "#E2E8F0" }}
                 interval={0}
               />
-              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
-              <Tooltip 
+              <YAxis
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+                width={55}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
               {showLabels && <Legend wrapperStyle={{ fontSize: 11 }} />}
               {chart.dataKeys.map((key, i) => (
-                <Bar key={key} dataKey={key} stackId="a" fill={chart.colors[i]} name={getColumnLabel(key)} />
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  stackId="a"
+                  fill={chart.colors[i]}
+                  name={getColumnLabel(key)}
+                  label={
+                    i === chart.dataKeys.length - 1
+                      ? ({
+                          position: "top",
+                          fontSize: showLabels ? 11 : 9,
+                          fill: "#475569",
+                          formatter: (v: any, entry: any, index: number) => {
+                            // Show total of stacked values for the top segment only
+                            // entry.payload contains the original data object
+                            const dataPoint = entry?.payload || entry || {};
+                            const total = chart.dataKeys.reduce((sum, k) => {
+                              const val = dataPoint[k];
+                              return sum + (typeof val === "number" ? val : 0);
+                            }, 0);
+                            return formatValue(total, isPercentage);
+                          },
+                        } as any)
+                      : false
+                  }
+                />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -501,23 +708,61 @@ export function ChartGridView({
       case "combo":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+            <ComposedChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 10,
+                left: 10,
+                bottom: showLabels ? 30 : 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
-                tick={showLabels ? { fontSize: tickFontSize } : false} 
-                axisLine={{ stroke: '#E2E8F0' }}
+              <XAxis
+                dataKey="name"
+                tick={showLabels ? { fontSize: tickFontSize } : false}
+                axisLine={{ stroke: "#E2E8F0" }}
                 interval={0}
               />
-              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
-              <Tooltip 
+              <YAxis
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+                width={55}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
               {showLabels && <Legend wrapperStyle={{ fontSize: 11 }} />}
-              <Bar dataKey={chart.dataKeys[0]} fill={chart.colors[0]} name={getColumnLabel(chart.dataKeys[0])} />
+              <Bar
+                dataKey={chart.dataKeys[0]}
+                fill={chart.colors[0]}
+                name={getColumnLabel(chart.dataKeys[0])}
+                label={
+                  {
+                    position: "top",
+                    fontSize: showLabels ? 11 : 9,
+                    fill: "#475569",
+                    formatter: (v: any) => formatValue(v, isPercentage),
+                  } as any
+                }
+              />
               {chart.dataKeys[1] && (
-                <Line type="monotone" dataKey={chart.dataKeys[1]} stroke={chart.colors[1]} strokeWidth={2} name={getColumnLabel(chart.dataKeys[1])} />
+                <Line
+                  type="monotone"
+                  dataKey={chart.dataKeys[1]}
+                  stroke={chart.colors[1]}
+                  strokeWidth={2}
+                  name={getColumnLabel(chart.dataKeys[1])}
+                  label={
+                    {
+                      position: "top",
+                      fontSize: showLabels ? 11 : 9,
+                      fill: chart.colors[1],
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    } as any
+                  }
+                />
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -528,13 +773,43 @@ export function ChartGridView({
           name: d.name,
           value: d[chart.dataKeys[0]] || 0,
         }));
+        // Custom tick renderer to show name + value (only when showLabels=true)
+        const renderRadarTick = (props: any) => {
+          const { x, y, payload } = props;
+          if (showLabels) {
+            const item = radarData.find((d) => d.name === payload.value);
+            const val = item ? formatValue(item.value, isPercentage) : "";
+            return (
+              <text x={x} y={y} textAnchor="middle" fill="#475569" fontSize={10}>
+                <tspan x={x} dy="0">{payload.value}</tspan>
+                <tspan x={x} dy="12" fontWeight="600">{val}</tspan>
+              </text>
+            );
+          }
+          return (
+            <text x={x} y={y} textAnchor="middle" fill="#475569" fontSize={8}>
+              {payload.value}
+            </text>
+          );
+        };
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <RadarChart data={radarData} margin={{ top: 20, right: 30, left: 30, bottom: 20 }}>
+            <RadarChart
+              data={radarData}
+              cx="50%"
+              cy="50%"
+              outerRadius={showLabels ? "60%" : "70%"}
+              margin={{ top: 25, right: 30, left: 30, bottom: 25 }}
+            >
               <PolarGrid stroke="#E2E8F0" />
-              <PolarAngleAxis dataKey="name" tick={{ fontSize: showLabels ? 11 : 8 }} />
-              <Radar dataKey="value" stroke={chart.colors[0]} fill={chart.colors[0]} fillOpacity={0.5} />
-              <Tooltip 
+              <PolarAngleAxis dataKey="name" tick={renderRadarTick} />
+              <Radar
+                dataKey="value"
+                stroke={chart.colors[0]}
+                fill={chart.colors[0]}
+                fillOpacity={0.5}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
@@ -545,22 +820,47 @@ export function ChartGridView({
       case "grouped-bar":
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+            <BarChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 10,
+                left: 10,
+                bottom: showLabels ? 30 : 10,
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
-                tick={showLabels ? { fontSize: tickFontSize } : false} 
-                axisLine={{ stroke: '#E2E8F0' }}
+              <XAxis
+                dataKey="name"
+                tick={showLabels ? { fontSize: tickFontSize } : false}
+                axisLine={{ stroke: "#E2E8F0" }}
                 interval={0}
               />
-              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
-              <Tooltip 
+              <YAxis
+                tick={{ fontSize: tickFontSize }}
+                tickFormatter={(v) => formatValue(v, isPercentage)}
+                width={55}
+              />
+              <Tooltip
                 formatter={(v: number) => formatValue(v, isPercentage)}
                 contentStyle={{ fontSize: fontSize }}
               />
               {showLabels && <Legend wrapperStyle={{ fontSize: 11 }} />}
               {chart.dataKeys.map((key, i) => (
-                <Bar key={key} dataKey={key} fill={chart.colors[i]} name={getColumnLabel(key)} />
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  fill={chart.colors[i]}
+                  name={getColumnLabel(key)}
+                  label={
+                    {
+                      position: "top",
+                      fontSize: showLabels ? 10 : 8,
+                      fill: "#475569",
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    } as any
+                  }
+                />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -571,14 +871,15 @@ export function ChartGridView({
     }
   };
 
-
   // Empty state when no charts
   if (charts.length === 0) {
     return (
       <div className="bg-white border-t border-slate-200 max-w-full overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200">
           <h3 className="text-slate-900 font-semibold">Chart Visualizations</h3>
-          <p className="text-sm text-slate-500 mt-1">Select data to generate charts</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Select data to generate charts
+          </p>
         </div>
         <div className="p-12 text-center">
           <p className="text-slate-400">No data available for visualization</p>
@@ -593,7 +894,8 @@ export function ChartGridView({
       <div className="px-6 py-4 border-b border-slate-200">
         <h3 className="text-slate-900 font-semibold">Chart Visualizations</h3>
         <p className="text-sm text-slate-500 mt-1">
-          {charts.length} charts based on {columns.filter((c) => c !== "mediaType").length} visible columns
+          {charts.length} charts based on{" "}
+          {columns.filter((c) => c !== "mediaType").length} visible columns
         </p>
       </div>
 
@@ -607,26 +909,10 @@ export function ChartGridView({
             >
               {/* Chart Header */}
               <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                <h5 className="text-xs font-medium text-slate-900 truncate flex-1">{chart.title}</h5>
+                <h5 className="text-xs font-medium text-slate-900 truncate flex-1">
+                  {chart.title}
+                </h5>
                 <div className="flex items-center gap-1">
-                  {/* Add to PPT Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const chartElement = chartRefs.current.get(chart.id);
-                      handleToggleForPPT(`table-${chart.id}`, chart.title, chartElement || undefined);
-                    }}
-                    className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
-                      isChartInPPT(`table-${chart.id}`) ? "bg-emerald-500 opacity-100" : "hover:bg-slate-200"
-                    }`}
-                    title={isChartInPPT(`table-${chart.id}`) ? "Remove from PPT" : "Add to PPT"}
-                  >
-                    {isChartInPPT(`table-${chart.id}`) ? (
-                      <Check className="w-3.5 h-3.5 text-white" />
-                    ) : (
-                      <FileText className="w-3.5 h-3.5 text-slate-600" />
-                    )}
-                  </button>
                   {/* Expand Button */}
                   <button
                     onClick={(e) => {
@@ -642,10 +928,7 @@ export function ChartGridView({
               </div>
 
               {/* Chart Content */}
-              <div
-                ref={(el) => { chartRefs.current.set(chart.id, el); }}
-                className="p-3 bg-white h-44"
-              >
+              <div className="p-3 bg-white h-44">
                 {renderChart(chart, 160)}
               </div>
             </Card>
@@ -656,7 +939,10 @@ export function ChartGridView({
       {/* Full-Screen Modal */}
       {fullScreenChart && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setFullScreenChart(null)} />
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setFullScreenChart(null)}
+          />
           <div className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-slate-200/60">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between flex-shrink-0">
@@ -665,7 +951,9 @@ export function ChartGridView({
                   <Maximize2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">{fullScreenChart.title}</h3>
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    {fullScreenChart.title}
+                  </h3>
                   <p className="text-sm text-slate-500">Expanded view</p>
                 </div>
               </div>
@@ -673,7 +961,12 @@ export function ChartGridView({
                 <button
                   onClick={() => {
                     const element = fullScreenChartRef.current;
-                    handleToggleForPPT(`table-${fullScreenChart.id}`, fullScreenChart.title, element || undefined);
+                    handleToggleForPPT(
+                      `table-${fullScreenChart.id}`,
+                      fullScreenChart.title,
+                      element || undefined,
+                      fullScreenChart,
+                    );
                   }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${
                     isChartInPPT(`table-${fullScreenChart.id}`)
@@ -682,12 +975,21 @@ export function ChartGridView({
                   }`}
                 >
                   {isChartInPPT(`table-${fullScreenChart.id}`) ? (
-                    <><Check className="w-4 h-4" /><span>Added to PPT</span></>
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Added to PPT</span>
+                    </>
                   ) : (
-                    <><FileText className="w-4 h-4" /><span>Add to PPT</span></>
+                    <>
+                      <FileText className="w-4 h-4" />
+                      <span>Add to PPT</span>
+                    </>
                   )}
                 </button>
-                <button onClick={() => setFullScreenChart(null)} className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+                <button
+                  onClick={() => setFullScreenChart(null)}
+                  className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
+                >
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
@@ -697,26 +999,37 @@ export function ChartGridView({
             {isChartInPPT(`table-${fullScreenChart.id}`) && (
               <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
                 <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium text-slate-700">Target Slide:</label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Target Slide:
+                  </label>
                   <input
                     type="number"
                     min="1"
-                    value={getSlideNumber?.(`table-${fullScreenChart.id}`) || ""}
+                    value={
+                      getSlideNumber?.(`table-${fullScreenChart.id}`) || ""
+                    }
                     onChange={(e) => {
-                      const num = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                      const num = e.target.value
+                        ? parseInt(e.target.value, 10)
+                        : undefined;
                       onUpdateSlideNumber?.(`table-${fullScreenChart.id}`, num);
                     }}
                     placeholder="Auto"
                     className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm bg-white"
                   />
-                  <span className="text-xs text-slate-500">Leave empty for auto-placement</span>
+                  <span className="text-xs text-slate-500">
+                    Leave empty for auto-placement
+                  </span>
                 </div>
               </div>
             )}
 
             {/* Modal Content */}
             <div className="flex-1 p-8 overflow-auto min-h-0 bg-gradient-to-br from-slate-50 to-slate-100/50">
-              <div ref={fullScreenChartRef} className="bg-white rounded-xl p-6 shadow-sm max-w-4xl mx-auto h-full">
+              <div
+                ref={fullScreenChartRef}
+                className="bg-white rounded-xl p-6 shadow-sm max-w-4xl mx-auto h-full"
+              >
                 <div className="h-full" style={{ minHeight: "400px" }}>
                   {renderChart(fullScreenChart, 500, true)}
                 </div>

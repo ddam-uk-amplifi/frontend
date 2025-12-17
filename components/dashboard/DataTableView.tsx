@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings2, Eye, EyeOff, RefreshCw, ChevronDown } from "lucide-react";
+import {
+  Settings2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  ChevronDown,
+  FileText,
+  Check,
+} from "lucide-react";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -44,6 +52,14 @@ interface DataTableViewProps {
   selectedDataSource?: "summary" | "trackers" | "";
   selectedMarket?: string; // From TopBar
   onDataChange?: (columns: string[], rows: TableRow[]) => void;
+  selectedGraphsForPPT?: Set<string> | string[];
+  onToggleGraphForPPT?: (
+    graphId: string,
+    graphTitle: string,
+    element?: HTMLElement,
+    chartData?: Array<{ name: string; [key: string]: any }>,
+    dataKeys?: string[],
+  ) => void;
 }
 
 // ============================================================================
@@ -87,29 +103,164 @@ const SUMMARY_FIELDS = [
 
 // Columns for Summary data
 const SUMMARY_COLUMNS: TableColumn[] = [
-  { id: "mediaType", label: "Media Type", type: "text", align: "left", visible: true, order: 0, frozen: true },
-  { id: "total_net_net_spend", label: "Net Net Spend", type: "currency", align: "right", visible: true, order: 1 },
-  { id: "total_addressable_net_net_spend", label: "Addressable Spend", type: "currency", align: "right", visible: true, order: 2 },
-  { id: "total_net_net_measured", label: "Measured Spend", type: "currency", align: "right", visible: true, order: 3 },
-  { id: "measured_spend_pct", label: "Measured %", type: "percentage", align: "right", visible: true, order: 4 },
-  { id: "savings_value", label: "Savings", type: "currency", align: "right", visible: true, order: 5 },
-  { id: "savings_pct", label: "Savings %", type: "percentage", align: "right", visible: true, order: 6 },
-  { id: "inflation_pct", label: "Inflation %", type: "percentage", align: "right", visible: true, order: 7 },
-  { id: "inflation_migration_pct", label: "Inflation Mitigation", type: "percentage", align: "right", visible: true, order: 8 },
-  { id: "inflation_after_migration_pct", label: "Inflation After Mitigation %", type: "percentage", align: "right", visible: true, order: 9 },
+  {
+    id: "mediaType",
+    label: "Media Type",
+    type: "text",
+    align: "left",
+    visible: true,
+    order: 0,
+    frozen: true,
+  },
+  {
+    id: "total_net_net_spend",
+    label: "Net Net Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "total_addressable_net_net_spend",
+    label: "Addressable Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 2,
+  },
+  {
+    id: "total_net_net_measured",
+    label: "Measured Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 3,
+  },
+  {
+    id: "measured_spend_pct",
+    label: "Measured %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 4,
+  },
+  {
+    id: "savings_value",
+    label: "Savings",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 5,
+  },
+  {
+    id: "savings_pct",
+    label: "Savings %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 6,
+  },
+  {
+    id: "inflation_pct",
+    label: "Inflation %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 7,
+  },
+  {
+    id: "inflation_migration_pct",
+    label: "Inflation Mitigation",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 8,
+  },
+  {
+    id: "inflation_after_migration_pct",
+    label: "Inflation After Mitigation %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 9,
+  },
 ];
 
 // Columns for Tracker Summary data
 const TRACKER_COLUMNS: TableColumn[] = [
-  { id: "mediaType", label: "Media Type", type: "text", align: "left", visible: true, order: 0, frozen: true },
-  { id: "total_net_net_spend", label: "Net Net Spend", type: "currency", align: "right", visible: true, order: 1 },
-  { id: "total_non_addressable_spend", label: "Non-Addressable", type: "currency", align: "right", visible: true, order: 2 },
-  { id: "total_addressable_spend", label: "Addressable", type: "currency", align: "right", visible: true, order: 3 },
-  { id: "measured_spend", label: "Measured Spend", type: "currency", align: "right", visible: true, order: 4 },
-  { id: "measured_spend_pct", label: "Measured %", type: "percentage", align: "right", visible: true, order: 5 },
-  { id: "benchmark_equivalent_net_net_spend", label: "Benchmark Spend", type: "currency", align: "right", visible: true, order: 6 },
-  { id: "value_loss", label: "Value Loss", type: "currency", align: "right", visible: true, order: 7 },
-  { id: "value_loss_pct", label: "Value Loss %", type: "percentage", align: "right", visible: true, order: 8 },
+  {
+    id: "mediaType",
+    label: "Media Type",
+    type: "text",
+    align: "left",
+    visible: true,
+    order: 0,
+    frozen: true,
+  },
+  {
+    id: "total_net_net_spend",
+    label: "Net Net Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "total_non_addressable_spend",
+    label: "Non-Addressable",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 2,
+  },
+  {
+    id: "total_addressable_spend",
+    label: "Addressable",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 3,
+  },
+  {
+    id: "measured_spend",
+    label: "Measured Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 4,
+  },
+  {
+    id: "measured_spend_pct",
+    label: "Measured %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 5,
+  },
+  {
+    id: "benchmark_equivalent_net_net_spend",
+    label: "Benchmark Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 6,
+  },
+  {
+    id: "value_loss",
+    label: "Value Loss",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 7,
+  },
+  {
+    id: "value_loss_pct",
+    label: "Value Loss %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 8,
+  },
 ];
 
 // ============================================================================
@@ -118,7 +269,8 @@ const TRACKER_COLUMNS: TableColumn[] = [
 
 export const tableDataKeys = {
   all: ["tableData"] as const,
-  latestJob: (client: string) => [...tableDataKeys.all, "latestJob", client] as const,
+  latestJob: (client: string) =>
+    [...tableDataKeys.all, "latestJob", client] as const,
   summary: (client: string, jobId: string, sheetType: string) =>
     [...tableDataKeys.all, "summary", client, jobId, sheetType] as const,
   // Tracker key only uses client + market (period filtering is done on frontend)
@@ -136,8 +288,8 @@ function formatCellValue(value: any, type: string): string {
   switch (type) {
     case "currency":
       return value.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
       });
     case "percentage":
       return `${(typeof value === "number" ? value : 0).toFixed(1)}%`;
@@ -196,7 +348,10 @@ function transformSummaryData(data: ConsolidatedSummaryResponse): TableRow[] {
 
   const totals: Record<string, number> = {};
   data.requested_fields.forEach((field) => {
-    totals[field] = tableRows.reduce((sum, row) => sum + (row.data[field] || 0), 0);
+    totals[field] = tableRows.reduce(
+      (sum, row) => sum + (row.data[field] || 0),
+      0,
+    );
   });
   tableRows.push({
     id: "total",
@@ -209,32 +364,40 @@ function transformSummaryData(data: ConsolidatedSummaryResponse): TableRow[] {
   return tableRows;
 }
 
-function transformTrackerData(data: TrackerSummaryItem[], selectedPeriod?: string): TableRow[] {
+function transformTrackerData(
+  data: TrackerSummaryItem[],
+  selectedPeriod?: string,
+): TableRow[] {
   if (!data || data.length === 0) return [];
 
   // Filter by selected period (frontend filtering since backend doesn't support it)
   const filteredData = selectedPeriod
-    ? data.filter((item) => item.period?.toLowerCase() === selectedPeriod.toLowerCase())
+    ? data.filter(
+        (item) => item.period?.toLowerCase() === selectedPeriod.toLowerCase(),
+      )
     : data;
 
   if (filteredData.length === 0) return [];
 
   // Group by normalized media type to handle duplicates with different capitalizations
-  const mediaGroups: Record<string, {
-    total_net_net_spend: number;
-    total_non_addressable_spend: number;
-    total_addressable_spend: number;
-    measured_spend: number;
-    measured_spend_pct: number | null;
-    benchmark_equivalent_net_net_spend: number;
-    value_loss: number;
-    value_loss_pct: number | null;
-  }> = {};
+  const mediaGroups: Record<
+    string,
+    {
+      total_net_net_spend: number;
+      total_non_addressable_spend: number;
+      total_addressable_spend: number;
+      measured_spend: number;
+      measured_spend_pct: number | null;
+      benchmark_equivalent_net_net_spend: number;
+      value_loss: number;
+      value_loss_pct: number | null;
+    }
+  > = {};
 
   filteredData.forEach((item) => {
     // Skip "GRAND TOTAL" rows from the API
     if (item.media_type?.toUpperCase() === "GRAND TOTAL") return;
-    
+
     const mediaType = normalizeMediaType(item.media_type);
     if (!mediaGroups[mediaType]) {
       mediaGroups[mediaType] = {
@@ -253,36 +416,58 @@ function transformTrackerData(data: TrackerSummaryItem[], selectedPeriod?: strin
     group.total_non_addressable_spend += item.total_non_addressable_spend || 0;
     group.total_addressable_spend += item.total_addressable_spend || 0;
     group.measured_spend += item.measured_spend || 0;
-    group.benchmark_equivalent_net_net_spend += item.benchmark_equivalent_net_net_spend || 0;
+    group.benchmark_equivalent_net_net_spend +=
+      item.benchmark_equivalent_net_net_spend || 0;
     group.value_loss += item.value_loss || 0;
     // Percentages can't be summed - we'll recalculate or leave null
   });
 
-  const tableRows: TableRow[] = Object.entries(mediaGroups).map(([mediaType, groupData], index) => ({
-    id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-${index}`,
-    mediaType,
-    type: "Actual" as const,
-    level: 0,
-    data: {
-      total_net_net_spend: groupData.total_net_net_spend,
-      total_non_addressable_spend: groupData.total_non_addressable_spend,
-      total_addressable_spend: groupData.total_addressable_spend,
-      measured_spend: groupData.measured_spend,
-      measured_spend_pct: groupData.measured_spend_pct,
-      benchmark_equivalent_net_net_spend: groupData.benchmark_equivalent_net_net_spend,
-      value_loss: groupData.value_loss,
-      value_loss_pct: groupData.value_loss_pct,
-    },
-  }));
+  const tableRows: TableRow[] = Object.entries(mediaGroups).map(
+    ([mediaType, groupData], index) => ({
+      id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-${index}`,
+      mediaType,
+      type: "Actual" as const,
+      level: 0,
+      data: {
+        total_net_net_spend: groupData.total_net_net_spend,
+        total_non_addressable_spend: groupData.total_non_addressable_spend,
+        total_addressable_spend: groupData.total_addressable_spend,
+        measured_spend: groupData.measured_spend,
+        measured_spend_pct: groupData.measured_spend_pct,
+        benchmark_equivalent_net_net_spend:
+          groupData.benchmark_equivalent_net_net_spend,
+        value_loss: groupData.value_loss,
+        value_loss_pct: groupData.value_loss_pct,
+      },
+    }),
+  );
 
   const totals = {
-    total_net_net_spend: tableRows.reduce((sum, row) => sum + (row.data.total_net_net_spend || 0), 0),
-    total_non_addressable_spend: tableRows.reduce((sum, row) => sum + (row.data.total_non_addressable_spend || 0), 0),
-    total_addressable_spend: tableRows.reduce((sum, row) => sum + (row.data.total_addressable_spend || 0), 0),
-    measured_spend: tableRows.reduce((sum, row) => sum + (row.data.measured_spend || 0), 0),
+    total_net_net_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.total_net_net_spend || 0),
+      0,
+    ),
+    total_non_addressable_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
+      0,
+    ),
+    total_addressable_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.total_addressable_spend || 0),
+      0,
+    ),
+    measured_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.measured_spend || 0),
+      0,
+    ),
     measured_spend_pct: null,
-    benchmark_equivalent_net_net_spend: tableRows.reduce((sum, row) => sum + (row.data.benchmark_equivalent_net_net_spend || 0), 0),
-    value_loss: tableRows.reduce((sum, row) => sum + (row.data.value_loss || 0), 0),
+    benchmark_equivalent_net_net_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.benchmark_equivalent_net_net_spend || 0),
+      0,
+    ),
+    value_loss: tableRows.reduce(
+      (sum, row) => sum + (row.data.value_loss || 0),
+      0,
+    ),
     value_loss_pct: null,
   };
 
@@ -306,14 +491,36 @@ export function DataTableView({
   selectedDataSource,
   selectedMarket = "",
   onDataChange,
+  selectedGraphsForPPT = new Set(),
+  onToggleGraphForPPT,
 }: DataTableViewProps) {
   const queryClient = useQueryClient();
   const [columns, setColumns] = useState<TableColumn[]>(SUMMARY_COLUMNS);
   const [showColumnControl, setShowColumnControl] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Local state for filters not in TopBar
   const [sheetType, setSheetType] = useState<"ytd" | "fyfc">("ytd");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
+
+  // PPT state
+  const tableId = "data-table-main";
+  const isTableInPPT = useMemo(() => {
+    if (selectedGraphsForPPT instanceof Set) {
+      return selectedGraphsForPPT.has(tableId);
+    }
+    if (Array.isArray(selectedGraphsForPPT)) {
+      return selectedGraphsForPPT.includes(tableId);
+    }
+    return false;
+  }, [selectedGraphsForPPT]);
+
+  const handleToggleTableForPPT = () => {
+    if (onToggleGraphForPPT && tableContainerRef.current) {
+      const tableTitle = getTableTitle();
+      onToggleGraphForPPT(tableId, tableTitle, tableContainerRef.current);
+    }
+  };
 
   const clientId = selectedClient ? CLIENT_ID_MAP[selectedClient] : undefined;
 
@@ -328,7 +535,11 @@ export function DataTableView({
 
   // Auto-select January when trackers is selected and market is chosen
   useEffect(() => {
-    if (selectedDataSource === "trackers" && selectedMarket && !selectedPeriod) {
+    if (
+      selectedDataSource === "trackers" &&
+      selectedMarket &&
+      !selectedPeriod
+    ) {
       setSelectedPeriod("Jan");
     }
   }, [selectedDataSource, selectedMarket, selectedPeriod]);
@@ -359,7 +570,9 @@ export function DataTableView({
         sheetType,
         fields: SUMMARY_FIELDS,
       }),
-    enabled: Boolean(selectedClient && selectedDataSource === "summary" && jobId),
+    enabled: Boolean(
+      selectedClient && selectedDataSource === "summary" && jobId,
+    ),
     staleTime: 2 * 60 * 1000, // 2 minutes - data can be cached
     gcTime: 5 * 60 * 1000,
     placeholderData: (prev) => prev, // Keep previous data while loading
@@ -381,14 +594,14 @@ export function DataTableView({
         clientId!,
         undefined,
         undefined,
-        selectedMarket
+        selectedMarket,
         // Don't pass period - backend doesn't support it, we filter on frontend
       ),
     enabled: Boolean(
       selectedClient &&
         selectedDataSource === "trackers" &&
         selectedMarket &&
-        clientId
+        clientId,
     ),
     staleTime: 5 * 60 * 1000, // Cache longer since we filter on frontend
     gcTime: 10 * 60 * 1000,
@@ -420,25 +633,26 @@ export function DataTableView({
 
   // Column visibility helpers
   const visibleColumns = useMemo(
-    () => columns.filter((col) => col.visible).sort((a, b) => a.order - b.order),
-    [columns]
+    () =>
+      columns.filter((col) => col.visible).sort((a, b) => a.order - b.order),
+    [columns],
   );
 
   const frozenColumns = useMemo(
     () => visibleColumns.filter((col) => col.frozen),
-    [visibleColumns]
+    [visibleColumns],
   );
 
   const scrollableColumns = useMemo(
     () => visibleColumns.filter((col) => !col.frozen),
-    [visibleColumns]
+    [visibleColumns],
   );
 
   const handleToggleColumn = (columnId: string) => {
     setColumns((prev) =>
       prev.map((col) =>
-        col.id === columnId ? { ...col, visible: !col.visible } : col
-      )
+        col.id === columnId ? { ...col, visible: !col.visible } : col,
+      ),
     );
   };
 
@@ -583,6 +797,30 @@ export function DataTableView({
             />
           </Button>
 
+          {/* Add to PPT Button */}
+          {onToggleGraphForPPT && rows.length > 0 && (
+            <Button
+              variant={isTableInPPT ? "default" : "outline"}
+              size="sm"
+              onClick={handleToggleTableForPPT}
+              className={
+                isTableInPPT ? "bg-emerald-600 hover:bg-emerald-700" : ""
+              }
+            >
+              {isTableInPPT ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Added to PPT
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Add to PPT
+                </>
+              )}
+            </Button>
+          )}
+
           {/* Column Control */}
           <Popover open={showColumnControl} onOpenChange={setShowColumnControl}>
             <PopoverTrigger asChild>
@@ -683,7 +921,10 @@ export function DataTableView({
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[600px] isolate max-w-full relative">
+          <div
+            ref={tableContainerRef}
+            className="overflow-x-auto overflow-y-auto max-h-[600px] isolate max-w-full relative"
+          >
             <table className="w-full border-collapse min-w-max">
               <thead className="sticky top-0 z-20">
                 <tr>

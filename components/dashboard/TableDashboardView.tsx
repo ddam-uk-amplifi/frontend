@@ -23,9 +23,14 @@ interface TableDashboardViewProps {
   onToggleGraphForPPT?: (
     graphId: string,
     graphTitle: string,
-    element?: HTMLElement
+    element?: HTMLElement,
+    chartData?: Array<{ name: string; [key: string]: any }>,
+    dataKeys?: string[],
   ) => void;
-  onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
+  onUpdateSlideNumber?: (
+    graphId: string,
+    slideNumber: number | undefined,
+  ) => void;
   getSlideNumber?: (graphId: string) => number | undefined;
 }
 
@@ -41,10 +46,13 @@ export function TableDashboardView({
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<TableRow[]>([]);
 
-  const handleDataChange = useCallback((columns: string[], rows: TableRow[]) => {
-    setSelectedColumns(columns);
-    setSelectedRows(rows);
-  }, []);
+  const handleDataChange = useCallback(
+    (columns: string[], rows: TableRow[]) => {
+      setSelectedColumns(columns);
+      setSelectedRows(rows);
+    },
+    [],
+  );
 
   // Show empty state when no client or data source is selected
   if (!selectedClient || !selectedDataSource) {
@@ -57,7 +65,9 @@ export function TableDashboardView({
               <Database className="w-8 h-8 text-violet-600" />
             </div>
             <h3 className="text-slate-900 mb-2">
-              {!selectedClient ? "No Client Selected" : "No Data Source Selected"}
+              {!selectedClient
+                ? "No Client Selected"
+                : "No Data Source Selected"}
             </h3>
             <p className="text-slate-600 text-sm">
               {!selectedClient
@@ -91,6 +101,8 @@ export function TableDashboardView({
           selectedDataSource={selectedDataSource}
           selectedMarket={selectedMarket}
           onDataChange={handleDataChange}
+          selectedGraphsForPPT={selectedGraphsForPPT}
+          onToggleGraphForPPT={onToggleGraphForPPT}
         />
       </div>
 

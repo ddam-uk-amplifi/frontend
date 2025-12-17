@@ -60,10 +60,10 @@ export function useDashboardData(
   // Track if we should fetch
   const hasRequiredParams = Boolean(
     debouncedParams.client &&
-    debouncedParams.dataSource &&
-    Object.values(debouncedParams.selectedFields).some(
-      (arr) => arr.length > 0,
-    ),
+      debouncedParams.dataSource &&
+      Object.values(debouncedParams.selectedFields).some(
+        (arr) => arr.length > 0,
+      ),
   );
 
   return useQuery({

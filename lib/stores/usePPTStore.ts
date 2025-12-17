@@ -30,37 +30,38 @@ interface PPTStoreState {
 // Helper to clear corrupted store data
 export const clearPPTStore = () => {
   try {
-    localStorage.removeItem('ppt-graph-storage');
-    console.log('[usePPTStore] Store cleared successfully');
+    localStorage.removeItem("ppt-graph-storage");
+    console.log("[usePPTStore] Store cleared successfully");
     // Force page reload to reinitialize store
     window.location.reload();
   } catch (error) {
-    console.error('[usePPTStore] Failed to clear store:', error);
+    console.error("[usePPTStore] Failed to clear store:", error);
   }
 };
 
 // Auto-clear corrupted data on load
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   try {
-    const stored = localStorage.getItem('ppt-graph-storage');
+    const stored = localStorage.getItem("ppt-graph-storage");
     if (stored) {
       const parsed = JSON.parse(stored);
       // Check if data looks corrupted (not proper structure)
       if (parsed?.state) {
         const state = parsed.state;
         // If graphsMetadata is not an object or is an array, it's corrupted
-        if (state.graphsMetadata && (
-          Array.isArray(state.graphsMetadata) ||
-          typeof state.graphsMetadata !== 'object'
-        )) {
-          console.warn('[usePPTStore] Detected corrupted data, clearing...');
-          localStorage.removeItem('ppt-graph-storage');
+        if (
+          state.graphsMetadata &&
+          (Array.isArray(state.graphsMetadata) ||
+            typeof state.graphsMetadata !== "object")
+        ) {
+          console.warn("[usePPTStore] Detected corrupted data, clearing...");
+          localStorage.removeItem("ppt-graph-storage");
         }
       }
     }
   } catch (error) {
-    console.error('[usePPTStore] Error checking store:', error);
-    localStorage.removeItem('ppt-graph-storage');
+    console.error("[usePPTStore] Error checking store:", error);
+    localStorage.removeItem("ppt-graph-storage");
   }
 }
 
@@ -73,13 +74,24 @@ export const usePPTStore = create<PPTStoreState>()(
       addGraph: (graphId, metadata) => {
         set((state) => {
           // Ensure we're working with proper Set and Map
-          const currentSelected = state.selectedGraphsForPPT instanceof Set
-            ? state.selectedGraphsForPPT
-            : new Set(Array.isArray(state.selectedGraphsForPPT) ? state.selectedGraphsForPPT : []);
+          const currentSelected =
+            state.selectedGraphsForPPT instanceof Set
+              ? state.selectedGraphsForPPT
+              : new Set(
+                  Array.isArray(state.selectedGraphsForPPT)
+                    ? state.selectedGraphsForPPT
+                    : [],
+                );
 
-          const currentMetadata = state.graphsMetadata instanceof Map
-            ? state.graphsMetadata
-            : new Map(Object.entries(state.graphsMetadata || {}) as [string, GraphForPPT][]);
+          const currentMetadata =
+            state.graphsMetadata instanceof Map
+              ? state.graphsMetadata
+              : new Map(
+                  Object.entries(state.graphsMetadata || {}) as [
+                    string,
+                    GraphForPPT,
+                  ][],
+                );
 
           const newSelectedGraphs = new Set(currentSelected);
           newSelectedGraphs.add(graphId);
@@ -97,13 +109,24 @@ export const usePPTStore = create<PPTStoreState>()(
       removeGraph: (graphId) => {
         set((state) => {
           // Ensure we're working with proper Set and Map
-          const currentSelected = state.selectedGraphsForPPT instanceof Set
-            ? state.selectedGraphsForPPT
-            : new Set(Array.isArray(state.selectedGraphsForPPT) ? state.selectedGraphsForPPT : []);
+          const currentSelected =
+            state.selectedGraphsForPPT instanceof Set
+              ? state.selectedGraphsForPPT
+              : new Set(
+                  Array.isArray(state.selectedGraphsForPPT)
+                    ? state.selectedGraphsForPPT
+                    : [],
+                );
 
-          const currentMetadata = state.graphsMetadata instanceof Map
-            ? state.graphsMetadata
-            : new Map(Object.entries(state.graphsMetadata || {}) as [string, GraphForPPT][]);
+          const currentMetadata =
+            state.graphsMetadata instanceof Map
+              ? state.graphsMetadata
+              : new Map(
+                  Object.entries(state.graphsMetadata || {}) as [
+                    string,
+                    GraphForPPT,
+                  ][],
+                );
 
           const newSelectedGraphs = new Set(currentSelected);
           newSelectedGraphs.delete(graphId);
@@ -121,9 +144,15 @@ export const usePPTStore = create<PPTStoreState>()(
       updateSlideNumber: (graphId, slideNumber) => {
         set((state) => {
           // Ensure we're working with a proper Map
-          const currentMetadata = state.graphsMetadata instanceof Map
-            ? state.graphsMetadata
-            : new Map(Object.entries(state.graphsMetadata || {}) as [string, GraphForPPT][]);
+          const currentMetadata =
+            state.graphsMetadata instanceof Map
+              ? state.graphsMetadata
+              : new Map(
+                  Object.entries(state.graphsMetadata || {}) as [
+                    string,
+                    GraphForPPT,
+                  ][],
+                );
 
           const newMetadata = new Map(currentMetadata);
           const existing = newMetadata.get(graphId);
@@ -148,7 +177,7 @@ export const usePPTStore = create<PPTStoreState>()(
         // Handle case where it's not a Map (e.g., from localStorage)
         if (metadata instanceof Map) {
           return metadata.get(graphId);
-        } else if (typeof metadata === 'object' && metadata !== null) {
+        } else if (typeof metadata === "object" && metadata !== null) {
           // @ts-ignore - accessing as plain object
           return metadata[graphId];
         }
@@ -160,7 +189,7 @@ export const usePPTStore = create<PPTStoreState>()(
         // Handle case where it's not a Map
         if (metadata instanceof Map) {
           return Array.from(metadata.values());
-        } else if (typeof metadata === 'object' && metadata !== null) {
+        } else if (typeof metadata === "object" && metadata !== null) {
           // @ts-ignore - accessing as plain object
           return Object.values(metadata);
         }
@@ -186,8 +215,14 @@ export const usePPTStore = create<PPTStoreState>()(
           if (Array.isArray(state.selectedGraphsForPPT)) {
             state.selectedGraphsForPPT = new Set(state.selectedGraphsForPPT);
           }
-          if (state.graphsMetadata && typeof state.graphsMetadata === 'object' && !(state.graphsMetadata instanceof Map)) {
-            state.graphsMetadata = new Map(Object.entries(state.graphsMetadata) as [string, GraphForPPT][]);
+          if (
+            state.graphsMetadata &&
+            typeof state.graphsMetadata === "object" &&
+            !(state.graphsMetadata instanceof Map)
+          ) {
+            state.graphsMetadata = new Map(
+              Object.entries(state.graphsMetadata) as [string, GraphForPPT][],
+            );
           }
         }
       },
@@ -202,13 +237,16 @@ export const usePPTStore = create<PPTStoreState>()(
 
             // Convert stored arrays/objects back to serializable format for zustand
             // Zustand will handle the conversion to Set/Map internally
-            const selectedGraphsArray = Array.isArray(state.selectedGraphsForPPT)
+            const selectedGraphsArray = Array.isArray(
+              state.selectedGraphsForPPT,
+            )
               ? state.selectedGraphsForPPT
               : [];
 
-            const graphsMetadataObj = state.graphsMetadata && typeof state.graphsMetadata === 'object'
-              ? state.graphsMetadata
-              : {};
+            const graphsMetadataObj =
+              state.graphsMetadata && typeof state.graphsMetadata === "object"
+                ? state.graphsMetadata
+                : {};
 
             return JSON.stringify({
               state: {
@@ -218,7 +256,7 @@ export const usePPTStore = create<PPTStoreState>()(
               },
             });
           } catch (error) {
-            console.error('[usePPTStore] getItem error:', error);
+            console.error("[usePPTStore] getItem error:", error);
             return null;
           }
         },
@@ -238,7 +276,7 @@ export const usePPTStore = create<PPTStoreState>()(
               if (state.graphsMetadata instanceof Map) {
                 // It's a Map, convert it
                 graphsMetadataObj = Object.fromEntries(state.graphsMetadata);
-              } else if (typeof state.graphsMetadata === 'object') {
+              } else if (typeof state.graphsMetadata === "object") {
                 // It's already an object, use as is
                 graphsMetadataObj = state.graphsMetadata;
               }
@@ -253,12 +291,12 @@ export const usePPTStore = create<PPTStoreState>()(
             });
             localStorage.setItem(name, serialized);
           } catch (error) {
-            console.error('[usePPTStore] setItem error:', error);
+            console.error("[usePPTStore] setItem error:", error);
             // Don't throw - just log the error to prevent breaking the app
           }
         },
         removeItem: (name) => localStorage.removeItem(name),
       })),
-    }
-  )
+    },
+  ),
 );

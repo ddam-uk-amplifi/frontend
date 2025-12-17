@@ -1023,12 +1023,22 @@ export async function generateDashboardPPTX(
  * Helper to capture a chart element as base64 image
  * Uses html2canvas-pro to render the chart to a canvas and export as PNG
  * html2canvas-pro has better support for modern CSS color functions (lab, oklch, etc.)
+ * @param element - The chart element to capture
+ * @param title - Optional title to display above the chart in the captured image
+ * @param chartData - Optional chart data to display in a table below the chart
+ * @param dataKeys - Optional data keys to show specific columns in the table
  */
 export async function captureChartAsBase64(
   element: HTMLElement,
+  title?: string,
+  chartData?: Array<{ name: string; [key: string]: any }>,
+  dataKeys?: string[],
 ): Promise<string> {
   console.log("=== [captureChartAsBase64] START ===");
   console.log("[captureChartAsBase64] Timestamp:", new Date().toISOString());
+  console.log("[captureChartAsBase64] Title provided:", title);
+  console.log("[captureChartAsBase64] Chart data provided:", !!chartData);
+  console.log("[captureChartAsBase64] Data keys:", dataKeys);
 
   try {
     // Log element details
@@ -1047,7 +1057,7 @@ export async function captureChartAsBase64(
     // Check if element is visible
     if (element.offsetWidth === 0 || element.offsetHeight === 0) {
       throw new Error(
-        `Element has zero dimensions: ${element.offsetWidth}x${element.offsetHeight}`
+        `Element has zero dimensions: ${element.offsetWidth}x${element.offsetHeight}`,
       );
     }
 
@@ -1056,13 +1066,201 @@ export async function captureChartAsBase64(
       throw new Error("Element is not attached to the DOM");
     }
 
+    // Determine which element to capture
+    let elementToCapture = element;
+    let wrapperElement: HTMLDivElement | null = null;
+
+    // If title or chartData is provided, create a wrapper
+    if (title || chartData) {
+      console.log(
+        "[captureChartAsBase64] Creating wrapper with title and/or data table...",
+      );
+
+      // Create wrapper container
+      wrapperElement = document.createElement("div");
+      wrapperElement.style.cssText = `
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        background: white;
+        padding: 24px;
+        width: ${element.offsetWidth + 48}px;
+      `;
+
+      // Create title element if provided
+      if (title) {
+        const titleElement = document.createElement("h3");
+        titleElement.textContent = title;
+        titleElement.style.cssText = `
+          margin: 0 0 16px 0;
+          font-size: 18px;
+          font-weight: 600;
+          color: #1e293b;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        `;
+        wrapperElement.appendChild(titleElement);
+      }
+
+      // Clone the chart element
+      const clonedChart = element.cloneNode(true) as HTMLElement;
+      wrapperElement.appendChild(clonedChart);
+
+      // Create data table if chartData is provided
+      if (chartData && chartData.length > 0) {
+        const tableContainer = document.createElement("div");
+        tableContainer.style.cssText = `
+          margin-top: 16px;
+          border-top: 2px solid #e2e8f0;
+          padding-top: 12px;
+        `;
+
+        const table = document.createElement("table");
+        table.style.cssText = `
+          width: 100%;
+          border-collapse: collapse;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 11px;
+        `;
+
+        // Helper function to format values
+        const formatValue = (value: any, key: string): string => {
+          if (value === null || value === undefined) return "—";
+          if (typeof value === "number") {
+            // Check if it's a percentage column
+            const isPercentage = key.includes("pct") || key.includes("percent");
+            if (isPercentage) {
+              return `${value.toFixed(1)}%`;
+            }
+            // Format large numbers
+            if (Math.abs(value) >= 1000000) {
+              return `${(value / 1000000).toFixed(2)}M`;
+            }
+            if (Math.abs(value) >= 1000) {
+              return `${(value / 1000).toFixed(2)}K`;
+            }
+            return value.toFixed(2);
+          }
+          return String(value);
+        };
+
+        // Helper to get readable column names
+        const getReadableColumnName = (key: string): string => {
+          const columnLabels: Record<string, string> = {
+            total_net_net_spend: "Net Net Spend",
+            total_addressable_net_net_spend: "Addressable Spend",
+            total_net_net_measured: "Measured Spend",
+            measured_spend_pct: "Measured %",
+            savings_value: "Savings",
+            savings_pct: "Savings %",
+            inflation_pct: "Inflation %",
+            inflation_migration_pct: "Inflation Mitigation %",
+            inflation_after_migration_pct: "Inflation After Mitigation %",
+            non_measured_spend: "Non-Measured Spend",
+            cumulative_savings_pct: "Cumulative %",
+          };
+          return (
+            columnLabels[key] ||
+            key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+          );
+        };
+
+        // Create table header
+        const thead = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        headerRow.style.cssText = `
+          background: #f8fafc;
+          border-bottom: 2px solid #e2e8f0;
+        `;
+
+        // Add "Name" column header
+        const nameHeader = document.createElement("th");
+        nameHeader.textContent = "Media Type";
+        nameHeader.style.cssText = `
+          padding: 8px 12px;
+          text-align: left;
+          font-weight: 600;
+          color: #475569;
+        `;
+        headerRow.appendChild(nameHeader);
+
+        // Add data column headers
+        const columnsToShow =
+          dataKeys || Object.keys(chartData[0]).filter((k) => k !== "name");
+        columnsToShow.forEach((key) => {
+          const th = document.createElement("th");
+          th.textContent = getReadableColumnName(key);
+          th.style.cssText = `
+            padding: 8px 12px;
+            text-align: right;
+            font-weight: 600;
+            color: #475569;
+          `;
+          headerRow.appendChild(th);
+        });
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Create table body
+        const tbody = document.createElement("tbody");
+        chartData.forEach((row, index) => {
+          const tr = document.createElement("tr");
+          tr.style.cssText = `
+            border-bottom: 1px solid #e2e8f0;
+            ${index % 2 === 0 ? "background: #ffffff;" : "background: #f8fafc;"}
+          `;
+
+          // Add name cell
+          const nameCell = document.createElement("td");
+          nameCell.textContent = row.name || "—";
+          nameCell.style.cssText = `
+            padding: 6px 12px;
+            font-weight: 500;
+            color: #1e293b;
+          `;
+          tr.appendChild(nameCell);
+
+          // Add data cells
+          columnsToShow.forEach((key) => {
+            const td = document.createElement("td");
+            td.textContent = formatValue(row[key], key);
+            td.style.cssText = `
+              padding: 6px 12px;
+              text-align: right;
+              color: #475569;
+            `;
+            tr.appendChild(td);
+          });
+
+          tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        tableContainer.appendChild(table);
+        wrapperElement.appendChild(tableContainer);
+      }
+
+      // Append wrapper to body (off-screen)
+      document.body.appendChild(wrapperElement);
+
+      // Use wrapper as capture target
+      elementToCapture = wrapperElement;
+
+      console.log("[captureChartAsBase64] Wrapper created:", {
+        width: wrapperElement.offsetWidth,
+        height: wrapperElement.offsetHeight,
+      });
+    }
+
     // Load html2canvas-pro
     console.log("[captureChartAsBase64] Loading html2canvas-pro...");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const html2canvas = (await import("html2canvas-pro" as any)).default;
 
     if (!html2canvas) {
-      throw new Error("html2canvas-pro failed to load or has no default export");
+      throw new Error(
+        "html2canvas-pro failed to load or has no default export",
+      );
     }
 
     console.log("[captureChartAsBase64] html2canvas-pro loaded successfully");
@@ -1076,12 +1274,18 @@ export async function captureChartAsBase64(
       useCORS: true,
     });
 
-    const canvas = await html2canvas(element, {
+    const canvas = await html2canvas(elementToCapture, {
       backgroundColor: "#ffffff",
       scale: 2, // Higher quality
       logging: false,
       useCORS: true,
     });
+
+    // Clean up wrapper if created
+    if (wrapperElement && document.body.contains(wrapperElement)) {
+      console.log("[captureChartAsBase64] Removing wrapper element...");
+      document.body.removeChild(wrapperElement);
+    }
 
     if (!canvas) {
       throw new Error("html2canvas returned null or undefined");
@@ -1098,7 +1302,9 @@ export async function captureChartAsBase64(
     const dataUrl = canvas.toDataURL("image/png");
 
     if (!dataUrl || !dataUrl.startsWith("data:image")) {
-      throw new Error(`Invalid data URL generated: ${dataUrl?.substring(0, 50)}...`);
+      throw new Error(
+        `Invalid data URL generated: ${dataUrl?.substring(0, 50)}...`,
+      );
     }
 
     console.log("[captureChartAsBase64] Data URL created successfully:", {
@@ -1110,7 +1316,10 @@ export async function captureChartAsBase64(
     return dataUrl;
   } catch (error: any) {
     console.error("=== [captureChartAsBase64] ERROR ===");
-    console.error("[captureChartAsBase64] Error type:", error?.constructor?.name);
+    console.error(
+      "[captureChartAsBase64] Error type:",
+      error?.constructor?.name,
+    );
     console.error("[captureChartAsBase64] Error message:", error?.message);
     console.error("[captureChartAsBase64] Error stack:", error?.stack);
     console.error("[captureChartAsBase64] Full error object:", error);

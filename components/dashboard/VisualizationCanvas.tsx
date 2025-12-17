@@ -29,10 +29,7 @@ import {
   Scatter,
   ReferenceLine,
 } from "recharts";
-import {
-  applyOthersLogic,
-  checkDataDensity,
-} from "./utils/dataProcessing";
+import { applyOthersLogic, checkDataDensity } from "./utils/dataProcessing";
 import { DataDensityWarning } from "./DataDensityWarning";
 import { GraphModal } from "./GraphModal";
 import { DashboardErrorState, DashboardEmptyState } from "./ErrorState";
@@ -62,6 +59,8 @@ interface VisualizationCanvasProps {
     graphId: string,
     graphTitle: string,
     element?: HTMLElement,
+    chartData?: Array<{ name: string; [key: string]: any }>,
+    dataKeys?: string[],
   ) => void;
   onUpdateSlideNumber?: (
     graphId: string,
@@ -134,7 +133,16 @@ export function VisualizationCanvas({
       setIsChartReady(!!chartOnlyRef.current);
     }, 300); // Increased timeout to ensure chart renders
     return () => clearTimeout(timer);
-  }, [selectedGraphType, client, market, period, apiData, trackerData, trackerSummaryData, isLoadingApiData]); // Re-check when these change
+  }, [
+    selectedGraphType,
+    client,
+    market,
+    period,
+    apiData,
+    trackerData,
+    trackerSummaryData,
+    isLoadingApiData,
+  ]); // Re-check when these change
 
   // Handle toggle with element ref - uses chartOnlyRef for clean capture without buttons
   const handleToggleForPPT = useCallback(() => {
@@ -1034,7 +1042,7 @@ export function VisualizationCanvas({
     }
 
     // Show message if trackers is selected but no market
-    if (dataSource === 'trackers' && !market) {
+    if (dataSource === "trackers" && !market) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center px-8">
           <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 mb-5">
@@ -1044,7 +1052,8 @@ export function VisualizationCanvas({
             Select a Market
           </h3>
           <p className="text-sm text-slate-500 max-w-md mb-6">
-            Trackers data requires a specific market to be selected. Please choose a market from the top bar to continue.
+            Trackers data requires a specific market to be selected. Please
+            choose a market from the top bar to continue.
           </p>
           <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
             <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -1219,12 +1228,13 @@ export function VisualizationCanvas({
       <button
         onClick={handleToggleForPPT}
         disabled={!isChartReady && !isIncludedInReport}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isIncludedInReport
-          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
-          : !isChartReady
-            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-            : "bg-slate-100 hover:bg-slate-200 text-slate-600"
-          }`}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+          isIncludedInReport
+            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
+            : !isChartReady
+              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+              : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+        }`}
         title={
           isIncludedInReport
             ? "Remove from PPT"

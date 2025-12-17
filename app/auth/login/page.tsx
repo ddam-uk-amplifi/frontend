@@ -48,8 +48,7 @@ function LoginForm() {
     const reason = searchParams.get("reason");
     if (reason) {
       const messages: Record<string, string> = {
-        authentication_required:
-          "Please sign in to access this page.",
+        authentication_required: "Please sign in to access this page.",
         session_expired: "Your session has expired. Please sign in again.",
         invalid_tokens: "Invalid authentication. Please sign in again.",
       };
@@ -179,7 +178,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

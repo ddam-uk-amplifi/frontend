@@ -156,16 +156,6 @@ export function GraphRecommendationsPanel({
       tooltip:
         "Use this to see if high Spend correlates with high CPU Index. Identify outliers and relationships between metrics.",
     },
-    {
-      id: "table",
-      name: "Table",
-      icon: Table2,
-      color: "#64748B",
-      description: "Detailed data view",
-      supportedFields: ["Any combination of fields"],
-      tooltip:
-        "View raw data with formatting. Best for detailed analysis, exporting, or when data density is too high for charts.",
-    },
   ];
 
   const getTotalSelected = () => {
@@ -279,11 +269,12 @@ export function GraphRecommendationsPanel({
                 onMouseLeave={() => setHoveredGraph(null)}
                 className={`
                   w-full p-3 rounded-xl border text-left transition-all relative
-                  ${selectedGraphType === graph.id
-                    ? "border-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 shadow-md shadow-violet-100"
-                    : isDisabled
-                      ? "border-slate-100 bg-slate-50/50 opacity-40 cursor-not-allowed"
-                      : "border-slate-200/60 hover:border-violet-300 hover:shadow-md bg-white cursor-pointer"
+                  ${
+                    selectedGraphType === graph.id
+                      ? "border-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 shadow-md shadow-violet-100"
+                      : isDisabled
+                        ? "border-slate-100 bg-slate-50/50 opacity-40 cursor-not-allowed"
+                        : "border-slate-200/60 hover:border-violet-300 hover:shadow-md bg-white cursor-pointer"
                   }
                 `}
               >

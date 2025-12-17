@@ -693,16 +693,16 @@ export function QueryBuilderPanel({
 
     for (const fieldId of allSelectedFieldIds) {
       const fieldType = getFieldType(fieldId);
-      if (fieldType === 'percentage') {
+      if (fieldType === "percentage") {
         hasPercentage = true;
-      } else if (fieldType === 'metric' || fieldType === 'index') {
+      } else if (fieldType === "metric" || fieldType === "index") {
         hasAbsolute = true;
       }
     }
 
     // Lock to first type selected
-    if (hasPercentage && !hasAbsolute) return 'percentage';
-    if (hasAbsolute && !hasPercentage) return 'absolute';
+    if (hasPercentage && !hasAbsolute) return "percentage";
+    if (hasAbsolute && !hasPercentage) return "absolute";
 
     // If mixed (shouldn't happen with this UI), no additional locking
     return null;
@@ -714,12 +714,12 @@ export function QueryBuilderPanel({
 
     const fieldType = getFieldType(fieldId);
 
-    if (lockedScaleType === 'percentage') {
+    if (lockedScaleType === "percentage") {
       // Only allow percentage fields when locked to percentage
-      return fieldType === 'metric' || fieldType === 'index';
-    } else if (lockedScaleType === 'absolute') {
+      return fieldType === "metric" || fieldType === "index";
+    } else if (lockedScaleType === "absolute") {
       // Only allow metric/index fields when locked to absolute
-      return fieldType === 'percentage';
+      return fieldType === "percentage";
     }
 
     return false;
@@ -785,15 +785,22 @@ export function QueryBuilderPanel({
                 return (
                   <button
                     key={field.id}
-                    onClick={() => !isDisabled && onFieldToggle(group.id, field.id)}
+                    onClick={() =>
+                      !isDisabled && onFieldToggle(group.id, field.id)
+                    }
                     disabled={isDisabled}
-                    title={isDisabled ? `Cannot mix ${lockedScaleType === 'percentage' ? 'absolute values' : 'percentages'} with ${lockedScaleType === 'percentage' ? 'percentages' : 'absolute values'}. Clear selection first.` : undefined}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${isSelected
-                      ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
-                      : isDisabled
-                        ? "bg-slate-100 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-50"
-                        : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
-                      }`}
+                    title={
+                      isDisabled
+                        ? `Cannot mix ${lockedScaleType === "percentage" ? "absolute values" : "percentages"} with ${lockedScaleType === "percentage" ? "percentages" : "absolute values"}. Clear selection first.`
+                        : undefined
+                    }
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                      isSelected
+                        ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
+                        : isDisabled
+                          ? "bg-slate-100 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-50"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
+                    }`}
                   >
                     <span className="text-sm">{field.label}</span>
                     <FieldTypeIndicator type={fieldType} />

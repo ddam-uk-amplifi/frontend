@@ -301,7 +301,8 @@ function ReportAutomationContent() {
     setFilesToReview([]);
 
     toast.success(
-      `${confirmedFiles.length} file${confirmedFiles.length > 1 ? "s" : ""
+      `${confirmedFiles.length} file${
+        confirmedFiles.length > 1 ? "s" : ""
       } ready to process`,
       {
         description: "Click 'Run Automation' to begin",
@@ -565,8 +566,8 @@ function ReportAutomationContent() {
             const batchProgressPct =
               status.total_files > 0
                 ? Math.round(
-                  (status.completed_files / status.total_files) * 100,
-                )
+                    (status.completed_files / status.total_files) * 100,
+                  )
                 : 0;
 
             // Update progress based on extracted_paths
@@ -629,8 +630,9 @@ function ReportAutomationContent() {
 
         if (successCount > 0) {
           toast.success("Extraction completed", {
-            description: `${successCount} file(s) extracted${failedCount > 0 ? `, ${failedCount} failed` : ""
-              } • Starting consolidation`,
+            description: `${successCount} file(s) extracted${
+              failedCount > 0 ? `, ${failedCount} failed` : ""
+            } • Starting consolidation`,
           });
 
           // Build final progress directly from marketsToUpload and finalStatus
@@ -793,15 +795,15 @@ function ReportAutomationContent() {
           const updated = prev.map((p) =>
             p.id === uploadId
               ? {
-                ...p,
-                status: "complete" as const,
-                progress: 100,
-                jobId: extractionData.job_id,
-                tablesExtracted: extractionData.tables_extracted || 0,
-                tableInfo: extractionData.table_info || [],
-                downloadUrl: extractionData.download_url,
-                extractedPath: extractionData.output_file, // Store for consolidation
-              }
+                  ...p,
+                  status: "complete" as const,
+                  progress: 100,
+                  jobId: extractionData.job_id,
+                  tablesExtracted: extractionData.tables_extracted || 0,
+                  tableInfo: extractionData.table_info || [],
+                  downloadUrl: extractionData.download_url,
+                  extractedPath: extractionData.output_file, // Store for consolidation
+                }
               : p,
           );
 
@@ -823,8 +825,9 @@ function ReportAutomationContent() {
           if (totalProcessed === expectedTotal && completedCount > 0) {
             console.log("🎯 All extractions done! Triggering consolidation...");
             toast.success("All files processed successfully", {
-              description: `${completedCount} file${completedCount > 1 ? "s" : ""
-                } extracted • Starting consolidation`,
+              description: `${completedCount} file${
+                completedCount > 1 ? "s" : ""
+              } extracted • Starting consolidation`,
             });
             // Trigger consolidation after a short delay to ensure UI updates
             setTimeout(() => handleConsolidation(updated), 500);
@@ -846,13 +849,13 @@ function ReportAutomationContent() {
           const updated = prev.map((p) =>
             p.id === uploadId
               ? {
-                ...p,
-                status: "failed" as const,
-                error:
-                  error.response?.data?.message ||
-                  error.response?.data?.detail ||
-                  "Upload failed",
-              }
+                  ...p,
+                  status: "failed" as const,
+                  error:
+                    error.response?.data?.message ||
+                    error.response?.data?.detail ||
+                    "Upload failed",
+                }
               : p,
           );
 
@@ -993,8 +996,9 @@ function ReportAutomationContent() {
     };
     return (
       <span
-        className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || "bg-gray-100 text-gray-700"
-          }`}
+        className={`px-3 py-1 rounded-full text-xs font-medium ${
+          styles[status as keyof typeof styles] || "bg-gray-100 text-gray-700"
+        }`}
       >
         {labels[status as keyof typeof labels] || status}
       </span>
@@ -1019,19 +1023,21 @@ function ReportAutomationContent() {
           <div className="flex gap-6">
             <button
               onClick={() => handleTabChange("data-upload")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors cursor-pointer ${activeTab === "data-upload"
+              className={`pb-3 px-1 text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "data-upload"
                   ? "text-blue-600 border-b-2 border-blue-600"
                   : "text-gray-500 hover:text-gray-700"
-                }`}
+              }`}
             >
               Data Upload
             </button>
             <button
               onClick={() => handleTabChange("history")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors cursor-pointer ${activeTab === "history"
+              className={`pb-3 px-1 text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "history"
                   ? "text-blue-600 border-b-2 border-blue-600"
                   : "text-gray-500 hover:text-gray-700"
-                }`}
+              }`}
             >
               History
             </button>
@@ -1142,10 +1148,11 @@ function ReportAutomationContent() {
                   {/* Dropzone Area - Compact */}
                   <div
                     {...getRootProps()}
-                    className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${isDragActive
+                    className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
+                      isDragActive
                         ? "border-blue-500 bg-blue-50"
                         : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50"
-                      }`}
+                    }`}
                   >
                     <input {...getInputProps()} />
                     <div className="flex flex-col items-center gap-2">
@@ -1230,10 +1237,10 @@ function ReportAutomationContent() {
                                   <span className="text-xs text-gray-500">
                                     {market.file
                                       ? (
-                                        market.file.size /
-                                        1024 /
-                                        1024
-                                      ).toFixed(1)
+                                          market.file.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(1)
                                       : "0"}{" "}
                                     MB
                                   </span>
@@ -1381,10 +1388,11 @@ function ReportAutomationContent() {
             {/* Consolidation Result */}
             {consolidationResult && (
               <div
-                className={`rounded-lg p-3 ${consolidationResult.error
+                className={`rounded-lg p-3 ${
+                  consolidationResult.error
                     ? "bg-red-50 border border-red-200"
                     : "bg-green-50 border border-green-200"
-                  }`}
+                }`}
               >
                 <div className="flex items-start gap-2.5">
                   <div className="flex-1">
@@ -1446,9 +1454,9 @@ function ReportAutomationContent() {
             {(markets.length > 0 || consolidationResult) && (
               <div className="flex justify-end gap-3">
                 {consolidationResult &&
-                  !consolidationResult.error &&
-                  (consolidationResult.excel_download_url ||
-                    consolidationResult.excel_path) ? (
+                !consolidationResult.error &&
+                (consolidationResult.excel_download_url ||
+                  consolidationResult.excel_path) ? (
                   <>
                     <button
                       onClick={() => handleDownloadConsolidation("excel")}
@@ -1469,24 +1477,24 @@ function ReportAutomationContent() {
                     </button>
                     {(consolidationResult.ppt_download_url ||
                       consolidationResult.ppt_path) && (
-                        <button
-                          onClick={() => handleDownloadConsolidation("ppt")}
-                          disabled={downloadingFile !== null}
-                          className="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {downloadingFile === "ppt" ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Downloading...
-                            </>
-                          ) : (
-                            <>
-                              <Download size={16} />
-                              Download PowerPoint
-                            </>
-                          )}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDownloadConsolidation("ppt")}
+                        disabled={downloadingFile !== null}
+                        className="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold shadow-sm cursor-pointer flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {downloadingFile === "ppt" ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={16} />
+                            Download PowerPoint
+                          </>
+                        )}
+                      </button>
+                    )}
                   </>
                 ) : (
                   markets.length > 0 && (
@@ -1604,8 +1612,8 @@ function ReportAutomationContent() {
                                   <div className="text-sm text-gray-600">
                                     {item.completed_date
                                       ? new Date(
-                                        item.completed_date,
-                                      ).toLocaleDateString()
+                                          item.completed_date,
+                                        ).toLocaleDateString()
                                       : "-"}
                                   </div>
                                 </td>
@@ -1663,8 +1671,9 @@ function ReportAutomationContent() {
                                           aria-controls={`history-row-${rowKey}`}
                                         >
                                           <span
-                                            className={`block transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
-                                              }`}
+                                            className={`block transition-transform duration-200 ${
+                                              isExpanded ? "rotate-180" : ""
+                                            }`}
                                           >
                                             <ChevronDown size={16} />
                                           </span>
@@ -1702,10 +1711,11 @@ function ReportAutomationContent() {
                                                   (tracker, trackerIndex) => (
                                                     <tr
                                                       key={`${tracker.market_code}-${tracker.file_name}-${trackerIndex}`}
-                                                      className={`bg-white ${trackerIndex !== 0
+                                                      className={`bg-white ${
+                                                        trackerIndex !== 0
                                                           ? "border-t border-gray-200"
                                                           : ""
-                                                        }`}
+                                                      }`}
                                                     >
                                                       <td className="w-1/2 px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
@@ -1788,8 +1798,7 @@ function ReportAutomationContent() {
                   </div>
                 )}
               </>
-
-)}
+            )}
           </div>
         ) : null}
       </div>

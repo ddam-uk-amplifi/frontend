@@ -58,7 +58,9 @@ export function AppLayout({ children }: AppLayoutProps) {
             <SidebarTrigger className="-ml-1" />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 overflow-hidden">{children}</div>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 overflow-hidden">
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

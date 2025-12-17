@@ -24,6 +24,8 @@ interface GraphTitleDialogState {
   graphId: string;
   defaultTitle: string;
   element?: HTMLElement;
+  chartData?: Array<{ name: string; [key: string]: any }>;
+  dataKeys?: string[];
 }
 
 // Client ID mapping - used for tracker API calls
@@ -46,7 +48,7 @@ export default function Dashboard() {
     Record<string, string[]>
   >({});
   const [selectedGraphType, setSelectedGraphType] = useState<string | null>(
-    null
+    null,
   );
   const [isRecommendationsPanelOpen, setIsRecommendationsPanelOpen] =
     useState(false);
@@ -139,11 +141,22 @@ export default function Dashboard() {
 
   // PPT Functions - capture base64 immediately when user selects a graph
   const handleToggleGraphForPPT = useCallback(
-    async (graphId: string, graphTitle: string, element?: HTMLElement) => {
+    async (
+      graphId: string,
+      graphTitle: string,
+      element?: HTMLElement,
+      chartData?: Array<{ name: string; [key: string]: any }>,
+      dataKeys?: string[],
+    ) => {
       console.log("=== [handleToggleGraphForPPT] CALLED ===");
       console.log("[handleToggleGraphForPPT] Graph ID:", graphId);
       console.log("[handleToggleGraphForPPT] Graph Title:", graphTitle);
       console.log("[handleToggleGraphForPPT] Element provided:", !!element);
+      console.log(
+        "[handleToggleGraphForPPT] Chart data provided:",
+        !!chartData,
+      );
+      console.log("[handleToggleGraphForPPT] Data keys:", dataKeys);
       console.log("[handleToggleGraphForPPT] Element details:", {
         tagName: element?.tagName,
         className: element?.className,
@@ -154,7 +167,9 @@ export default function Dashboard() {
 
       // Check if already selected (toggling off)
       if (isGraphSelected(graphId)) {
-        console.log("[handleToggleGraphForPPT] Graph already selected, removing...");
+        console.log(
+          "[handleToggleGraphForPPT] Graph already selected, removing...",
+        );
         removeGraph(graphId);
         chartElementRefs.current.delete(graphId);
         toast.info("Graph removed from PPT report");
@@ -165,7 +180,7 @@ export default function Dashboard() {
       if (!element) {
         console.error(
           "[handleToggleGraphForPPT] ERROR: No element provided for graph:",
-          graphId
+          graphId,
         );
         toast.error("Could not capture chart. Please try again.");
         return;
@@ -178,16 +193,18 @@ export default function Dashboard() {
         graphId,
         defaultTitle: graphTitle,
         element,
+        chartData,
+        dataKeys,
       });
       console.log("=== [handleToggleGraphForPPT] END ===");
     },
-    [isGraphSelected, removeGraph]
+    [isGraphSelected, removeGraph],
   );
 
   // Actually add the graph to PPT after user confirms title and slide number
   const handleConfirmGraphTitle = useCallback(
     async (customTitle: string, slideNumber?: number) => {
-      const { graphId, element } = graphTitleDialog;
+      const { graphId, element, chartData, dataKeys } = graphTitleDialog;
 
       if (!element) {
         toast.error("Could not capture chart. Please try again.");
@@ -202,6 +219,11 @@ export default function Dashboard() {
         console.log("[handleConfirmGraphTitle] Graph ID:", graphId);
         console.log("[handleConfirmGraphTitle] Custom Title:", customTitle);
         console.log("[handleConfirmGraphTitle] Slide Number:", slideNumber);
+        console.log(
+          "[handleConfirmGraphTitle] Chart data provided:",
+          !!chartData,
+        );
+        console.log("[handleConfirmGraphTitle] Data keys:", dataKeys);
         console.log("[handleConfirmGraphTitle] Element:", {
           tagName: element?.tagName,
           className: element?.className,
@@ -212,11 +234,21 @@ export default function Dashboard() {
           throw new Error("Element is undefined or null");
         }
 
-        console.log("[handleConfirmGraphTitle] Calling captureChartAsBase64...");
-        const imageBase64 = await captureChartAsBase64(element);
+        console.log(
+          "[handleConfirmGraphTitle] Calling captureChartAsBase64...",
+        );
+        // Note: We don't pass chartData/dataKeys anymore - values are shown directly on charts
+        // (bar charts have labels above bars, pie/donut have legends with values)
+        const imageBase64 = await captureChartAsBase64(element, customTitle);
         console.log("[handleConfirmGraphTitle] Capture successful!");
-        console.log("[handleConfirmGraphTitle] Image length:", imageBase64.length);
-        console.log("[handleConfirmGraphTitle] Image prefix:", imageBase64.substring(0, 50));
+        console.log(
+          "[handleConfirmGraphTitle] Image length:",
+          imageBase64.length,
+        );
+        console.log(
+          "[handleConfirmGraphTitle] Image prefix:",
+          imageBase64.substring(0, 50),
+        );
 
         // Add to Zustand store
         console.log("[handleConfirmGraphTitle] Adding to store...");
@@ -233,14 +265,20 @@ export default function Dashboard() {
         toast.success(
           slideNumber
             ? `Graph added to PPT report (Slide ${slideNumber})`
-            : "Graph added to PPT report"
+            : "Graph added to PPT report",
         );
         setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
         console.log("=== [handleConfirmGraphTitle] SUCCESS ===");
       } catch (error: any) {
         console.error("=== [handleConfirmGraphTitle] ERROR ===");
-        console.error("[handleConfirmGraphTitle] Error type:", error?.constructor?.name);
-        console.error("[handleConfirmGraphTitle] Error message:", error?.message);
+        console.error(
+          "[handleConfirmGraphTitle] Error type:",
+          error?.constructor?.name,
+        );
+        console.error(
+          "[handleConfirmGraphTitle] Error message:",
+          error?.message,
+        );
         console.error("[handleConfirmGraphTitle] Error stack:", error?.stack);
         console.error("[handleConfirmGraphTitle] Full error:", error);
         console.error("=== [handleConfirmGraphTitle] END ERROR ===");
@@ -252,14 +290,14 @@ export default function Dashboard() {
 
         toast.error(errorMessage, {
           duration: 5000,
-          description: "Check console for detailed error logs"
+          description: "Check console for detailed error logs",
         });
         setGraphTitleDialog({ isOpen: false, graphId: "", defaultTitle: "" });
       } finally {
         setIsAddingGraph(false);
       }
     },
-    [graphTitleDialog, addGraph]
+    [graphTitleDialog, addGraph],
   );
 
   // Register a chart element for later capture
@@ -271,21 +309,21 @@ export default function Dashboard() {
         chartElementRefs.current.delete(graphId);
       }
     },
-    []
+    [],
   );
 
   const handleUpdateSlideNumber = useCallback(
     (graphId: string, slideNumber: number | undefined) => {
       updateSlideNumberInStore(graphId, slideNumber);
     },
-    [updateSlideNumberInStore]
+    [updateSlideNumberInStore],
   );
 
   const getSlideNumber = useCallback(
     (graphId: string) => {
       return getGraph(graphId)?.slideNumber;
     },
-    [getGraph]
+    [getGraph],
   );
 
   const handleGenerateReport = () => {
@@ -296,7 +334,7 @@ export default function Dashboard() {
     console.log("[handleConfirmGenerate] Called!");
     console.log(
       "[handleConfirmGenerate] selectedGraphsForPPT:",
-      Array.from(selectedGraphsForPPT)
+      Array.from(selectedGraphsForPPT),
     );
     console.log("[handleConfirmGenerate] selectedClient:", selectedClient);
 
@@ -319,7 +357,7 @@ export default function Dashboard() {
       // Build chart images from stored base64 (captured when user selected each graph)
       const chartImages: ChartImageForPPT[] = [];
       console.log(
-        "[handleConfirmGenerate] Building chart images from stored base64..."
+        "[handleConfirmGenerate] Building chart images from stored base64...",
       );
 
       for (const graphId of selectedGraphsForPPT) {
@@ -329,7 +367,7 @@ export default function Dashboard() {
 
         if (!metadata?.imageBase64) {
           console.warn(
-            `[handleConfirmGenerate] No image found for graph ${graphId}, skipping...`
+            `[handleConfirmGenerate] No image found for graph ${graphId}, skipping...`,
           );
           continue;
         }
@@ -340,25 +378,25 @@ export default function Dashboard() {
           title: metadata.title || graphId,
         });
         console.log(
-          `[handleConfirmGenerate] Added to chartImages. Total: ${chartImages.length}`
+          `[handleConfirmGenerate] Added to chartImages. Total: ${chartImages.length}`,
         );
       }
 
       console.log(
         "[handleConfirmGenerate] Total chartImages:",
-        chartImages.length
+        chartImages.length,
       );
       chartImages.forEach((img, i) => {
         console.log(
           `[handleConfirmGenerate] Chart ${i}: slide_index=${
             img.slide_index
-          }, title=${img.title}, imageSize=${img.image_base64?.length || 0}`
+          }, title=${img.title}, imageSize=${img.image_base64?.length || 0}`,
         );
       });
 
       if (chartImages.length === 0) {
         console.log(
-          "[handleConfirmGenerate] No chart images available, aborting"
+          "[handleConfirmGenerate] No chart images available, aborting",
         );
         toast.dismiss(loadingToast);
         toast.error("No chart images available. Please re-select your charts.");
@@ -380,25 +418,36 @@ export default function Dashboard() {
       if (response.charts_placed > 0) {
         toast.success(
           `PowerPoint generated successfully! ${response.charts_placed} chart(s) placed.`,
-          { duration: 5000 }
+          { duration: 5000 },
         );
 
         // Download the file
         if (response.download_url || response.output_path) {
           try {
             console.log("[handleConfirmGenerate] Starting download...");
-            console.log("[handleConfirmGenerate] Download URL:", response.download_url);
-            console.log("[handleConfirmGenerate] Output path:", response.output_path);
+            console.log(
+              "[handleConfirmGenerate] Download URL:",
+              response.download_url,
+            );
+            console.log(
+              "[handleConfirmGenerate] Output path:",
+              response.output_path,
+            );
 
             // If it's an S3 URL, just open it directly (browser will handle download)
             // The presigned URL already has auth built-in
-            if (response.download_url && response.download_url.startsWith("https://")) {
+            if (
+              response.download_url &&
+              response.download_url.startsWith("https://")
+            ) {
               console.log("[handleConfirmGenerate] Using direct S3 download");
 
               // Create a temporary anchor element to trigger download
               const a = document.createElement("a");
               a.href = response.download_url;
-              a.download = response.output_path.split("/").pop() || "dashboard_export.pptx";
+              a.download =
+                response.output_path.split("/").pop() ||
+                "dashboard_export.pptx";
 
               // Some browsers require the element to be in the DOM
               document.body.appendChild(a);
@@ -409,11 +458,16 @@ export default function Dashboard() {
                 document.body.removeChild(a);
               }, 100);
 
-              console.log("[handleConfirmGenerate] Download triggered successfully");
+              console.log(
+                "[handleConfirmGenerate] Download triggered successfully",
+              );
             } else {
               // Fallback: proxy through backend
-              console.log("[handleConfirmGenerate] Using backend proxy download");
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+              console.log(
+                "[handleConfirmGenerate] Using backend proxy download",
+              );
+              const apiUrl =
+                process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
               const downloadUrl = response.download_url?.startsWith("http")
                 ? response.download_url
                 : `${apiUrl}${response.download_url || response.output_path}`;
@@ -429,31 +483,43 @@ export default function Dashboard() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = response.output_path.split("/").pop() || "dashboard_export.pptx";
+                a.download =
+                  response.output_path.split("/").pop() ||
+                  "dashboard_export.pptx";
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
-                console.log("[handleConfirmGenerate] Download completed via proxy");
+                console.log(
+                  "[handleConfirmGenerate] Download completed via proxy",
+                );
               } else {
-                console.error("[handleConfirmGenerate] Download failed:", downloadResponse.status);
+                console.error(
+                  "[handleConfirmGenerate] Download failed:",
+                  downloadResponse.status,
+                );
                 toast.error("Failed to download PowerPoint file");
               }
             }
           } catch (downloadError: any) {
-            console.error("[handleConfirmGenerate] Download error:", downloadError);
-            toast.error(`Failed to download: ${downloadError.message || 'Unknown error'}`);
+            console.error(
+              "[handleConfirmGenerate] Download error:",
+              downloadError,
+            );
+            toast.error(
+              `Failed to download: ${downloadError.message || "Unknown error"}`,
+            );
           }
         }
       } else {
         toast.warning(
-          "PowerPoint generated but no charts were placed successfully."
+          "PowerPoint generated but no charts were placed successfully.",
         );
       }
 
       if (response.charts_failed > 0) {
         toast.warning(
-          `${response.charts_failed} chart(s) failed to be placed.`
+          `${response.charts_failed} chart(s) failed to be placed.`,
         );
       }
 
@@ -468,7 +534,7 @@ export default function Dashboard() {
       toast.error(
         error instanceof Error
           ? `Failed to generate PowerPoint: ${error.message}`
-          : "Failed to generate PowerPoint. Please try again."
+          : "Failed to generate PowerPoint. Please try again.",
       );
     } finally {
       setIsGeneratingPPT(false);
