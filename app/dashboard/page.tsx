@@ -537,6 +537,8 @@ export default function Dashboard() {
         <div className="flex-1 overflow-hidden">
           <TableDashboardView
             selectedClient={selectedClient}
+            selectedDataSource={selectedDataSource}
+            selectedMarket={selectedMarket}
             selectedGraphsForPPT={selectedGraphsForPPT}
             onToggleGraphForPPT={handleToggleGraphForPPT}
             onUpdateSlideNumber={handleUpdateSlideNumber}

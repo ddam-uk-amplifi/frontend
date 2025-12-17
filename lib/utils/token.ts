@@ -2,6 +2,8 @@
  * Centralized token management utilities
  */
 
+import { cookieUtils } from "./cookies";
+
 export const TOKEN_KEYS = {
   ACCESS: "access_token",
   REFRESH: "refresh_token",
@@ -25,7 +27,7 @@ export const tokenUtils = {
   },
 
   /**
-   * Store tokens in localStorage with error handling
+   * Store tokens in localStorage and cookies with error handling
    */
   setTokens: (accessToken: string, refreshToken: string): void => {
     if (typeof window === "undefined") return;
@@ -33,6 +35,9 @@ export const tokenUtils = {
     try {
       localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
       localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
+
+      // Also set cookies for server-side middleware access
+      cookieUtils.setAuthCookies(accessToken, refreshToken);
 
       // Verify tokens were stored correctly
       const storedAccess = localStorage.getItem(TOKEN_KEYS.ACCESS);
@@ -43,6 +48,7 @@ export const tokenUtils = {
         // Retry once
         localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
         localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
+        cookieUtils.setAuthCookies(accessToken, refreshToken);
       }
     } catch (error) {
       console.error("Failed to store tokens in localStorage:", error);
@@ -51,6 +57,7 @@ export const tokenUtils = {
         localStorage.clear();
         localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
         localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
+        cookieUtils.setAuthCookies(accessToken, refreshToken);
       } catch (retryError) {
         console.error(
           "Critical: Unable to store authentication tokens:",
@@ -61,12 +68,15 @@ export const tokenUtils = {
   },
 
   /**
-   * Clear all tokens from localStorage
+   * Clear all tokens from localStorage and cookies
    */
   clearTokens: (): void => {
     if (typeof window === "undefined") return;
     localStorage.removeItem(TOKEN_KEYS.ACCESS);
     localStorage.removeItem(TOKEN_KEYS.REFRESH);
+
+    // Also clear cookies
+    cookieUtils.clearAuthCookies();
   },
 
   /**

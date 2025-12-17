@@ -17,6 +17,8 @@ interface TableRow {
 
 interface TableDashboardViewProps {
   selectedClient: string;
+  selectedDataSource?: "summary" | "trackers" | "";
+  selectedMarket?: string; // From TopBar for trackers
   selectedGraphsForPPT?: Set<string> | string[]; // Support both Set and Array (Zustand persist serialization)
   onToggleGraphForPPT?: (
     graphId: string,
@@ -29,6 +31,8 @@ interface TableDashboardViewProps {
 
 export function TableDashboardView({
   selectedClient,
+  selectedDataSource = "",
+  selectedMarket = "",
   selectedGraphsForPPT = new Set(),
   onToggleGraphForPPT,
   onUpdateSlideNumber,
@@ -42,8 +46,8 @@ export function TableDashboardView({
     setSelectedRows(rows);
   }, []);
 
-  // Show empty state when no client is selected
-  if (!selectedClient) {
+  // Show empty state when no client or data source is selected
+  if (!selectedClient || !selectedDataSource) {
     return (
       <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50 max-w-full">
         {/* Empty State Message */}
@@ -52,10 +56,13 @@ export function TableDashboardView({
             <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Database className="w-8 h-8 text-violet-600" />
             </div>
-            <h3 className="text-slate-900 mb-2">No Client Selected</h3>
+            <h3 className="text-slate-900 mb-2">
+              {!selectedClient ? "No Client Selected" : "No Data Source Selected"}
+            </h3>
             <p className="text-slate-600 text-sm">
-              Select a client from the dropdown above to view the data overview
-              table and interactive charts.
+              {!selectedClient
+                ? "Select a client from the dropdown above to view the data overview table and interactive charts."
+                : "Select a data source (Summary or Trackers) to view data."}
             </p>
           </div>
         </div>
@@ -79,7 +86,12 @@ export function TableDashboardView({
     <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-50 isolate max-w-full">
       {/* Data Table */}
       <div className="overflow-hidden max-w-full">
-        <DataTableView selectedClient={selectedClient} onDataChange={handleDataChange} />
+        <DataTableView
+          selectedClient={selectedClient}
+          selectedDataSource={selectedDataSource}
+          selectedMarket={selectedMarket}
+          onDataChange={handleDataChange}
+        />
       </div>
 
       {/* Visualization Section - Always Visible Below Table */}
