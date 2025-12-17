@@ -17,7 +17,7 @@ interface TableRow {
 
 interface TableDashboardViewProps {
   selectedClient: string;
-  selectedGraphsForPPT?: Set<string>;
+  selectedGraphsForPPT?: Set<string> | string[]; // Support both Set and Array (Zustand persist serialization)
   onToggleGraphForPPT?: (
     graphId: string,
     graphTitle: string,

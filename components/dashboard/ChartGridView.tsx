@@ -56,7 +56,7 @@ interface TableRow {
 interface ChartGridViewProps {
   columns: string[];
   rows: TableRow[];
-  selectedGraphsForPPT?: Set<string>;
+  selectedGraphsForPPT?: Set<string> | string[]; // Support both Set and Array (Zustand persist serialization)
   onToggleGraphForPPT?: (
     graphId: string,
     graphTitle: string,
@@ -244,8 +244,18 @@ export function ChartGridView({
   );
 
   // Check if a chart is included in PPT
+  // Handle both Set and Array types (Zustand persist may serialize Set to Array)
   const isChartInPPT = useCallback(
-    (chartId: string) => selectedGraphsForPPT.has(chartId),
+    (chartId: string) => {
+      if (!selectedGraphsForPPT) return false;
+      if (selectedGraphsForPPT instanceof Set) {
+        return selectedGraphsForPPT.has(chartId);
+      }
+      if (Array.isArray(selectedGraphsForPPT)) {
+        return selectedGraphsForPPT.includes(chartId);
+      }
+      return false;
+    },
     [selectedGraphsForPPT]
   );
 

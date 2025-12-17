@@ -1788,7 +1788,8 @@ function ReportAutomationContent() {
                   </div>
                 )}
               </>
-            )}
+
+)}
           </div>
         ) : null}
       </div>
