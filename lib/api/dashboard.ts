@@ -690,6 +690,7 @@ export async function fetchTrackerComplete(
  * This is different from media-specific data (TV, Print, etc.)
  * Returns aggregated spend data by media type
  * @param markets - Comma-separated market codes (e.g., "UK,DK,SE")
+ * @param period - Period filter (e.g., "Jan", "Feb", "YTD")
  */
 export async function fetchTrackerSummaryData(
   clientName: string,
@@ -697,6 +698,7 @@ export async function fetchTrackerSummaryData(
   marketId?: number,
   mediaType?: string,
   markets?: string,
+  period?: string,
 ): Promise<TrackerSummaryItem[]> {
   const queryParams = new URLSearchParams({
     client_id: clientId.toString(),
@@ -711,6 +713,10 @@ export async function fetchTrackerSummaryData(
 
   if (mediaType) {
     queryParams.append("media_type", mediaType);
+  }
+
+  if (period) {
+    queryParams.append("period", period);
   }
 
   const response = await apiClient.get<TrackerSummaryItem[]>(

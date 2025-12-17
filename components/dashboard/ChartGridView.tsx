@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Maximize2, X, FileText, Check } from "lucide-react";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import {
   BarChart,
@@ -11,6 +10,8 @@ import {
   Pie,
   LineChart as RechartsLineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,27 +20,23 @@ import {
   ResponsiveContainer,
   Cell,
   ComposedChart,
-  Scatter as RechartsScatter,
-  ScatterChart,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
 } from "recharts";
 
-export interface ChartConfig {
+// ============================================================================
+// Types
+// ============================================================================
+
+type ChartType = "bar" | "pie" | "donut" | "line" | "area" | "stacked-bar" | "horizontal-bar" | "combo" | "radar" | "grouped-bar";
+
+interface ChartConfig {
   id: string;
   title: string;
-  type:
-    | "donut-pie"
-    | "pie"
-    | "column"
-    | "stacked-bar"
-    | "clustered-bar"
-    | "pareto"
-    | "bar-line-combo"
-    | "scatter"
-    | "scatter-line"
-    | "scatter-line-markers";
-  dataKey: string;
-  secondaryDataKey?: string;
-  categoryKey: string;
+  type: ChartType;
+  dataKeys: string[];
   colors: string[];
 }
 
@@ -48,174 +45,227 @@ interface TableRow {
   mediaType: string;
   type: "Actual" | "Planned";
   level: number;
-  isExpanded?: boolean;
-  hasChildren?: boolean;
   data: Record<string, any>;
 }
 
 interface ChartGridViewProps {
   columns: string[];
   rows: TableRow[];
-  selectedGraphsForPPT?: Set<string> | string[]; // Support both Set and Array (Zustand persist serialization)
-  onToggleGraphForPPT?: (
-    graphId: string,
-    graphTitle: string,
-    element?: HTMLElement
-  ) => void;
+  selectedGraphsForPPT?: Set<string> | string[];
+  onToggleGraphForPPT?: (graphId: string, graphTitle: string, element?: HTMLElement) => void;
   onUpdateSlideNumber?: (graphId: string, slideNumber: number | undefined) => void;
   getSlideNumber?: (graphId: string) => number | undefined;
 }
 
-// Define the 10 chart types
-const CHART_TYPES: Omit<ChartConfig, "id">[] = [
-  {
-    title: "Share of Spend by Media Type",
-    type: "donut-pie",
-    dataKey: "shareOfSpend",
-    categoryKey: "mediaType",
-    colors: [
-      "#8B5CF6",
-      "#A78BFA",
-      "#C4B5FD",
-      "#DDD6FE",
-      "#EDE9FE",
-      "#F5F3FF",
-      "#FAF5FF",
-      "#FDFCFE",
-    ],
-  },
-  {
-    title: "Media Distribution (2D Pie)",
-    type: "pie",
-    dataKey: "shareOfSpend",
-    categoryKey: "mediaType",
-    colors: [
-      "#8B5CF6",
-      "#A78BFA",
-      "#C4B5FD",
-      "#DDD6FE",
-      "#EDE9FE",
-      "#F5F3FF",
-      "#FAF5FF",
-      "#FDFCFE",
-    ],
-  },
-  {
-    title: "Media Net by Type",
-    type: "column",
-    dataKey: "mediaNet",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6"],
-  },
-  {
-    title: "Addressable Spend Breakdown",
-    type: "stacked-bar",
-    dataKey: "addressable",
-    secondaryDataKey: "nonAddressable",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#DDD6FE"],
-  },
-  {
-    title: "Actual vs Planned Comparison",
-    type: "clustered-bar",
-    dataKey: "mediaNet",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#C084FC"],
-  },
-  {
-    title: "Spend Pareto Analysis",
-    type: "pareto",
-    dataKey: "mediaNet",
-    secondaryDataKey: "shareOfSpend",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#F472B6"],
-  },
-  {
-    title: "Spend & Share Combination",
-    type: "bar-line-combo",
-    dataKey: "mediaNet",
-    secondaryDataKey: "shareOfSpend",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#F472B6"],
-  },
-  {
-    title: "Addressable vs Audited",
-    type: "scatter",
-    dataKey: "addressable",
-    secondaryDataKey: "audited",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#A78BFA", "#C4B5FD", "#DDD6FE"],
-  },
-  {
-    title: "Addressable vs Audited (With Lines)",
-    type: "scatter-line",
-    dataKey: "addressable",
-    secondaryDataKey: "audited",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#A78BFA", "#C4B5FD", "#DDD6FE"],
-  },
-  {
-    title: "Addressable vs Audited (Lines & Markers)",
-    type: "scatter-line-markers",
-    dataKey: "addressable",
-    secondaryDataKey: "audited",
-    categoryKey: "mediaType",
-    colors: ["#8B5CF6", "#A78BFA", "#C4B5FD", "#DDD6FE"],
-  },
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const CHART_COLORS = [
+  "#8B5CF6", "#A78BFA", "#C4B5FD", "#7C3AED", "#6D28D9",
+  "#5B21B6", "#4C1D95", "#DDD6FE", "#EDE9FE", "#F5F3FF",
 ];
 
-// Dummy sample data for preview when no client is selected
-const DUMMY_SAMPLE_DATA = {
-  pie: [
-    { name: "TV", value: 35 },
-    { name: "Digital", value: 40 },
-    { name: "OOH", value: 12 },
-    { name: "Radio", value: 8 },
-    { name: "Print", value: 5 },
-  ],
-  column: [
-    { name: "TV", value: 1200000 },
-    { name: "Digital", value: 1400000 },
-    { name: "OOH", value: 400000 },
-    { name: "Radio", value: 250000 },
-    { name: "Print", value: 150000 },
-  ],
-  clustered: [
-    { name: "TV", actual: 1200000, planned: 1190000 },
-    { name: "Digital", actual: 1400000, planned: 1450000 },
-    { name: "OOH", actual: 400000, planned: 380000 },
-    { name: "Radio", actual: 250000, planned: 240000 },
-    { name: "Print", actual: 150000, planned: 140000 },
-  ],
-  stacked: [
-    { name: "TV", primary: 600000, secondary: 600000 },
-    { name: "Digital", primary: 700000, secondary: 700000 },
-    { name: "OOH", primary: 200000, secondary: 200000 },
-    { name: "Radio", primary: 125000, secondary: 125000 },
-    { name: "Print", primary: 75000, secondary: 75000 },
-  ],
-  combo: [
-    { name: "TV", value: 1200000, percentage: 35 },
-    { name: "Digital", value: 1400000, percentage: 40 },
-    { name: "OOH", value: 400000, percentage: 12 },
-    { name: "Radio", value: 250000, percentage: 8 },
-    { name: "Print", value: 150000, percentage: 5 },
-  ],
-  pareto: [
-    { name: "Digital", value: 1400000, percentage: 40, cumulative: 40 },
-    { name: "TV", value: 1200000, percentage: 35, cumulative: 75 },
-    { name: "OOH", value: 400000, percentage: 12, cumulative: 87 },
-    { name: "Radio", value: 250000, percentage: 8, cumulative: 95 },
-    { name: "Print", value: 150000, percentage: 5, cumulative: 100 },
-  ],
-  scatter: [
-    { name: "TV", x: 600000000, y: 600000000, z: 100 },
-    { name: "Digital", x: 700000000, y: 700000000, z: 100 },
-    { name: "OOH", x: 200000000, y: 200000000, z: 100 },
-    { name: "Radio", x: 125000000, y: 125000000, z: 100 },
-    { name: "Print", x: 75000000, y: 75000000, z: 100 },
-  ],
+const COLUMN_LABELS: Record<string, string> = {
+  total_net_net_spend: "Net Net Spend",
+  total_addressable_net_net_spend: "Addressable Spend",
+  total_net_net_measured: "Measured Spend",
+  measured_spend_pct: "Measured %",
+  savings_value: "Savings",
+  savings_pct: "Savings %",
+  inflation_pct: "Inflation %",
+  inflation_migration_pct: "Inflation Mitigation",
+  inflation_after_migration_pct: "Inflation After Mitigation %",
+  total_non_addressable_spend: "Non-Addressable",
+  total_addressable_spend: "Addressable",
+  measured_spend: "Measured Spend",
+  benchmark_equivalent_net_net_spend: "Benchmark Spend",
+  value_loss: "Value Loss",
+  value_loss_pct: "Value Loss %",
 };
+
+const getColumnLabel = (col: string) => COLUMN_LABELS[col] || col;
+
+// ============================================================================
+// Chart Generation Logic
+// ============================================================================
+
+function generateChartConfigs(columns: string[]): ChartConfig[] {
+  // Filter out non-numeric columns
+  const numericCols = columns.filter((col) => col !== "mediaType");
+  if (numericCols.length === 0) return [];
+
+  const charts: ChartConfig[] = [];
+  let chartIndex = 0;
+
+  // 1. Bar Chart - First numeric column
+  if (numericCols[0]) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} by Media Type`,
+      type: "bar",
+      dataKeys: [numericCols[0]],
+      colors: [CHART_COLORS[0]],
+    });
+  }
+
+  // 2. Pie Chart - First numeric column distribution
+  if (numericCols[0]) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} Distribution`,
+      type: "pie",
+      dataKeys: [numericCols[0]],
+      colors: CHART_COLORS,
+    });
+  }
+
+  // 3. Donut Chart - Second numeric column or first
+  const donutCol = numericCols[1] || numericCols[0];
+  if (donutCol) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(donutCol)} Share`,
+      type: "donut",
+      dataKeys: [donutCol],
+      colors: CHART_COLORS,
+    });
+  }
+
+  // 4. Horizontal Bar - Third column or first
+  const hBarCol = numericCols[2] || numericCols[0];
+  if (hBarCol) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(hBarCol)} Comparison`,
+      type: "horizontal-bar",
+      dataKeys: [hBarCol],
+      colors: [CHART_COLORS[3]],
+    });
+  }
+
+  // 5. Stacked Bar - Two columns if available
+  if (numericCols.length >= 2) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} vs ${getColumnLabel(numericCols[1])}`,
+      type: "stacked-bar",
+      dataKeys: [numericCols[0], numericCols[1]],
+      colors: [CHART_COLORS[0], CHART_COLORS[2]],
+    });
+  } else if (numericCols[0]) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} Stacked`,
+      type: "bar",
+      dataKeys: [numericCols[0]],
+      colors: [CHART_COLORS[0]],
+    });
+  }
+
+  // 6. Line Chart - Trend view
+  const lineCol = numericCols[3] || numericCols[0];
+  if (lineCol) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(lineCol)} Trend`,
+      type: "line",
+      dataKeys: [lineCol],
+      colors: [CHART_COLORS[4]],
+    });
+  }
+
+  // 7. Area Chart
+  const areaCol = numericCols[4] || numericCols[1] || numericCols[0];
+  if (areaCol) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(areaCol)} Area`,
+      type: "area",
+      dataKeys: [areaCol],
+      colors: [CHART_COLORS[1]],
+    });
+  }
+
+  // 8. Combo Chart - Bar + Line
+  if (numericCols.length >= 2) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} & ${getColumnLabel(numericCols[1])} Combo`,
+      type: "combo",
+      dataKeys: [numericCols[0], numericCols[1]],
+      colors: [CHART_COLORS[0], CHART_COLORS[5]],
+    });
+  } else if (numericCols[0]) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} Overview`,
+      type: "bar",
+      dataKeys: [numericCols[0]],
+      colors: [CHART_COLORS[0]],
+    });
+  }
+
+  // 9. Radar Chart - Multiple metrics
+  const radarCols = numericCols.slice(0, Math.min(5, numericCols.length));
+  if (radarCols.length >= 2) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: "Multi-Metric Radar",
+      type: "radar",
+      dataKeys: radarCols,
+      colors: [CHART_COLORS[0]],
+    });
+  } else if (numericCols[0]) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} Radar`,
+      type: "radar",
+      dataKeys: [numericCols[0]],
+      colors: [CHART_COLORS[0]],
+    });
+  }
+
+  // 10. Grouped Bar - Compare multiple metrics
+  if (numericCols.length >= 2) {
+    const groupedCols = numericCols.slice(0, Math.min(3, numericCols.length));
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: "Metrics Comparison",
+      type: "grouped-bar",
+      dataKeys: groupedCols,
+      colors: groupedCols.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+    });
+  } else if (numericCols[0]) {
+    charts.push({
+      id: `chart-${chartIndex++}`,
+      title: `${getColumnLabel(numericCols[0])} Summary`,
+      type: "bar",
+      dataKeys: [numericCols[0]],
+      colors: [CHART_COLORS[0]],
+    });
+  }
+
+  return charts.slice(0, 10);
+}
+
+
+// ============================================================================
+// Value Formatting
+// ============================================================================
+
+function formatValue(value: number, isPercentage: boolean = false): string {
+  if (value === null || value === undefined) return "—";
+  if (isPercentage) return `${value.toFixed(1)}%`;
+  if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return value.toFixed(1);
+}
+
+// ============================================================================
+// Component
+// ============================================================================
 
 export function ChartGridView({
   columns,
@@ -225,15 +275,35 @@ export function ChartGridView({
   onUpdateSlideNumber,
   getSlideNumber,
 }: ChartGridViewProps) {
-  const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [fullScreenChart, setFullScreenChart] = useState<ChartConfig | null>(null);
-  const [selectedCharts, setSelectedCharts] = useState<Set<string>>(new Set());
-
-  // Refs for chart elements (for PPT capture)
   const chartRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const fullScreenChartRef = useRef<HTMLDivElement | null>(null);
 
-  // Handle PPT toggle for a chart
+  // Generate charts based on visible columns
+  const charts = useMemo(() => generateChartConfigs(columns), [columns]);
+
+  // Prepare chart data from rows
+  const chartData = useMemo((): Array<{ name: string; [key: string]: any }> => {
+    if (!rows || rows.length === 0) return [];
+    return rows
+      .filter((row) => row.mediaType !== "Total")
+      .map((row) => ({
+        name: row.mediaType,
+        ...row.data,
+      }));
+  }, [rows]);
+
+  // Check if a chart is in PPT
+  const isChartInPPT = useCallback(
+    (chartId: string) => {
+      if (!selectedGraphsForPPT) return false;
+      if (selectedGraphsForPPT instanceof Set) return selectedGraphsForPPT.has(chartId);
+      if (Array.isArray(selectedGraphsForPPT)) return selectedGraphsForPPT.includes(chartId);
+      return false;
+    },
+    [selectedGraphsForPPT]
+  );
+
   const handleToggleForPPT = useCallback(
     (chartId: string, chartTitle: string, element?: HTMLElement) => {
       if (onToggleGraphForPPT) {
@@ -243,167 +313,10 @@ export function ChartGridView({
     [onToggleGraphForPPT]
   );
 
-  // Check if a chart is included in PPT
-  // Handle both Set and Array types (Zustand persist may serialize Set to Array)
-  const isChartInPPT = useCallback(
-    (chartId: string) => {
-      if (!selectedGraphsForPPT) return false;
-      if (selectedGraphsForPPT instanceof Set) {
-        return selectedGraphsForPPT.has(chartId);
-      }
-      if (Array.isArray(selectedGraphsForPPT)) {
-        return selectedGraphsForPPT.includes(chartId);
-      }
-      return false;
-    },
-    [selectedGraphsForPPT]
-  );
-
-  // Initialize charts on mount
-  useEffect(() => {
-    const initializedCharts = CHART_TYPES.map((chartType, index) => ({
-      ...chartType,
-      id: `chart-${index}`,
-    }));
-    setCharts(initializedCharts);
-  }, []);
-
-  // Generate chart data from table rows
-  const generateChartData = (chart: ChartConfig) => {
-    if (!rows || rows.length === 0) return [];
-
-    // Filter out Total rows and group data by media type
-    const mediaTypeMap = new Map<
-      string,
-      { actual?: TableRow; planned?: TableRow }
-    >();
-
-    rows.forEach((row) => {
-      if (row.mediaType === "Total") return;
-
-      const existing = mediaTypeMap.get(row.mediaType) || {};
-      if (row.type === "Actual") {
-        existing.actual = row;
-      } else {
-        existing.planned = row;
-      }
-      mediaTypeMap.set(row.mediaType, existing);
-    });
-
-    const mediaTypes = Array.from(mediaTypeMap.keys());
-
-    if (chart.type === "pie" || chart.type === "donut-pie") {
-      return mediaTypes
-        .map((mediaType) => {
-          const data = mediaTypeMap.get(mediaType);
-          const actualRow = data?.actual;
-          const value = actualRow?.data[chart.dataKey];
-          return {
-            name: mediaType,
-            value: typeof value === "number" ? value : 0,
-          };
-        })
-        .filter((item) => item.value > 0);
-    }
-
-    if (chart.type === "column") {
-      return mediaTypes
-        .map((mediaType) => {
-          const data = mediaTypeMap.get(mediaType);
-          const actualRow = data?.actual;
-          const value = actualRow?.data[chart.dataKey];
-          return {
-            name: mediaType,
-            value: typeof value === "number" ? value : 0,
-          };
-        })
-        .filter((item) => item.value > 0);
-    }
-
-    if (chart.type === "clustered-bar") {
-      return mediaTypes.map((mediaType) => {
-        const data = mediaTypeMap.get(mediaType);
-        const actualRow = data?.actual;
-        const plannedRow = data?.planned;
-        const actualValue = actualRow?.data[chart.dataKey];
-        const plannedValue = plannedRow?.data[chart.dataKey];
-        return {
-          name: mediaType,
-          actual: typeof actualValue === "number" ? actualValue : 0,
-          planned: typeof plannedValue === "number" ? plannedValue : 0,
-        };
-      });
-    }
-
-    if (chart.type === "stacked-bar") {
-      return mediaTypes.map((mediaType) => {
-        const data = mediaTypeMap.get(mediaType);
-        const actualRow = data?.actual;
-        const primaryValue = actualRow?.data[chart.dataKey];
-        const secondaryValue =
-          actualRow?.data[chart.secondaryDataKey || chart.dataKey];
-        return {
-          name: mediaType,
-          primary: typeof primaryValue === "number" ? primaryValue : 0,
-          secondary: typeof secondaryValue === "number" ? secondaryValue : 0,
-        };
-      });
-    }
-
-    if (chart.type === "bar-line-combo" || chart.type === "pareto") {
-      const chartData = mediaTypes.map((mediaType) => {
-        const data = mediaTypeMap.get(mediaType);
-        const actualRow = data?.actual;
-        const dataValue = actualRow?.data[chart.dataKey];
-        const percentValue =
-          actualRow?.data[chart.secondaryDataKey || "shareOfSpend"];
-        return {
-          name: mediaType,
-          value: typeof dataValue === "number" ? dataValue : 0,
-          percentage: typeof percentValue === "number" ? percentValue : 0,
-        };
-      });
-
-      if (chart.type === "pareto") {
-        chartData.sort((a, b) => b.value - a.value);
-        let cumulative = 0;
-        chartData.forEach((item) => {
-          cumulative += item.percentage;
-          (item as any).cumulative = cumulative;
-        });
-      }
-
-      return chartData;
-    }
-
-    if (
-      chart.type === "scatter" ||
-      chart.type === "scatter-line" ||
-      chart.type === "scatter-line-markers"
-    ) {
-      return mediaTypes
-        .map((mediaType) => {
-          const data = mediaTypeMap.get(mediaType);
-          const actualRow = data?.actual;
-          const xValue = actualRow?.data[chart.dataKey];
-          const yValue =
-            actualRow?.data[chart.secondaryDataKey || chart.dataKey];
-          return {
-            name: mediaType,
-            x: typeof xValue === "number" ? xValue : 0,
-            y: typeof yValue === "number" ? yValue : 0,
-            z: 100,
-          };
-        })
-        .filter((item) => item.x > 0 && item.y > 0);
-    }
-
-    return [];
-  };
-
-  const renderChart = (chart: ChartConfig, height: number = 250) => {
-    // If no rows at all (no client selected), show "No data available"
-    if (!rows || rows.length === 0) {
+  // Render individual chart
+  // showLabels: true for full-screen view, false for thumbnail grid
+  const renderChart = (chart: ChartConfig, height: number = 160, showLabels: boolean = false) => {
+    if (!chartData || chartData.length === 0) {
       return (
         <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded">
           <p className="text-xs text-slate-400">No data available</p>
@@ -411,180 +324,268 @@ export function ChartGridView({
       );
     }
 
-    // Client is selected, use real data from table
-    const data = generateChartData(chart);
+    const isPercentage = chart.dataKeys.some((k) => k.includes("pct"));
+    const fontSize = showLabels ? 12 : 9;
+    const tickFontSize = showLabels ? 11 : 9;
 
-    // If still no data, show placeholder
-    if (!data || data.length === 0) {
-      return (
-        <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded">
-          <p className="text-xs text-slate-400">No data available</p>
-        </div>
-      );
-    }
+    switch (chart.type) {
+      case "bar":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis 
+                dataKey="name" 
+                tick={showLabels ? { fontSize: tickFontSize } : false} 
+                axisLine={{ stroke: '#E2E8F0' }}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                labelFormatter={(label) => label}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              <Bar dataKey={chart.dataKeys[0]} fill={chart.colors[0]} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        );
 
-    if (chart.type === "pie" || chart.type === "donut-pie") {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <RechartsPieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={({ name, percent }: any) =>
-                `${name}: ${(percent * 100).toFixed(0)}%`
-              }
-              outerRadius={height * 0.32}
-              innerRadius={chart.type === "donut-pie" ? height * 0.2 : 0}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={chart.colors[index % chart.colors.length]}
+      case "horizontal-bar":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 10, left: showLabels ? 80 : 50, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis type="number" tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: tickFontSize }} width={showLabels ? 70 : 45} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              <Bar dataKey={chart.dataKeys[0]} fill={chart.colors[0]} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        );
+
+      case "pie":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <RechartsPieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="45%"
+                outerRadius={showLabels ? height * 0.32 : Math.min(height * 0.35, 55)}
+                dataKey={chart.dataKeys[0]}
+                label={showLabels ? ({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(0)}%` : false}
+                labelLine={showLabels}
+              >
+                {chartData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={chart.colors[index % chart.colors.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              {!showLabels && (
+                <Legend 
+                  wrapperStyle={{ fontSize: 9 }}
+                  layout="horizontal"
+                  align="center"
+                  verticalAlign="bottom"
                 />
+              )}
+            </RechartsPieChart>
+          </ResponsiveContainer>
+        );
+
+      case "donut":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <RechartsPieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="45%"
+                innerRadius={showLabels ? height * 0.18 : Math.min(height * 0.18, 30)}
+                outerRadius={showLabels ? height * 0.32 : Math.min(height * 0.35, 55)}
+                dataKey={chart.dataKeys[0]}
+                label={showLabels ? ({ percent }: any) => `${((percent || 0) * 100).toFixed(0)}%` : false}
+                labelLine={showLabels}
+              >
+                {chartData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={chart.colors[index % chart.colors.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              <Legend 
+                wrapperStyle={{ fontSize: showLabels ? 11 : 9 }}
+                layout="horizontal"
+                align="center"
+                verticalAlign="bottom"
+              />
+            </RechartsPieChart>
+          </ResponsiveContainer>
+        );
+
+      case "line":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <RechartsLineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis 
+                dataKey="name" 
+                tick={showLabels ? { fontSize: tickFontSize } : false} 
+                axisLine={{ stroke: '#E2E8F0' }}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              <Line type="monotone" dataKey={chart.dataKeys[0]} stroke={chart.colors[0]} strokeWidth={2} dot={{ r: showLabels ? 5 : 3 }} />
+            </RechartsLineChart>
+          </ResponsiveContainer>
+        );
+
+      case "area":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis 
+                dataKey="name" 
+                tick={showLabels ? { fontSize: tickFontSize } : false} 
+                axisLine={{ stroke: '#E2E8F0' }}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              <Area type="monotone" dataKey={chart.dataKeys[0]} stroke={chart.colors[0]} fill={chart.colors[0]} fillOpacity={0.3} />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+
+      case "stacked-bar":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis 
+                dataKey="name" 
+                tick={showLabels ? { fontSize: tickFontSize } : false} 
+                axisLine={{ stroke: '#E2E8F0' }}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              {showLabels && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              {chart.dataKeys.map((key, i) => (
+                <Bar key={key} dataKey={key} stackId="a" fill={chart.colors[i]} name={getColumnLabel(key)} />
               ))}
-            </Pie>
-            <Tooltip />
-          </RechartsPieChart>
-        </ResponsiveContainer>
-      );
-    }
+            </BarChart>
+          </ResponsiveContainer>
+        );
 
-    if (chart.type === "column") {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip
-              formatter={(value: any) => `$${(value / 1000000).toFixed(1)}M`}
-            />
-            <Bar dataKey="value" fill={chart.colors[0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
+      case "combo":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis 
+                dataKey="name" 
+                tick={showLabels ? { fontSize: tickFontSize } : false} 
+                axisLine={{ stroke: '#E2E8F0' }}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              {showLabels && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              <Bar dataKey={chart.dataKeys[0]} fill={chart.colors[0]} name={getColumnLabel(chart.dataKeys[0])} />
+              {chart.dataKeys[1] && (
+                <Line type="monotone" dataKey={chart.dataKeys[1]} stroke={chart.colors[1]} strokeWidth={2} name={getColumnLabel(chart.dataKeys[1])} />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        );
 
-    if (chart.type === "clustered-bar") {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip
-              formatter={(value: any) => `$${(value / 1000000).toFixed(1)}M`}
-            />
-            <Legend />
-            <Bar dataKey="actual" fill={chart.colors[0]} name="Actual" />
-            <Bar dataKey="planned" fill={chart.colors[1]} name="Planned" />
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
+      case "radar":
+        const radarData = chartData.map((d) => ({
+          name: d.name,
+          value: d[chart.dataKeys[0]] || 0,
+        }));
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <RadarChart data={radarData} margin={{ top: 20, right: 30, left: 30, bottom: 20 }}>
+              <PolarGrid stroke="#E2E8F0" />
+              <PolarAngleAxis dataKey="name" tick={{ fontSize: showLabels ? 11 : 8 }} />
+              <Radar dataKey="value" stroke={chart.colors[0]} fill={chart.colors[0]} fillOpacity={0.5} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        );
 
-    if (chart.type === "stacked-bar") {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip
-              formatter={(value: any) => `$${(value / 1000000).toFixed(1)}M`}
-            />
-            <Legend />
-            <Bar
-              dataKey="primary"
-              stackId="a"
-              fill={chart.colors[0]}
-              name="Addressable"
-            />
-            <Bar
-              dataKey="secondary"
-              stackId="a"
-              fill={chart.colors[1]}
-              name="Non-Addressable"
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
+      case "grouped-bar":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: showLabels ? 30 : 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis 
+                dataKey="name" 
+                tick={showLabels ? { fontSize: tickFontSize } : false} 
+                axisLine={{ stroke: '#E2E8F0' }}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: tickFontSize }} tickFormatter={(v) => formatValue(v, isPercentage)} width={55} />
+              <Tooltip 
+                formatter={(v: number) => formatValue(v, isPercentage)}
+                contentStyle={{ fontSize: fontSize }}
+              />
+              {showLabels && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              {chart.dataKeys.map((key, i) => (
+                <Bar key={key} dataKey={key} fill={chart.colors[i]} name={getColumnLabel(key)} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        );
 
-    if (chart.type === "bar-line-combo" || chart.type === "pareto") {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip
-              formatter={(value: any) =>
-                typeof value === "number" ? `${value.toFixed(1)}` : value
-              }
-            />
-            <Legend />
-            <Bar dataKey="value" fill={chart.colors[0]} name="Spend" />
-            <Line
-              type="monotone"
-              dataKey={chart.type === "pareto" ? "cumulative" : "percentage"}
-              stroke={chart.colors[1]}
-              strokeWidth={2}
-              name={chart.type === "pareto" ? "Cumulative %" : "Percentage"}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      );
+      default:
+        return null;
     }
-
-    if (
-      chart.type === "scatter" ||
-      chart.type === "scatter-line" ||
-      chart.type === "scatter-line-markers"
-    ) {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <ScatterChart>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="x" name="Addressable" />
-            <YAxis dataKey="y" name="Audited" />
-            <Tooltip
-              formatter={(value: any) => `$${(value / 1000000).toFixed(1)}M`}
-              cursor={{ strokeDasharray: "3 3" }}
-            />
-            <Legend />
-            <RechartsScatter
-              name="Media Types"
-              data={data}
-              fill={chart.colors[0]}
-              line={chart.type !== "scatter"}
-              lineType={chart.type !== "scatter" ? "joint" : undefined}
-              shape={chart.type === "scatter-line" ? undefined : "circle"}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
-      );
-    }
-
-    return null;
   };
 
-  // Toggle chart selection
-  const handleChartClick = (chartId: string) => {
-    setSelectedCharts((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(chartId)) {
-        newSet.delete(chartId);
-      } else {
-        newSet.add(chartId);
-      }
-      return newSet;
-    });
-  };
+
+  // Empty state when no charts
+  if (charts.length === 0) {
+    return (
+      <div className="bg-white border-t border-slate-200 max-w-full overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200">
+          <h3 className="text-slate-900 font-semibold">Chart Visualizations</h3>
+          <p className="text-sm text-slate-500 mt-1">Select data to generate charts</p>
+        </div>
+        <div className="p-12 text-center">
+          <p className="text-slate-400">No data available for visualization</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border-t border-slate-200 max-w-full overflow-hidden">
@@ -592,116 +593,70 @@ export function ChartGridView({
       <div className="px-6 py-4 border-b border-slate-200">
         <h3 className="text-slate-900 font-semibold">Chart Visualizations</h3>
         <p className="text-sm text-slate-500 mt-1">
-          10 chart types automatically updated based on your selected data
+          {charts.length} charts based on {columns.filter((c) => c !== "mediaType").length} visible columns
         </p>
       </div>
 
       {/* Chart Grid - 5 columns × 2 rows */}
       <div className="p-6 overflow-x-auto">
         <div className="grid grid-cols-5 gap-4 min-w-[1000px]">
-          {charts.map((chart) => {
-            const isSelected = selectedCharts.has(chart.id);
-            return (
-              <Card
-                key={chart.id}
-                className={`overflow-hidden transition-all cursor-pointer ${
-                  isSelected
-                    ? "border-2 border-violet-600 shadow-lg"
-                    : "border-slate-200 hover:shadow-lg"
-                } relative group`}
-                onClick={() => handleChartClick(chart.id)}
-              >
-                {/* Chart Header */}
-                <div
-                  className={`px-4 py-3 border-b border-slate-200 flex items-center justify-between transition-colors ${
-                    isSelected
-                      ? "bg-violet-600 text-white"
-                      : "bg-slate-50 text-slate-900"
-                  }`}
-                >
-                  <h5
-                    className={`text-xs font-medium truncate ${
-                      isSelected ? "text-white" : "text-slate-900"
+          {charts.map((chart) => (
+            <Card
+              key={chart.id}
+              className="overflow-hidden border-slate-200 hover:shadow-lg transition-all relative group"
+            >
+              {/* Chart Header */}
+              <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <h5 className="text-xs font-medium text-slate-900 truncate flex-1">{chart.title}</h5>
+                <div className="flex items-center gap-1">
+                  {/* Add to PPT Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const chartElement = chartRefs.current.get(chart.id);
+                      handleToggleForPPT(`table-${chart.id}`, chart.title, chartElement || undefined);
+                    }}
+                    className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
+                      isChartInPPT(`table-${chart.id}`) ? "bg-emerald-500 opacity-100" : "hover:bg-slate-200"
                     }`}
+                    title={isChartInPPT(`table-${chart.id}`) ? "Remove from PPT" : "Add to PPT"}
                   >
-                    {chart.title}
-                  </h5>
-                  <div className="flex items-center gap-1">
-                    {/* Add to PPT Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const chartElement = chartRefs.current.get(chart.id);
-                        handleToggleForPPT(
-                          `table-${chart.id}`,
-                          chart.title,
-                          chartElement || undefined
-                        );
-                      }}
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
-                        isChartInPPT(`table-${chart.id}`)
-                          ? "bg-emerald-500 opacity-100"
-                          : isSelected
-                            ? "hover:bg-violet-700"
-                            : "hover:bg-slate-200"
-                      }`}
-                      title={isChartInPPT(`table-${chart.id}`) ? "Remove from PPT" : "Add to PPT"}
-                    >
-                      {isChartInPPT(`table-${chart.id}`) ? (
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      ) : (
-                        <FileText
-                          className={`w-3.5 h-3.5 ${
-                            isSelected ? "text-white" : "text-slate-600"
-                          }`}
-                        />
-                      )}
-                    </button>
-                    {/* Expand Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFullScreenChart(chart);
-                      }}
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center ${
-                        isSelected ? "hover:bg-violet-700" : "hover:bg-slate-200"
-                      }`}
-                      title="Expand to full screen"
-                    >
-                      <Maximize2
-                        className={`w-4 h-4 ${
-                          isSelected ? "text-white" : "text-slate-600"
-                        }`}
-                      />
-                    </button>
-                  </div>
+                    {isChartInPPT(`table-${chart.id}`) ? (
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    ) : (
+                      <FileText className="w-3.5 h-3.5 text-slate-600" />
+                    )}
+                  </button>
+                  {/* Expand Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFullScreenChart(chart);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200"
+                    title="Expand"
+                  >
+                    <Maximize2 className="w-4 h-4 text-slate-600" />
+                  </button>
                 </div>
+              </div>
 
-                {/* Chart Content */}
-                <div
-                  ref={(el) => {
-                    chartRefs.current.set(chart.id, el);
-                  }}
-                  className="p-4 bg-white h-48"
-                >
-                  {renderChart(chart, 160)}
-                </div>
-              </Card>
-            );
-          })}
+              {/* Chart Content */}
+              <div
+                ref={(el) => { chartRefs.current.set(chart.id, el); }}
+                className="p-3 bg-white h-44"
+              >
+                {renderChart(chart, 160)}
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
 
-      {/* Full-Screen Chart Modal - positioned within main content area */}
+      {/* Full-Screen Modal */}
       {fullScreenChart && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setFullScreenChart(null)}
-          />
-
-          {/* Modal - constrained to not overlap sidebar */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setFullScreenChart(null)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-slate-200/60">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between flex-shrink-0">
@@ -710,91 +665,60 @@ export function ChartGridView({
                   <Maximize2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">
-                    {fullScreenChart.title}
-                  </h3>
+                  <h3 className="text-lg font-semibold text-slate-800">{fullScreenChart.title}</h3>
                   <p className="text-sm text-slate-500">Expanded view</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* Add to PPT Button */}
                 <button
                   onClick={() => {
                     const element = fullScreenChartRef.current;
-                    handleToggleForPPT(
-                      `table-${fullScreenChart.id}`,
-                      fullScreenChart.title,
-                      element || undefined
-                    );
+                    handleToggleForPPT(`table-${fullScreenChart.id}`, fullScreenChart.title, element || undefined);
                   }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${
                     isChartInPPT(`table-${fullScreenChart.id}`)
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200"
-                      : "bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-violet-200"
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                      : "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
                   }`}
                 >
                   {isChartInPPT(`table-${fullScreenChart.id}`) ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Added to PPT</span>
-                    </>
+                    <><Check className="w-4 h-4" /><span>Added to PPT</span></>
                   ) : (
-                    <>
-                      <FileText className="w-4 h-4" />
-                      <span>Add to PPT Report</span>
-                    </>
+                    <><FileText className="w-4 h-4" /><span>Add to PPT</span></>
                   )}
                 </button>
-
-                {/* Close Button */}
-                <button
-                  onClick={() => setFullScreenChart(null)}
-                  className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
-                >
+                <button onClick={() => setFullScreenChart(null)} className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
             </div>
 
-            {/* Slide Number Configuration - visible when included in PPT */}
+            {/* Slide Number Config */}
             {isChartInPPT(`table-${fullScreenChart.id}`) && (
               <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-slate-700">
-                      Target Slide:
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={getSlideNumber?.(`table-${fullScreenChart.id}`) || ""}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const num = value ? parseInt(value, 10) : undefined;
-                        onUpdateSlideNumber?.(`table-${fullScreenChart.id}`, num);
-                      }}
-                      placeholder="Auto"
-                      className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm bg-white"
-                    />
-                  </div>
-                  <span className="text-xs text-slate-500">
-                    Leave empty for auto-placement
-                  </span>
+                  <label className="text-sm font-medium text-slate-700">Target Slide:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={getSlideNumber?.(`table-${fullScreenChart.id}`) || ""}
+                    onChange={(e) => {
+                      const num = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                      onUpdateSlideNumber?.(`table-${fullScreenChart.id}`, num);
+                    }}
+                    placeholder="Auto"
+                    className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm bg-white"
+                  />
+                  <span className="text-xs text-slate-500">Leave empty for auto-placement</span>
                 </div>
               </div>
             )}
 
-            {/* Modal Content - Chart for PPT capture */}
+            {/* Modal Content */}
             <div className="flex-1 p-8 overflow-auto min-h-0 bg-gradient-to-br from-slate-50 to-slate-100/50">
-              <div
-                ref={fullScreenChartRef}
-                className="bg-white rounded-xl p-6 shadow-sm max-w-4xl mx-auto"
-              >
-                <h4 className="text-lg font-semibold text-slate-800 mb-4">
-                  {fullScreenChart.title}
-                </h4>
-                <div style={{ height: "calc(85vh - 280px)", minHeight: "400px" }}>
-                  {renderChart(fullScreenChart, Math.max(400, window.innerHeight - 350))}
+              <div ref={fullScreenChartRef} className="bg-white rounded-xl p-6 shadow-sm max-w-4xl mx-auto h-full">
+                <div className="h-full" style={{ minHeight: "400px" }}>
+                  {renderChart(fullScreenChart, 500, true)}
                 </div>
               </div>
             </div>
