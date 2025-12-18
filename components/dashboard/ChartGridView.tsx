@@ -1017,45 +1017,13 @@ export function ChartGridView({
                 </div>
               </div>
 
-              {/* Slide Number Config */}
-              {isChartInPPT(`table-${fullScreenChart.id}`) && (
-                <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
-                  <div className="flex items-center gap-4">
-                    <label className="text-sm font-medium text-slate-700">
-                      Target Slide:
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={
-                        getSlideNumber?.(`table-${fullScreenChart.id}`) || ""
-                      }
-                      onChange={(e) => {
-                        const num = e.target.value
-                          ? parseInt(e.target.value, 10)
-                          : undefined;
-                        onUpdateSlideNumber?.(
-                          `table-${fullScreenChart.id}`,
-                          num,
-                        );
-                      }}
-                      placeholder="Auto"
-                      className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm bg-white"
-                    />
-                    <span className="text-xs text-slate-500">
-                      Leave empty for auto-placement
-                    </span>
-                  </div>
-                </div>
-              )}
-
               {/* Modal Content */}
-              <div className="flex-1 p-8 overflow-auto min-h-0 bg-gradient-to-br from-slate-50 to-slate-100/50">
+              <div className="flex-1 p-8 overflow-auto bg-gradient-to-br from-slate-50 to-slate-100/50">
                 <div
                   ref={fullScreenChartRef}
-                  className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm max-w-4xl mx-auto h-full"
+                  className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm max-w-4xl mx-auto"
                 >
-                  <div className="h-full" style={{ minHeight: "400px" }}>
+                  <div style={{ height: "500px" }}>
                     {renderChart(fullScreenChart, 500, true)}
                   </div>
                 </div>
