@@ -25,8 +25,6 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  ScatterChart,
-  Scatter,
   ReferenceLine,
 } from "recharts";
 import { applyOthersLogic, checkDataDensity } from "./utils/dataProcessing";
@@ -43,6 +41,77 @@ import {
   TrackerMediaType,
   getTrackerMediaTypeFromFields,
 } from "@/lib/api/dashboard";
+
+// Field name to readable label mapping
+const FIELD_LABELS: Record<string, string> = {
+  // Summary fields
+  total_net_net_spend: "Net Net Spend",
+  savings_value: "Savings Value",
+  savings_pct: "Savings %",
+  fy_total_savings: "FY Total Savings",
+  fy_total_savings_pct: "FY Total Savings %",
+  fy_savings: "FY Savings",
+  fy_savings_pct: "FY Savings %",
+  inflation_pct: "Inflation %",
+  measured_spend_pct: "Measured %",
+  total_addressable_spend: "Addressable Spend",
+  total_non_addressable_spend: "Non-Addressable Spend",
+  measured_spend: "Measured Spend",
+  benchmark_equivalent_net_net_spend: "Benchmark Spend",
+  value_loss: "Value Loss",
+  value_loss_pct: "Value Loss %",
+  spend: "Spend",
+  savings: "Savings",
+  // Tracker summary specific fields (from Summary_YTD sheets)
+  total_addressable_net_net_spend: "Total Addressable Spend",
+  total_net_net_measured: "Measured Spend",
+};
+
+// Get readable label for a field name
+const getFieldLabel = (fieldName: string): string => {
+  if (FIELD_LABELS[fieldName]) return FIELD_LABELS[fieldName];
+  // Convert snake_case to Title Case
+  return fieldName
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
+// Check if a field is a percentage field
+const isPercentageField = (fieldName: string): boolean => {
+  const lowerName = fieldName.toLowerCase();
+  return lowerName.includes("pct") || lowerName.includes("percent") || lowerName.includes("%");
+};
+
+// Format value based on field type (percentage vs currency)
+const formatValue = (value: any, fieldName: string): string => {
+  if (value === null || value === undefined || value === 0) return "";
+  if (isPercentageField(fieldName)) {
+    return `${Number(value).toFixed(1)}%`;
+  }
+  // Currency formatting
+  if (Math.abs(value) >= 1000000) {
+    return `€${(value / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `€${(value / 1000).toFixed(0)}K`;
+  }
+  return `€${Number(value).toFixed(0)}`;
+};
+
+// Color palette for multiple fields
+const CHART_COLORS = [
+  "#7C3AED", // violet
+  "#10B981", // emerald
+  "#F59E0B", // amber
+  "#EF4444", // red
+  "#3B82F6", // blue
+  "#EC4899", // pink
+  "#06B6D4", // cyan
+  "#8B5CF6", // purple
+  "#14B8A6", // teal
+  "#F97316", // orange
+];
 
 interface VisualizationCanvasProps {
   selectedFields: Record<string, string[]>;
@@ -486,26 +555,70 @@ export function VisualizationCanvas({
   }, [trackerData]);
 
   // Transform tracker summary data into chart-compatible format
-  // Each row represents a media type with aggregated metrics
+  // Data comes with multiple periods per media_type, so we need to aggregate
   const getTrackerSummaryChartData = useMemo(() => {
     if (!trackerSummaryData || trackerSummaryData.length === 0) return null;
 
-    // Transform each summary row - use media_type as the name
-    return trackerSummaryData.map((row) => {
-      return {
-        name: row.media_type || "Unknown",
-        period: row.period,
-        total_net_net_spend: row.total_net_net_spend || 0,
-        total_non_addressable_spend: row.total_non_addressable_spend || 0,
-        total_addressable_spend: row.total_addressable_spend || 0,
-        measured_spend: row.measured_spend || 0,
-        measured_spend_pct: row.measured_spend_pct || 0,
-        benchmark_equivalent_net_net_spend:
-          row.benchmark_equivalent_net_net_spend || 0,
-        value_loss: row.value_loss || 0,
-        value_loss_pct: row.value_loss_pct || 0,
-      };
+    // Get numeric field names from first row (excluding id, market_id)
+    const sampleRow = trackerSummaryData[0] as unknown as Record<string, unknown>;
+    const numericFields = Object.keys(sampleRow).filter((key) => {
+      return !["id", "market_id", "period", "data_type", "media_type"].includes(key);
     });
+
+    // Group by media_type and aggregate numeric values
+    // Use the latest period's data (Dec/YTD) for each media type
+    const mediaAggregates: Record<string, Record<string, unknown>> = {};
+
+    trackerSummaryData.forEach((row) => {
+      const rowData = row as unknown as Record<string, unknown>;
+      const mediaType = row.media_type || "Unknown";
+      const period = row.period || "";
+
+      // Skip GRAND TOTAL rows - we want individual media types
+      if (mediaType === "GRAND TOTAL") return;
+
+      // Use the latest period data (prefer Dec, then Nov, etc.)
+      const periodOrder = ["Dec", "Nov", "Oct", "Sep", "Aug", "Jul", "Jun", "May", "Apr", "Mar", "Feb", "Jan"];
+      const currentPeriodIndex = periodOrder.indexOf(period);
+      const existingPeriod = mediaAggregates[mediaType]?._period as string | undefined;
+      const existingPeriodIndex = existingPeriod ? periodOrder.indexOf(existingPeriod) : 999;
+
+      // Only update if this is a later period (lower index = later in year)
+      if (currentPeriodIndex < existingPeriodIndex || !mediaAggregates[mediaType]) {
+        mediaAggregates[mediaType] = {
+          name: mediaType,
+          _period: period,
+        };
+
+        // Copy all numeric fields
+        numericFields.forEach((field) => {
+          const val = rowData[field];
+          if (typeof val === "number") {
+            mediaAggregates[mediaType][field] = val;
+          } else if (val !== null && val !== undefined) {
+            const parsed = Number(val);
+            if (!isNaN(parsed)) {
+              mediaAggregates[mediaType][field] = parsed;
+            }
+          }
+        });
+      }
+    });
+
+    // Convert to array and filter out media types with no data
+    return Object.values(mediaAggregates)
+      .filter((item) => {
+        // Check if at least one numeric field has a non-zero value
+        return numericFields.some((field) => {
+          const val = item[field];
+          return typeof val === "number" && val !== 0;
+        });
+      })
+      .map((item) => {
+        // Remove internal _period field
+        const { _period, ...rest } = item;
+        return rest;
+      });
   }, [trackerSummaryData]);
 
   // Get real Arla data based on data source selection
@@ -580,13 +693,27 @@ export function VisualizationCanvas({
   const isArlaData = client === "Arla" && getArlaData && getArlaData.length > 0;
   const isApiData = apiData && apiData.data.length > 0;
   const isTrackerApiData =
-    trackerData &&
-    ((trackerData.general && trackerData.general.length > 0) ||
-      (trackerData.monthly && trackerData.monthly.length > 0) ||
-      (trackerData.percentile && trackerData.percentile.length > 0));
+    (trackerData &&
+      ((trackerData.general && trackerData.general.length > 0) ||
+        (trackerData.monthly && trackerData.monthly.length > 0) ||
+        (trackerData.percentile && trackerData.percentile.length > 0))) ||
+    (trackerSummaryData && trackerSummaryData.length > 0);
 
-  // Get available fields from tracker complete response
+  // Get available fields from tracker data (complete or summary)
   const trackerAvailableFields = useMemo(() => {
+    // Check tracker summary data first
+    if (trackerSummaryData && trackerSummaryData.length > 0) {
+      const sampleRow = trackerSummaryData[0] as unknown as Record<string, unknown>;
+      return Object.keys(sampleRow).filter((key) => {
+        const val = sampleRow[key];
+        return (
+          typeof val === "number" &&
+          !["id", "market_id"].includes(key)
+        );
+      });
+    }
+
+    // Fall back to tracker complete data
     if (!trackerData) return [];
 
     // Get fields from general, monthly, or percentile data
@@ -615,21 +742,50 @@ export function VisualizationCanvas({
         ].includes(key)
       );
     });
-  }, [trackerData]);
+  }, [trackerData, trackerSummaryData]);
+
+  // Get selected field names from the Query Builder
+  // For trackers, strip the prefix (e.g., "summary-total-net-net-spend" -> "total_net_net_spend")
+  // Also convert dashes to underscores to match API field names
+  const selectedFieldNames = useMemo(() => {
+    const rawFields = Object.values(selectedFields).flat();
+
+    // For tracker data source, strip the media type prefix and convert to API format
+    if (dataSource === "trackers") {
+      return rawFields.map((field) => {
+        // Remove prefixes like "summary-", "tv-", "radio-", etc.
+        const prefixes = ["summary-", "tv-", "radio-", "print-", "ooh-", "online-", "cinema-"];
+        let cleanField = field;
+        for (const prefix of prefixes) {
+          if (field.startsWith(prefix)) {
+            cleanField = field.substring(prefix.length);
+            break;
+          }
+        }
+        // Convert dashes to underscores to match API field names
+        // e.g., "total-net-net-spend" -> "total_net_net_spend"
+        return cleanField.replace(/-/g, "_");
+      });
+    }
+
+    return rawFields;
+  }, [selectedFields, dataSource]);
 
   // Get the first field from API response for primary data key (for charts)
   const primaryApiField =
     isApiData && apiData.requested_fields.length > 0
       ? apiData.requested_fields[0]
-      : isTrackerApiData && trackerAvailableFields.length > 0
-        ? trackerAvailableFields[0]
+      : dataSource === "trackers" && selectedFieldNames.length > 0
+        ? selectedFieldNames[0]
         : null;
 
   // Get all requested fields from either API source
+  // For summary: use apiData.requested_fields
+  // For trackers: use the selected fields from Query Builder
   const allApiFields = isApiData
     ? apiData.requested_fields
-    : isTrackerApiData
-      ? trackerAvailableFields
+    : dataSource === "trackers" && selectedFieldNames.length > 0
+      ? selectedFieldNames
       : [];
 
   const dataKeys = {
@@ -867,22 +1023,6 @@ export function VisualizationCanvas({
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Scatter Plot */}
-          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500"></span>
-              Scatter Plot
-            </h4>
-            <ResponsiveContainer width="100%" height={120}>
-              <ScatterChart>
-                <Scatter
-                  data={demoData.map((d) => ({ x: d.spend, y: d.savings }))}
-                  fill="#F43F5E"
-                />
-              </ScatterChart>
             </ResponsiveContainer>
           </div>
 
@@ -1281,7 +1421,7 @@ export function VisualizationCanvas({
                     cy="50%"
                     labelLine={false}
                     label={({ name, value }) =>
-                      `${name}: €${(Number(value) / 1000).toFixed(0)}K`
+                      `${name}: ${formatValue(value, dataKeys.spend)}`
                     }
                     outerRadius={140}
                     fill="#8884d8"
@@ -1304,7 +1444,7 @@ export function VisualizationCanvas({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number) => formatValue(value, dataKeys.spend)}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -1343,7 +1483,7 @@ export function VisualizationCanvas({
                     cy="50%"
                     labelLine={false}
                     label={({ name, value }) =>
-                      `${name}: €${(Number(value) / 1000).toFixed(0)}K`
+                      `${name}: ${formatValue(value, dataKeys.spend)}`
                     }
                     outerRadius={140}
                     innerRadius={90}
@@ -1367,7 +1507,7 @@ export function VisualizationCanvas({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number) => formatValue(value, dataKeys.spend)}
                   />
                   <text
                     x="50%"
@@ -1422,22 +1562,25 @@ export function VisualizationCanvas({
                     width={100}
                   />
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
                   <Legend />
-                  <Bar
-                    dataKey={dataKeys.spend}
-                    fill="#0891B2"
-                    radius={[0, 8, 8, 0]}
-                    name="Spend (€)"
-                    style={{ cursor: "pointer" }}
-                    label={{
-                      position: "right",
-                      fontSize: 10,
-                      fill: "#475569",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend]).map((field, index) => (
+                    <Bar
+                      key={field}
+                      dataKey={field}
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      radius={[0, 8, 8, 0]}
+                      name={getFieldLabel(field)}
+                      style={{ cursor: "pointer" }}
+                      label={{
+                        position: "right",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (value: any) => formatValue(value, field),
+                      }}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1469,34 +1612,42 @@ export function VisualizationCanvas({
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
                   <Legend />
-                  <Bar
-                    dataKey={dataKeys.spend}
-                    fill="#7C3AED"
-                    radius={[8, 8, 0, 0]}
-                    name="Total Spend"
-                    label={{
-                      position: "top",
-                      fontSize: 10,
-                      fill: "#475569",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={dataKeys.savings}
-                    stroke="#10B981"
-                    strokeWidth={3}
-                    name="Savings Value"
-                    label={{
-                      position: "top",
-                      fontSize: 10,
-                      fill: "#10B981",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
+                  {/* First half of fields as bars */}
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend]).slice(0, Math.ceil((dataKeys.apiFields.length || 1) / 2) || 1).map((field, index) => (
+                    <Bar
+                      key={field}
+                      dataKey={field}
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      radius={[8, 8, 0, 0]}
+                      name={getFieldLabel(field)}
+                      label={{
+                        position: "top",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (value: any) => formatValue(value, field),
+                      }}
+                    />
+                  ))}
+                  {/* Second half of fields as lines */}
+                  {(dataKeys.apiFields.length > 1 ? dataKeys.apiFields : [dataKeys.savings]).slice(Math.ceil((dataKeys.apiFields.length || 2) / 2)).map((field, index) => (
+                    <Line
+                      key={field}
+                      type="monotone"
+                      dataKey={field}
+                      stroke={CHART_COLORS[(index + Math.ceil((dataKeys.apiFields.length || 2) / 2)) % CHART_COLORS.length]}
+                      strokeWidth={3}
+                      name={getFieldLabel(field)}
+                      label={{
+                        position: "top",
+                        fontSize: 10,
+                        fill: CHART_COLORS[(index + Math.ceil((dataKeys.apiFields.length || 2) / 2)) % CHART_COLORS.length],
+                        formatter: (value: any) => formatValue(value, field),
+                      }}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1552,19 +1703,22 @@ export function VisualizationCanvas({
                       }}
                     />
                   )}
-                  <Bar
-                    dataKey={dataKeys.spend}
-                    fill="#7C3AED"
-                    radius={[8, 8, 0, 0]}
-                    name="Spend (€)"
-                    style={{ cursor: "pointer" }}
-                    label={{
-                      position: "top",
-                      fontSize: 10,
-                      fill: "#475569",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend]).map((field, index) => (
+                    <Bar
+                      key={field}
+                      dataKey={field}
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      radius={[8, 8, 0, 0]}
+                      name={getFieldLabel(field)}
+                      style={{ cursor: "pointer" }}
+                      label={{
+                        position: "top",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (value: any) => formatValue(value, field),
+                      }}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1594,33 +1748,24 @@ export function VisualizationCanvas({
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
                   <Legend />
-                  <Bar
-                    dataKey={dataKeys.spend}
-                    fill="#7C3AED"
-                    radius={[8, 8, 0, 0]}
-                    name="Total Spend"
-                    label={{
-                      position: "top",
-                      fontSize: 9,
-                      fill: "#475569",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
-                  <Bar
-                    dataKey={dataKeys.savings}
-                    fill="#10B981"
-                    radius={[8, 8, 0, 0]}
-                    name="Savings Value"
-                    label={{
-                      position: "top",
-                      fontSize: 9,
-                      fill: "#475569",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index) => (
+                    <Bar
+                      key={field}
+                      dataKey={field}
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      radius={[8, 8, 0, 0]}
+                      name={getFieldLabel(field)}
+                      label={{
+                        position: "top",
+                        fontSize: 9,
+                        fill: "#475569",
+                        formatter: (value: any) => formatValue(value, field),
+                      }}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1650,29 +1795,25 @@ export function VisualizationCanvas({
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
                   <Legend />
-                  <Bar
-                    dataKey={dataKeys.spend}
-                    stackId="a"
-                    fill="#7C3AED"
-                    radius={[0, 0, 0, 0]}
-                    name="Total Spend"
-                  />
-                  <Bar
-                    dataKey={dataKeys.savings}
-                    stackId="a"
-                    fill="#10B981"
-                    radius={[8, 8, 0, 0]}
-                    name="Savings Value"
-                    label={{
-                      position: "top",
-                      fontSize: 10,
-                      fill: "#475569",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index, arr) => (
+                    <Bar
+                      key={field}
+                      dataKey={field}
+                      stackId="a"
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      radius={index === arr.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]}
+                      name={getFieldLabel(field)}
+                      label={index === arr.length - 1 ? {
+                        position: "top",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (value: any) => formatValue(value, field),
+                      } : undefined}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1702,35 +1843,25 @@ export function VisualizationCanvas({
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey={dataKeys.spend}
-                    stroke="#7C3AED"
-                    strokeWidth={2}
-                    name="Total Spend"
-                    label={{
-                      position: "top",
-                      fontSize: 10,
-                      fill: "#7C3AED",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={dataKeys.savings}
-                    stroke="#10B981"
-                    strokeWidth={2}
-                    name="Savings Value"
-                    label={{
-                      position: "bottom",
-                      fontSize: 10,
-                      fill: "#10B981",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
-                    }}
-                  />
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index) => (
+                    <Line
+                      key={field}
+                      type="monotone"
+                      dataKey={field}
+                      stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                      strokeWidth={2}
+                      name={getFieldLabel(field)}
+                      label={{
+                        position: index % 2 === 0 ? "top" : "bottom",
+                        fontSize: 10,
+                        fill: CHART_COLORS[index % CHART_COLORS.length],
+                        formatter: (value: any) => formatValue(value, field),
+                      }}
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -1760,87 +1891,35 @@ export function VisualizationCanvas({
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
-                    formatter={(value: number) => `€${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
                   <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey={dataKeys.spend}
-                    stroke="#7C3AED"
-                    fill="#7C3AED"
-                    fillOpacity={0.6}
-                    name="Total Spend"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey={dataKeys.savings}
-                    stroke="#10B981"
-                    fill="#10B981"
-                    fillOpacity={0.6}
-                    name="Savings Value"
-                  />
+                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index) => (
+                    <Area
+                      key={field}
+                      type="monotone"
+                      dataKey={field}
+                      stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      fillOpacity={0.4}
+                      name={getFieldLabel(field)}
+                    />
+                  ))}
+                  {/* Invisible line for labels on first field */}
                   <Line
                     type="monotone"
-                    dataKey={dataKeys.spend}
+                    dataKey={dataKeys.apiFields[0] || dataKeys.spend}
                     stroke="transparent"
                     dot={false}
                     legendType="none"
                     label={{
                       position: "top",
                       fontSize: 10,
-                      fill: "#7C3AED",
-                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                      fill: CHART_COLORS[0],
+                      formatter: (value: any) => formatValue(value, dataKeys.apiFields[0] || dataKeys.spend),
                     } as any}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        );
-
-      case "scatter":
-        return (
-          <div
-            ref={chartContainerRef}
-            className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
-          >
-            {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
-            {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <ResponsiveContainer width="100%" height={450}>
-                <ScatterChart>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis
-                    type="number"
-                    dataKey={dataKeys.spend}
-                    name="Spend"
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}K`}
-                  />
-                  <YAxis
-                    type="number"
-                    dataKey={dataKeys.savings}
-                    name="Savings"
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}K`}
-                  />
-                  <Tooltip
-                    cursor={{ strokeDasharray: "3 3" }}
-                    formatter={(value: number, name: string) => [
-                      `€${value.toLocaleString()}`,
-                      name,
-                    ]}
-                  />
-                  <Scatter name="Media" data={sampleData} fill="#7C3AED" />
-                </ScatterChart>
               </ResponsiveContainer>
             </div>
           </div>

@@ -146,16 +146,6 @@ export function GraphRecommendationsPanel({
       tooltip:
         "Show cumulative trends over time. Great for visualizing how different segments contribute to total over time.",
     },
-    {
-      id: "scatter",
-      name: "Scatter",
-      icon: Activity,
-      color: "#EF4444",
-      description: "Correlation between 2 metrics",
-      supportedFields: ["2 metrics (CPU vs Benchmark)"],
-      tooltip:
-        "Use this to see if high Spend correlates with high CPU Index. Identify outliers and relationships between metrics.",
-    },
   ];
 
   const getTotalSelected = () => {
