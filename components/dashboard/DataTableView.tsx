@@ -419,56 +419,81 @@ function transformTrackerData(
     group.benchmark_equivalent_net_net_spend +=
       item.benchmark_equivalent_net_net_spend || 0;
     group.value_loss += item.value_loss || 0;
-    // Percentages can't be summed - we'll recalculate or leave null
   });
 
   const tableRows: TableRow[] = Object.entries(mediaGroups).map(
-    ([mediaType, groupData], index) => ({
-      id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-${index}`,
-      mediaType,
-      type: "Actual" as const,
-      level: 0,
-      data: {
-        total_net_net_spend: groupData.total_net_net_spend,
-        total_non_addressable_spend: groupData.total_non_addressable_spend,
-        total_addressable_spend: groupData.total_addressable_spend,
-        measured_spend: groupData.measured_spend,
-        measured_spend_pct: groupData.measured_spend_pct,
-        benchmark_equivalent_net_net_spend:
-          groupData.benchmark_equivalent_net_net_spend,
-        value_loss: groupData.value_loss,
-        value_loss_pct: groupData.value_loss_pct,
-      },
-    }),
+    ([mediaType, groupData], index) => {
+      // Calculate measured_spend_pct from measured_spend / total_addressable_spend
+      const measuredPct =
+        groupData.total_addressable_spend > 0
+          ? (groupData.measured_spend / groupData.total_addressable_spend) * 100
+          : null;
+      // Calculate value_loss_pct from value_loss / measured_spend
+      const valueLossPct =
+        groupData.measured_spend > 0
+          ? (groupData.value_loss / groupData.measured_spend) * 100
+          : null;
+
+      return {
+        id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-${index}`,
+        mediaType,
+        type: "Actual" as const,
+        level: 0,
+        data: {
+          total_net_net_spend: groupData.total_net_net_spend,
+          total_non_addressable_spend: groupData.total_non_addressable_spend,
+          total_addressable_spend: groupData.total_addressable_spend,
+          measured_spend: groupData.measured_spend,
+          measured_spend_pct: measuredPct,
+          benchmark_equivalent_net_net_spend:
+            groupData.benchmark_equivalent_net_net_spend,
+          value_loss: groupData.value_loss,
+          value_loss_pct: valueLossPct,
+        },
+      };
+    },
+  );
+
+  const totalNetNetSpend = tableRows.reduce(
+    (sum, row) => sum + (row.data.total_net_net_spend || 0),
+    0,
+  );
+  const totalNonAddressableSpend = tableRows.reduce(
+    (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
+    0,
+  );
+  const totalAddressableSpend = tableRows.reduce(
+    (sum, row) => sum + (row.data.total_addressable_spend || 0),
+    0,
+  );
+  const totalMeasuredSpend = tableRows.reduce(
+    (sum, row) => sum + (row.data.measured_spend || 0),
+    0,
+  );
+  const totalBenchmarkSpend = tableRows.reduce(
+    (sum, row) => sum + (row.data.benchmark_equivalent_net_net_spend || 0),
+    0,
+  );
+  const totalValueLoss = tableRows.reduce(
+    (sum, row) => sum + (row.data.value_loss || 0),
+    0,
   );
 
   const totals = {
-    total_net_net_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_net_net_spend || 0),
-      0,
-    ),
-    total_non_addressable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
-      0,
-    ),
-    total_addressable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_addressable_spend || 0),
-      0,
-    ),
-    measured_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_spend || 0),
-      0,
-    ),
-    measured_spend_pct: null,
-    benchmark_equivalent_net_net_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.benchmark_equivalent_net_net_spend || 0),
-      0,
-    ),
-    value_loss: tableRows.reduce(
-      (sum, row) => sum + (row.data.value_loss || 0),
-      0,
-    ),
-    value_loss_pct: null,
+    total_net_net_spend: totalNetNetSpend,
+    total_non_addressable_spend: totalNonAddressableSpend,
+    total_addressable_spend: totalAddressableSpend,
+    measured_spend: totalMeasuredSpend,
+    measured_spend_pct:
+      totalAddressableSpend > 0
+        ? (totalMeasuredSpend / totalAddressableSpend) * 100
+        : null,
+    benchmark_equivalent_net_net_spend: totalBenchmarkSpend,
+    value_loss: totalValueLoss,
+    value_loss_pct:
+      totalMeasuredSpend > 0
+        ? (totalValueLoss / totalMeasuredSpend) * 100
+        : null,
   };
 
   tableRows.push({
