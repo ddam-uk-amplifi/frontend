@@ -188,14 +188,6 @@ export function checkDataDensity(
 
   if (!limit) return { isHigh: false };
 
-  if (dataLength > limit * 2) {
-    return {
-      isHigh: true,
-      message: `Data volume is very high (${dataLength} items). Switching to Table View for better readability.`,
-      suggestedChart: "table",
-    };
-  }
-
   if (dataLength > limit) {
     return {
       isHigh: true,
