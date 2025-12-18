@@ -1,19 +1,15 @@
 "use client";
 
-import { AlertTriangle, Info, Table2 } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 
 interface DataDensityWarningProps {
   message: string;
   severity: "info" | "warning" | "error";
-  suggestedChart?: string;
-  onSwitchChart?: (chartType: string) => void;
 }
 
 export function DataDensityWarning({
   message,
   severity,
-  suggestedChart,
-  onSwitchChart,
 }: DataDensityWarningProps) {
   const getStyles = () => {
     switch (severity) {
@@ -50,15 +46,6 @@ export function DataDensityWarning({
       <div className="flex-shrink-0 mt-0.5">{styles.icon}</div>
       <div className="flex-1">
         <p className={`text-sm ${styles.text}`}>{message}</p>
-        {suggestedChart && onSwitchChart && (
-          <button
-            onClick={() => onSwitchChart(suggestedChart)}
-            className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-          >
-            <Table2 className="w-4 h-4" />
-            Switch to Table View
-          </button>
-        )}
       </div>
     </div>
   );

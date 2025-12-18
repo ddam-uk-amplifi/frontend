@@ -148,7 +148,7 @@ export function VisualizationCanvas({
   const handleToggleForPPT = useCallback(() => {
     console.log("[VisualizationCanvas] handleToggleForPPT called");
     console.log("[VisualizationCanvas] graphId:", graphId);
-    console.log("[VisualizationCanvas] isChartReady:", isChartReady);
+    console.log("[VisualizationCanvas] isModalOpen:", isModalOpen);
     console.log(
       "[VisualizationCanvas] chartOnlyRef.current:",
       chartOnlyRef.current,
@@ -157,29 +157,30 @@ export function VisualizationCanvas({
     // If already included, allow removal without element
     const isCurrentlyIncluded = selectedGraphsForPPT.has(graphId);
 
-    // Double-check if ref is available now (fallback if isChartReady state is stale)
-    if (!isCurrentlyIncluded && !chartOnlyRef.current) {
-      console.warn("[VisualizationCanvas] Cannot add to PPT - chart not ready");
+    if (isCurrentlyIncluded) {
+      // Removing from PPT - no element needed
+      if (onToggleGraphForPPT) {
+        onToggleGraphForPPT(graphId, graphTitle, undefined);
+      }
       return;
     }
 
-    // Update isChartReady if it was false but ref is now available
-    if (!isChartReady && chartOnlyRef.current) {
-      setIsChartReady(true);
-    }
-
-    if (onToggleGraphForPPT) {
-      onToggleGraphForPPT(
-        graphId,
-        graphTitle,
-        chartOnlyRef.current || undefined,
-      );
-    }
+    // Adding to PPT - need element
+    // Use a delay to ensure the portal content is fully rendered
+    setTimeout(() => {
+      if (chartOnlyRef.current) {
+        if (onToggleGraphForPPT) {
+          onToggleGraphForPPT(graphId, graphTitle, chartOnlyRef.current);
+        }
+      } else {
+        console.warn("[VisualizationCanvas] Cannot add to PPT - chart element not found");
+      }
+    }, 100);
   }, [
     graphId,
     graphTitle,
     onToggleGraphForPPT,
-    isChartReady,
+    isModalOpen,
     selectedGraphsForPPT,
   ]);
 
@@ -1259,9 +1260,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1271,14 +1271,8 @@ export function VisualizationCanvas({
               </button>
             </div>
 
-            {/* Chart content for PPT capture - includes title and chart only */}
+            {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
-              <p className="text-sm text-slate-500 mb-4">
-                Click on any slice to filter and see details below
-              </p>
               <ResponsiveContainer width="100%" height={450}>
                 <PieChart>
                   <Pie
@@ -1328,9 +1322,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1342,12 +1335,6 @@ export function VisualizationCanvas({
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
-              <p className="text-sm text-slate-500 mb-4">
-                Click on any slice to filter and see details below
-              </p>
               <ResponsiveContainer width="100%" height={450}>
                 <PieChart>
                   <Pie
@@ -1403,9 +1390,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1417,12 +1403,6 @@ export function VisualizationCanvas({
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
-              <p className="text-sm text-slate-500 mb-4">
-                Click on any bar to filter and see details below
-              </p>
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
@@ -1451,6 +1431,12 @@ export function VisualizationCanvas({
                     radius={[0, 8, 8, 0]}
                     name="Spend (€)"
                     style={{ cursor: "pointer" }}
+                    label={{
+                      position: "right",
+                      fontSize: 10,
+                      fill: "#475569",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -1464,9 +1450,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1478,9 +1463,6 @@ export function VisualizationCanvas({
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart data={sampleData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -1495,6 +1477,12 @@ export function VisualizationCanvas({
                     fill="#7C3AED"
                     radius={[8, 8, 0, 0]}
                     name="Total Spend"
+                    label={{
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#475569",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                   <Line
                     type="monotone"
@@ -1502,6 +1490,12 @@ export function VisualizationCanvas({
                     stroke="#10B981"
                     strokeWidth={3}
                     name="Savings Value"
+                    label={{
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#10B981",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -1518,9 +1512,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1532,12 +1525,6 @@ export function VisualizationCanvas({
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
-              <p className="text-sm text-slate-500 mb-4">
-                Click on any bar to filter and see details below
-              </p>
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
@@ -1571,6 +1558,12 @@ export function VisualizationCanvas({
                     radius={[8, 8, 0, 0]}
                     name="Spend (€)"
                     style={{ cursor: "pointer" }}
+                    label={{
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#475569",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -1584,9 +1577,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1596,9 +1588,6 @@ export function VisualizationCanvas({
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart data={sampleData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -1613,12 +1602,24 @@ export function VisualizationCanvas({
                     fill="#7C3AED"
                     radius={[8, 8, 0, 0]}
                     name="Total Spend"
+                    label={{
+                      position: "top",
+                      fontSize: 9,
+                      fill: "#475569",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                   <Bar
                     dataKey={dataKeys.savings}
                     fill="#10B981"
                     radius={[8, 8, 0, 0]}
                     name="Savings Value"
+                    label={{
+                      position: "top",
+                      fontSize: 9,
+                      fill: "#475569",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -1632,9 +1633,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1644,9 +1644,6 @@ export function VisualizationCanvas({
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart data={sampleData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -1669,6 +1666,12 @@ export function VisualizationCanvas({
                     fill="#10B981"
                     radius={[8, 8, 0, 0]}
                     name="Savings Value"
+                    label={{
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#475569",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -1682,9 +1685,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1694,9 +1696,6 @@ export function VisualizationCanvas({
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <LineChart data={sampleData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -1712,6 +1711,12 @@ export function VisualizationCanvas({
                     stroke="#7C3AED"
                     strokeWidth={2}
                     name="Total Spend"
+                    label={{
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#7C3AED",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                   <Line
                     type="monotone"
@@ -1719,6 +1724,12 @@ export function VisualizationCanvas({
                     stroke="#10B981"
                     strokeWidth={2}
                     name="Savings Value"
+                    label={{
+                      position: "bottom",
+                      fontSize: 10,
+                      fill: "#10B981",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -1732,9 +1743,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1744,9 +1754,6 @@ export function VisualizationCanvas({
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <AreaChart data={sampleData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -1759,7 +1766,6 @@ export function VisualizationCanvas({
                   <Area
                     type="monotone"
                     dataKey={dataKeys.spend}
-                    stackId="1"
                     stroke="#7C3AED"
                     fill="#7C3AED"
                     fillOpacity={0.6}
@@ -1768,11 +1774,23 @@ export function VisualizationCanvas({
                   <Area
                     type="monotone"
                     dataKey={dataKeys.savings}
-                    stackId="1"
                     stroke="#10B981"
                     fill="#10B981"
                     fillOpacity={0.6}
                     name="Savings Value"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={dataKeys.spend}
+                    stroke="transparent"
+                    dot={false}
+                    legendType="none"
+                    label={{
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#7C3AED",
+                      formatter: (value: any) => value ? `€${(value / 1000).toFixed(0)}K` : "",
+                    } as any}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -1786,9 +1804,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
+            {/* Expand Button */}
+            <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1798,9 +1815,6 @@ export function VisualizationCanvas({
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                {graphTitle}
-              </h3>
               <ResponsiveContainer width="100%" height={450}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -1838,17 +1852,8 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden relative"
           >
-            {/* Chart Action Buttons - outside chartOnlyRef for clean PPT capture */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <PPTButton />
-            </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white">
-              <div className="p-6 border-b border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-800">
-                  {graphTitle}
-                </h3>
-              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -1926,10 +1931,6 @@ export function VisualizationCanvas({
           <DataDensityWarning
             message={densityCheck.message}
             severity={densityCheck.suggestedChart ? "warning" : "info"}
-            suggestedChart={densityCheck.suggestedChart}
-            onSwitchChart={() => {
-              // Auto-switching removed
-            }}
           />
         )}
 
@@ -1986,11 +1987,11 @@ export function VisualizationCanvas({
           graphId={graphId}
           title={graphTitle}
           isIncluded={isIncludedInReport}
-          onToggleInclude={() => onToggleGraphForPPT?.(graphId, graphTitle)}
+          onToggleInclude={handleToggleForPPT}
           slideNumber={slideNumber}
           onUpdateSlideNumber={(num) => onUpdateSlideNumber?.(graphId, num)}
         >
-          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm">
+          <div ref={chartOnlyRef} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm">
             {renderVisualization()}
           </div>
         </GraphModal>

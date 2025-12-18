@@ -1,7 +1,8 @@
 "use client";
 
 import { X, FileText, Check, Maximize2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface GraphModalProps {
   isOpen: boolean;
@@ -12,28 +13,23 @@ interface GraphModalProps {
   isIncluded: boolean;
   onToggleInclude: () => void;
   slideNumber?: number;
-  onUpdateSlideNumber: (slideNumber: number | undefined) => void;
+  onUpdateSlideNumber?: (slideNumber: number | undefined) => void;
 }
 
 export function GraphModal({
   isOpen,
   onClose,
-  graphId,
   title,
   children,
   isIncluded,
   onToggleInclude,
-  slideNumber,
-  onUpdateSlideNumber,
 }: GraphModalProps) {
-  const [localSlideNumber, setLocalSlideNumber] = useState<string>(
-    slideNumber?.toString() || "",
-  );
+  const [mounted, setMounted] = useState(false);
 
-  // Update local state when slideNumber prop changes
+  // Ensure we only render portal on client side
   useEffect(() => {
-    setLocalSlideNumber(slideNumber?.toString() || "");
-  }, [slideNumber]);
+    setMounted(true);
+  }, []);
 
   // Prevent scroll when modal is open
   useEffect(() => {
@@ -47,22 +43,10 @@ export function GraphModal({
     };
   }, [isOpen]);
 
-  const handleSlideNumberChange = (value: string) => {
-    setLocalSlideNumber(value);
+  if (!isOpen || !mounted) return null;
 
-    // Parse and update the slide number
-    const num = parseInt(value, 10);
-    if (value === "" || value === null) {
-      onUpdateSlideNumber(undefined);
-    } else if (!isNaN(num) && num > 0) {
-      onUpdateSlideNumber(num);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -118,30 +102,6 @@ export function GraphModal({
           </div>
         </div>
 
-        {/* Slide Number Configuration - Always visible when included */}
-        {isIncluded && (
-          <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-slate-700">
-                  Target Slide:
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={localSlideNumber}
-                  onChange={(e) => handleSlideNumberChange(e.target.value)}
-                  placeholder="Auto"
-                  className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm bg-white"
-                />
-              </div>
-              <span className="text-xs text-slate-500">
-                Leave empty for auto-placement, or specify a slide number
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Content */}
         <div className="flex-1 p-8 overflow-auto bg-gradient-to-br from-slate-50 to-slate-100/50">
           <div className="max-w-6xl mx-auto">{children}</div>
@@ -149,4 +109,6 @@ export function GraphModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

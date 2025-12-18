@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Menu } from "lucide-react";
 import { toast } from "sonner";
 import { TopBar } from "@/components/dashboard/TopBar";
@@ -730,8 +731,8 @@ function GraphTitleInputDialog({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -810,6 +811,7 @@ function GraphTitleInputDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

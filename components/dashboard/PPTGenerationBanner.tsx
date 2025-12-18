@@ -14,7 +14,7 @@ export function PPTGenerationBanner({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="sticky top-0 z-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-lg">
+    <div className="sticky top-0 z-50 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">

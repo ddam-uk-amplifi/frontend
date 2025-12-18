@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Maximize2, X, FileText, Check } from "lucide-react";
 import { Card } from "../ui/card";
 import {
@@ -304,6 +305,12 @@ export function ChartGridView({
     null,
   );
   const fullScreenChartRef = useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure we only render portal on client side
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Generate charts based on visible columns
   const charts = useMemo(() => generateChartConfigs(columns), [columns]);
@@ -936,108 +943,127 @@ export function ChartGridView({
         </div>
       </div>
 
-      {/* Full-Screen Modal */}
-      {fullScreenChart && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setFullScreenChart(null)}
-          />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-slate-200/60">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-                  <Maximize2 className="w-5 h-5 text-white" />
+      {/* Full-Screen Modal - rendered via portal to ensure it's above everything */}
+      {fullScreenChart &&
+        mounted &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setFullScreenChart(null)}
+            />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-slate-200/60">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                    <Maximize2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      {fullScreenChart.title}
+                    </h3>
+                    <p className="text-sm text-slate-500">Expanded view</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-800">
-                    {fullScreenChart.title}
-                  </h3>
-                  <p className="text-sm text-slate-500">Expanded view</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    const element = fullScreenChartRef.current;
-                    handleToggleForPPT(
-                      `table-${fullScreenChart.id}`,
-                      fullScreenChart.title,
-                      element || undefined,
-                      fullScreenChart,
-                    );
-                  }}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${
-                    isChartInPPT(`table-${fullScreenChart.id}`)
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                      : "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
-                  }`}
-                >
-                  {isChartInPPT(`table-${fullScreenChart.id}`) ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Added to PPT</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4" />
-                      <span>Add to PPT</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => setFullScreenChart(null)}
-                  className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5 text-slate-500" />
-                </button>
-              </div>
-            </div>
-
-            {/* Slide Number Config */}
-            {isChartInPPT(`table-${fullScreenChart.id}`) && (
-              <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium text-slate-700">
-                    Target Slide:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={
-                      getSlideNumber?.(`table-${fullScreenChart.id}`) || ""
-                    }
-                    onChange={(e) => {
-                      const num = e.target.value
-                        ? parseInt(e.target.value, 10)
-                        : undefined;
-                      onUpdateSlideNumber?.(`table-${fullScreenChart.id}`, num);
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      // For removal, no element needed
+                      if (isChartInPPT(`table-${fullScreenChart.id}`)) {
+                        handleToggleForPPT(
+                          `table-${fullScreenChart.id}`,
+                          fullScreenChart.title,
+                          undefined,
+                          fullScreenChart,
+                        );
+                        return;
+                      }
+                      // For adding, get element (should be available since modal is already open)
+                      const element = fullScreenChartRef.current;
+                      if (element) {
+                        handleToggleForPPT(
+                          `table-${fullScreenChart.id}`,
+                          fullScreenChart.title,
+                          element,
+                          fullScreenChart,
+                        );
+                      }
                     }}
-                    placeholder="Auto"
-                    className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm bg-white"
-                  />
-                  <span className="text-xs text-slate-500">
-                    Leave empty for auto-placement
-                  </span>
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${
+                      isChartInPPT(`table-${fullScreenChart.id}`)
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                        : "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                    }`}
+                  >
+                    {isChartInPPT(`table-${fullScreenChart.id}`) ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Added to PPT</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4" />
+                        <span>Add to PPT</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setFullScreenChart(null)}
+                    className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Modal Content */}
-            <div className="flex-1 p-8 overflow-auto min-h-0 bg-gradient-to-br from-slate-50 to-slate-100/50">
-              <div
-                ref={fullScreenChartRef}
-                className="bg-white rounded-xl p-6 shadow-sm max-w-4xl mx-auto h-full"
-              >
-                <div className="h-full" style={{ minHeight: "400px" }}>
-                  {renderChart(fullScreenChart, 500, true)}
+              {/* Slide Number Config */}
+              {isChartInPPT(`table-${fullScreenChart.id}`) && (
+                <div className="px-6 py-4 border-b border-slate-200/60 bg-gradient-to-r from-violet-50 to-purple-50">
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium text-slate-700">
+                      Target Slide:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={
+                        getSlideNumber?.(`table-${fullScreenChart.id}`) || ""
+                      }
+                      onChange={(e) => {
+                        const num = e.target.value
+                          ? parseInt(e.target.value, 10)
+                          : undefined;
+                        onUpdateSlideNumber?.(
+                          `table-${fullScreenChart.id}`,
+                          num,
+                        );
+                      }}
+                      placeholder="Auto"
+                      className="w-24 px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm bg-white"
+                    />
+                    <span className="text-xs text-slate-500">
+                      Leave empty for auto-placement
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Content */}
+              <div className="flex-1 p-8 overflow-auto min-h-0 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                <div
+                  ref={fullScreenChartRef}
+                  className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm max-w-4xl mx-auto h-full"
+                >
+                  <div className="h-full" style={{ minHeight: "400px" }}>
+                    {renderChart(fullScreenChart, 500, true)}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
