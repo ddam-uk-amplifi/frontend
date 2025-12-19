@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   Settings2,
   Eye,
@@ -14,7 +14,6 @@ import {
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { toast } from "sonner";
 import {
   fetchConsolidatedSummary,
   fetchTrackerSummaryData,
@@ -379,122 +378,77 @@ function transformTrackerData(
 
   if (filteredData.length === 0) return [];
 
-  // Group by normalized media type to handle duplicates with different capitalizations
-  const mediaGroups: Record<
-    string,
-    {
-      total_net_net_spend: number;
-      total_non_addressable_spend: number;
-      total_addressable_spend: number;
-      measured_spend: number;
-      measured_spend_pct: number | null;
-      benchmark_equivalent_net_net_spend: number;
-      value_loss: number;
-      value_loss_pct: number | null;
-    }
-  > = {};
+  // Find the GRAND TOTAL row from API for the totals
+  const grandTotalRow = filteredData.find(
+    (item) => item.media_type?.toUpperCase() === "GRAND TOTAL",
+  );
 
-  filteredData.forEach((item) => {
-    // Skip "GRAND TOTAL" rows from the API
-    if (item.media_type?.toUpperCase() === "GRAND TOTAL") return;
-
-    const mediaType = normalizeMediaType(item.media_type);
-    if (!mediaGroups[mediaType]) {
-      mediaGroups[mediaType] = {
-        total_net_net_spend: 0,
-        total_non_addressable_spend: 0,
-        total_addressable_spend: 0,
-        measured_spend: 0,
-        measured_spend_pct: null,
-        benchmark_equivalent_net_net_spend: 0,
-        value_loss: 0,
-        value_loss_pct: null,
-      };
-    }
-    const group = mediaGroups[mediaType];
-    group.total_net_net_spend += item.total_net_net_spend || 0;
-    group.total_non_addressable_spend += item.total_non_addressable_spend || 0;
-    group.total_addressable_spend += item.total_addressable_spend || 0;
-    group.measured_spend += item.measured_spend || 0;
-    group.benchmark_equivalent_net_net_spend +=
-      item.benchmark_equivalent_net_net_spend || 0;
-    group.value_loss += item.value_loss || 0;
-  });
-
-  const tableRows: TableRow[] = Object.entries(mediaGroups).map(
-    ([mediaType, groupData], index) => {
-      // Calculate measured_spend_pct from measured_spend / total_addressable_spend
-      const measuredPct =
-        groupData.total_addressable_spend > 0
-          ? (groupData.measured_spend / groupData.total_addressable_spend) * 100
-          : null;
-      // Calculate value_loss_pct from value_loss / measured_spend
-      const valueLossPct =
-        groupData.measured_spend > 0
-          ? (groupData.value_loss / groupData.measured_spend) * 100
-          : null;
-
+  // Create table rows directly from API data (no recalculation needed)
+  const tableRows: TableRow[] = filteredData
+    .filter((item) => item.media_type?.toUpperCase() !== "GRAND TOTAL")
+    .map((item, index) => {
+      const mediaType = normalizeMediaType(item.media_type);
       return {
         id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-${index}`,
         mediaType,
         type: "Actual" as const,
         level: 0,
         data: {
-          total_net_net_spend: groupData.total_net_net_spend,
-          total_non_addressable_spend: groupData.total_non_addressable_spend,
-          total_addressable_spend: groupData.total_addressable_spend,
-          measured_spend: groupData.measured_spend,
-          measured_spend_pct: measuredPct,
+          total_net_net_spend: item.total_net_net_spend,
+          total_non_addressable_spend: item.total_non_addressable_spend,
+          total_addressable_spend: item.total_addressable_spend,
+          measured_spend: item.measured_spend,
+          measured_spend_pct: item.measured_spend_pct,
           benchmark_equivalent_net_net_spend:
-            groupData.benchmark_equivalent_net_net_spend,
-          value_loss: groupData.value_loss,
-          value_loss_pct: valueLossPct,
+            item.benchmark_equivalent_net_net_spend,
+          value_loss: item.value_loss,
+          value_loss_pct: item.value_loss_pct,
         },
       };
-    },
-  );
+    });
 
-  const totalNetNetSpend = tableRows.reduce(
-    (sum, row) => sum + (row.data.total_net_net_spend || 0),
-    0,
-  );
-  const totalNonAddressableSpend = tableRows.reduce(
-    (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
-    0,
-  );
-  const totalAddressableSpend = tableRows.reduce(
-    (sum, row) => sum + (row.data.total_addressable_spend || 0),
-    0,
-  );
-  const totalMeasuredSpend = tableRows.reduce(
-    (sum, row) => sum + (row.data.measured_spend || 0),
-    0,
-  );
-  const totalBenchmarkSpend = tableRows.reduce(
-    (sum, row) => sum + (row.data.benchmark_equivalent_net_net_spend || 0),
-    0,
-  );
-  const totalValueLoss = tableRows.reduce(
-    (sum, row) => sum + (row.data.value_loss || 0),
-    0,
-  );
-
-  const totals = {
-    total_net_net_spend: totalNetNetSpend,
-    total_non_addressable_spend: totalNonAddressableSpend,
-    total_addressable_spend: totalAddressableSpend,
-    measured_spend: totalMeasuredSpend,
-    measured_spend_pct:
-      totalAddressableSpend > 0
-        ? (totalMeasuredSpend / totalAddressableSpend) * 100
-        : null,
-    benchmark_equivalent_net_net_spend: totalBenchmarkSpend,
-    value_loss: totalValueLoss,
-    value_loss_pct:
-      totalMeasuredSpend > 0
-        ? (totalValueLoss / totalMeasuredSpend) * 100
-        : null,
-  };
+  // Use GRAND TOTAL from API if available, otherwise calculate totals
+  const totals = grandTotalRow
+    ? {
+        total_net_net_spend: grandTotalRow.total_net_net_spend,
+        total_non_addressable_spend: grandTotalRow.total_non_addressable_spend,
+        total_addressable_spend: grandTotalRow.total_addressable_spend,
+        measured_spend: grandTotalRow.measured_spend,
+        measured_spend_pct: grandTotalRow.measured_spend_pct,
+        benchmark_equivalent_net_net_spend:
+          grandTotalRow.benchmark_equivalent_net_net_spend,
+        value_loss: grandTotalRow.value_loss,
+        value_loss_pct: grandTotalRow.value_loss_pct,
+      }
+    : {
+        total_net_net_spend: tableRows.reduce(
+          (sum, row) => sum + (row.data.total_net_net_spend || 0),
+          0,
+        ),
+        total_non_addressable_spend: tableRows.reduce(
+          (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
+          0,
+        ),
+        total_addressable_spend: tableRows.reduce(
+          (sum, row) => sum + (row.data.total_addressable_spend || 0),
+          0,
+        ),
+        measured_spend: tableRows.reduce(
+          (sum, row) => sum + (row.data.measured_spend || 0),
+          0,
+        ),
+        measured_spend_pct: null,
+        benchmark_equivalent_net_net_spend: tableRows.reduce(
+          (sum, row) =>
+            sum + (row.data.benchmark_equivalent_net_net_spend || 0),
+          0,
+        ),
+        value_loss: tableRows.reduce(
+          (sum, row) => sum + (row.data.value_loss || 0),
+          0,
+        ),
+        value_loss_pct: null,
+      };
 
   tableRows.push({
     id: "total",
@@ -519,7 +473,6 @@ export function DataTableView({
   selectedGraphsForPPT = new Set(),
   onToggleGraphForPPT,
 }: DataTableViewProps) {
-  const queryClient = useQueryClient();
   const [columns, setColumns] = useState<TableColumn[]>(SUMMARY_COLUMNS);
   const [showColumnControl, setShowColumnControl] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
