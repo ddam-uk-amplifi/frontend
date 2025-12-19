@@ -1040,6 +1040,9 @@ export async function captureChartAsBase64(
   console.log("[captureChartAsBase64] Chart data provided:", !!chartData);
   console.log("[captureChartAsBase64] Data keys:", dataKeys);
 
+  // Store original styles to restore later
+  const originalStyles: Map<HTMLElement, string> = new Map();
+
   try {
     // Log element details
     console.log("[captureChartAsBase64] Element details:", {
@@ -1064,6 +1067,43 @@ export async function captureChartAsBase64(
     // Check if element is in the DOM
     if (!document.body.contains(element)) {
       throw new Error("Element is not attached to the DOM");
+    }
+
+    // Check if element has scrollable content (table case)
+    const hasScrollableContent =
+      element.scrollWidth > element.offsetWidth ||
+      element.scrollHeight > element.offsetHeight;
+
+    if (hasScrollableContent) {
+      console.log("[captureChartAsBase64] Element has scrollable content, expanding...");
+      console.log("[captureChartAsBase64] ScrollWidth:", element.scrollWidth, "OffsetWidth:", element.offsetWidth);
+      console.log("[captureChartAsBase64] ScrollHeight:", element.scrollHeight, "OffsetHeight:", element.offsetHeight);
+
+      // Store original styles
+      originalStyles.set(element, element.style.cssText);
+
+      // Temporarily expand to show full content
+      element.style.overflow = "visible";
+      element.style.maxHeight = "none";
+      element.style.maxWidth = "none";
+      element.style.width = `${element.scrollWidth}px`;
+      element.style.height = `${element.scrollHeight}px`;
+
+      // Also check parent elements for overflow constraints
+      let parent = element.parentElement;
+      while (parent && parent !== document.body) {
+        const parentStyle = window.getComputedStyle(parent);
+        if (parentStyle.overflow !== "visible" || parentStyle.maxHeight !== "none") {
+          originalStyles.set(parent, parent.style.cssText);
+          parent.style.overflow = "visible";
+          parent.style.maxHeight = "none";
+          parent.style.maxWidth = "none";
+        }
+        parent = parent.parentElement;
+      }
+
+      // Wait for reflow
+      await new Promise((resolve) => requestAnimationFrame(resolve));
     }
 
     // Determine which element to capture
@@ -1101,8 +1141,74 @@ export async function captureChartAsBase64(
         wrapperElement.appendChild(titleElement);
       }
 
-      // Clone the chart element
+      // Clone the chart element and fix table column order if needed
       const clonedChart = element.cloneNode(true) as HTMLElement;
+
+      // Fix table structure for proper capture - remove all sticky/fixed positioning
+      // and ensure the table renders correctly without scroll container constraints
+      const tables = clonedChart.querySelectorAll("table");
+      tables.forEach((table) => {
+        const tableEl = table as HTMLTableElement;
+
+        // Reset table styles for clean capture
+        tableEl.style.width = "auto";
+        tableEl.style.minWidth = "0";
+        tableEl.style.tableLayout = "auto";
+
+        // Process all rows to fix cell alignment
+        const allRows = tableEl.querySelectorAll("tr");
+        allRows.forEach((row) => {
+          const cells = row.querySelectorAll("th, td");
+          cells.forEach((cell, cellIndex) => {
+            const el = cell as HTMLElement;
+            // Remove sticky positioning
+            el.style.position = "static";
+            el.style.left = "auto";
+            el.style.right = "auto";
+            el.style.zIndex = "auto";
+            el.style.boxShadow = "none";
+            // Ensure proper display
+            el.style.display = "table-cell";
+            // Add some padding for better appearance
+            el.style.padding = "8px 12px";
+            el.style.whiteSpace = "nowrap";
+
+            // First column (Media Type) should be left-aligned
+            // All other columns (numeric) should be right-aligned
+            if (cellIndex === 0) {
+              el.style.textAlign = "left";
+            } else {
+              el.style.textAlign = "right";
+            }
+          });
+        });
+
+        // Process thead - remove sticky positioning
+        const thead = tableEl.querySelector("thead");
+        if (thead) {
+          (thead as HTMLElement).style.position = "static";
+          (thead as HTMLElement).style.top = "auto";
+          (thead as HTMLElement).style.zIndex = "auto";
+        }
+      });
+
+      // Remove overflow constraints from cloned element and all children
+      clonedChart.style.overflow = "visible";
+      clonedChart.style.maxHeight = "none";
+      clonedChart.style.maxWidth = "none";
+      clonedChart.style.height = "auto";
+      clonedChart.style.width = "auto";
+      clonedChart.style.position = "static";
+
+      // Also fix any nested scrollable containers
+      const scrollContainers = clonedChart.querySelectorAll("[class*='overflow']");
+      scrollContainers.forEach((container) => {
+        const el = container as HTMLElement;
+        el.style.overflow = "visible";
+        el.style.maxHeight = "none";
+        el.style.maxWidth = "none";
+      });
+
       wrapperElement.appendChild(clonedChart);
 
       // Create data table if chartData is provided
@@ -1287,6 +1393,14 @@ export async function captureChartAsBase64(
       document.body.removeChild(wrapperElement);
     }
 
+    // Restore original styles for expanded elements
+    if (originalStyles.size > 0) {
+      console.log("[captureChartAsBase64] Restoring original styles...");
+      originalStyles.forEach((cssText, el) => {
+        el.style.cssText = cssText;
+      });
+    }
+
     if (!canvas) {
       throw new Error("html2canvas returned null or undefined");
     }
@@ -1324,6 +1438,15 @@ export async function captureChartAsBase64(
     console.error("[captureChartAsBase64] Error stack:", error?.stack);
     console.error("[captureChartAsBase64] Full error object:", error);
     console.error("=== [captureChartAsBase64] END ERROR ===");
+
+    // Restore original styles even on error
+    if (originalStyles.size > 0) {
+      console.log("[captureChartAsBase64] Restoring original styles after error...");
+      originalStyles.forEach((cssText, el) => {
+        el.style.cssText = cssText;
+      });
+    }
+
     throw error;
   }
 }

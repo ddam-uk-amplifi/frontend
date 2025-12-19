@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Menu } from "lucide-react";
 import { toast } from "sonner";
-import { TopBar } from "@/components/dashboard/TopBar";
+import { TopBar, type MarketOption } from "@/components/dashboard/TopBar";
 import { QueryBuilderPanel } from "@/components/dashboard/QueryBuilderPanel";
 import { GraphRecommendationsPanel } from "@/components/dashboard/GraphRecommendationsPanel";
 import { VisualizationCanvas } from "@/components/dashboard/VisualizationCanvas";
@@ -17,6 +17,7 @@ import {
   captureChartAsBase64,
   type ChartImageForPPT,
 } from "@/lib/api/dashboard";
+import { consolidationApi } from "@/lib/api/consolidation";
 import { tokenUtils } from "@/lib/utils/token";
 import { usePPTStore } from "@/lib/stores/usePPTStore";
 
@@ -44,6 +45,9 @@ export default function Dashboard() {
   const [selectedMarket, setSelectedMarket] = useState("");
   const [selectedYtdMonth, setSelectedYtdMonth] = useState("");
   const [selectedJobId, setSelectedJobId] = useState("");
+  // Dynamic markets from consolidation job (for trackers data source)
+  const [availableMarkets, setAvailableMarkets] = useState<MarketOption[]>([]);
+  const [isLoadingMarkets, setIsLoadingMarkets] = useState(false);
   const [isQueryPanelOpen, setIsQueryPanelOpen] = useState(true);
   const [selectedFields, setSelectedFields] = useState<
     Record<string, string[]>
@@ -85,24 +89,71 @@ export default function Dashboard() {
     : undefined;
 
   // Fetch latest job when client changes (for summary data source)
+  // Also fetch markets from job when trackers is selected
   useEffect(() => {
-    const fetchJob = async () => {
-      if (!selectedClient || selectedDataSource !== "summary") {
+    const fetchJobAndMarkets = async () => {
+      if (!selectedClient) {
         setSelectedJobId("");
+        setAvailableMarkets([]);
         return;
       }
 
-      try {
-        const response = await fetchLatestJob(selectedClient);
-        setSelectedJobId(response.consolidation_job_id);
-      } catch (error) {
-        console.error("Failed to fetch latest job:", error);
-        // Don't show toast - it's expected if no jobs exist
-        setSelectedJobId("");
+      // For trackers data source, fetch latest job and extract markets
+      if (selectedDataSource === "trackers") {
+        setIsLoadingMarkets(true);
+        try {
+          const response = await fetchLatestJob(selectedClient);
+          const jobId = response.consolidation_job_id;
+          setSelectedJobId(jobId);
+
+          // Fetch job details to get trackers with market info
+          const jobDetail = await consolidationApi.getJobDetail(jobId);
+          
+          // Extract unique markets from trackers
+          const marketsMap = new Map<string, MarketOption>();
+          jobDetail.trackers.forEach((tracker) => {
+            if (!marketsMap.has(tracker.market_code)) {
+              marketsMap.set(tracker.market_code, {
+                code: tracker.market_code,
+                name: tracker.market_name,
+              });
+            }
+          });
+          
+          // Sort markets by name
+          const markets = Array.from(marketsMap.values()).sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
+          setAvailableMarkets(markets);
+        } catch (error) {
+          console.error("Failed to fetch job/markets:", error);
+          setSelectedJobId("");
+          setAvailableMarkets([]);
+        } finally {
+          setIsLoadingMarkets(false);
+        }
+        return;
       }
+
+      // For summary data source
+      if (selectedDataSource === "summary") {
+        setAvailableMarkets([]); // Clear markets for summary
+        try {
+          const response = await fetchLatestJob(selectedClient);
+          setSelectedJobId(response.consolidation_job_id);
+        } catch (error) {
+          console.error("Failed to fetch latest job:", error);
+          setSelectedJobId("");
+        }
+        return;
+      }
+
+      // No data source selected
+      setSelectedJobId("");
+      setAvailableMarkets([]);
     };
 
-    fetchJob();
+    fetchJobAndMarkets();
   }, [selectedClient, selectedDataSource]);
 
   const handleFieldToggle = (groupId: string, fieldId: string) => {
@@ -132,12 +183,17 @@ export default function Dashboard() {
   // When data source changes, clear market selection if switching to summary
   const handleDataSourceChange = (source: "summary" | "trackers" | "") => {
     setSelectedDataSource(source);
-    if (source === "summary" || source === "") {
-      setSelectedMarket(""); // Summary Excel doesn't use market selection
-    }
+    setSelectedMarket(""); // Always clear market when data source changes
     // Clear fields when switching data source since field sets are different
     setSelectedFields({});
     setSelectedGraphType(null);
+  };
+
+  // When client changes, clear market selection
+  const handleClientChange = (client: string) => {
+    setSelectedClient(client);
+    setSelectedMarket("");
+    setAvailableMarkets([]);
   };
 
   // PPT Functions - capture base64 immediately when user selects a graph
@@ -562,10 +618,12 @@ export default function Dashboard() {
         selectedDataSource={selectedDataSource}
         selectedMarket={selectedMarket}
         selectedYtdMonth={selectedYtdMonth}
-        onClientChange={setSelectedClient}
+        onClientChange={handleClientChange}
         onDataSourceChange={handleDataSourceChange}
         onMarketChange={setSelectedMarket}
         onYtdMonthChange={setSelectedYtdMonth}
+        availableMarkets={availableMarkets}
+        isLoadingMarkets={isLoadingMarkets}
       />
       {/* View Mode Toggle */}
       <div className="border-b border-slate-200 bg-white px-6">

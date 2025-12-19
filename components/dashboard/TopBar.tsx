@@ -1,8 +1,14 @@
 "use client";
 
-import { Building2, Database, MapPin, ChevronDown } from "lucide-react";
+import { Building2, Database, MapPin, ChevronDown, Loader2 } from "lucide-react";
 
 export type DataSource = "summary" | "trackers" | "";
+
+// Market option type for dynamic markets
+export interface MarketOption {
+  code: string;
+  name: string;
+}
 
 interface TopBarProps {
   selectedClient: string;
@@ -13,6 +19,9 @@ interface TopBarProps {
   onDataSourceChange: (source: DataSource) => void;
   onMarketChange: (market: string) => void;
   onYtdMonthChange: (month: string) => void;
+  // Dynamic markets from consolidation job
+  availableMarkets?: MarketOption[];
+  isLoadingMarkets?: boolean;
 }
 
 export function TopBar({
@@ -24,48 +33,14 @@ export function TopBar({
   onDataSourceChange,
   onMarketChange,
   onYtdMonthChange,
+  availableMarkets = [],
+  isLoadingMarkets = false,
 }: TopBarProps) {
   const clients = ["Arla", "Carlsberg", "Kering"];
 
-  // Markets available per client (for Trackers data source)
-  // Format: { code: displayName }
-  const marketsByClient: Record<string, Record<string, string>> = {
-    Arla: {
-      DK: "Denmark",
-      SE: "Sweden",
-      UK: "United Kingdom",
-      DE: "Germany",
-      FI: "Finland",
-      NL: "Netherlands",
-      PL: "Poland",
-      ES: "Spain",
-      NZ: "New Zealand",
-      DO: "Dominican Republic",
-    },
-    Carlsberg: {
-      DK: "Denmark",
-      PL: "Poland",
-      RU: "Russia",
-      CN: "China",
-      UK: "United Kingdom",
-    },
-    Kering: {
-      FR: "France",
-      IT: "Italy",
-      UK: "United Kingdom",
-      US: "United States",
-      CN: "China",
-      JP: "Japan",
-    },
-  };
-
-  const availableMarkets = selectedClient
-    ? marketsByClient[selectedClient] || {}
-    : {};
-
   // Get display name for selected market code
   const selectedMarketName = selectedMarket
-    ? availableMarkets[selectedMarket] || selectedMarket
+    ? availableMarkets.find(m => m.code === selectedMarket)?.name || selectedMarket
     : "";
 
   // When data source changes, reset market if switching to summary
@@ -154,20 +129,31 @@ export function TopBar({
                   <MapPin className="w-4 h-4 text-white" />
                 </div>
                 <div className="relative">
-                  <select
-                    value={selectedMarket}
-                    onChange={(e) => onMarketChange(e.target.value)}
-                    disabled={!selectedClient}
-                    className={`${selectBaseClass} min-w-[150px]`}
-                  >
-                    <option value="">Select Market...</option>
-                    {Object.entries(availableMarkets).map(([code, name]) => (
-                      <option key={code} value={code}>
-                        {name} ({code})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  {isLoadingMarkets ? (
+                    <div className={`${selectBaseClass} min-w-[150px] flex items-center gap-2`}>
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                      <span className="text-slate-400">Loading...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedMarket}
+                        onChange={(e) => onMarketChange(e.target.value)}
+                        disabled={!selectedClient || availableMarkets.length === 0}
+                        className={`${selectBaseClass} min-w-[150px]`}
+                      >
+                        <option value="">
+                          {availableMarkets.length === 0 ? "No markets available" : "Select Market..."}
+                        </option>
+                        {availableMarkets.map((market) => (
+                          <option key={market.code} value={market.code}>
+                            {market.name} ({market.code})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </>
+                  )}
                 </div>
               </div>
             </div>

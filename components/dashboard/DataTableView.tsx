@@ -528,8 +528,17 @@ export function DataTableView({
   const [sheetType, setSheetType] = useState<"ytd" | "fyfc">("ytd");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
 
-  // PPT state
-  const tableId = "data-table-main";
+  // PPT state - unique ID based on data source and filters
+  const tableId = useMemo(() => {
+    if (selectedDataSource === "summary") {
+      return `data-table-summary-${sheetType}`;
+    }
+    if (selectedDataSource === "trackers") {
+      return `data-table-tracker-${selectedMarket}-${selectedPeriod}`;
+    }
+    return "data-table-main";
+  }, [selectedDataSource, sheetType, selectedMarket, selectedPeriod]);
+
   const isTableInPPT = useMemo(() => {
     if (selectedGraphsForPPT instanceof Set) {
       return selectedGraphsForPPT.has(tableId);
@@ -538,7 +547,7 @@ export function DataTableView({
       return selectedGraphsForPPT.includes(tableId);
     }
     return false;
-  }, [selectedGraphsForPPT]);
+  }, [selectedGraphsForPPT, tableId]);
 
   const handleToggleTableForPPT = () => {
     if (onToggleGraphForPPT && tableContainerRef.current) {

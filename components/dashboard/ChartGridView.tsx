@@ -414,12 +414,14 @@ export function ChartGridView({
                 fill={chart.colors[0]}
                 radius={[4, 4, 0, 0]}
                 label={
-                  {
-                    position: "top",
-                    fontSize: showLabels ? 10 : 8,
-                    fill: "#475569",
-                    formatter: (v: any) => formatValue(v, isPercentage),
-                  } as any
+                  showLabels
+                    ? {
+                        position: "top",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
+                    : false
                 }
               />
             </BarChart>
@@ -460,12 +462,14 @@ export function ChartGridView({
                 fill={chart.colors[0]}
                 radius={[0, 4, 4, 0]}
                 label={
-                  {
-                    position: "right",
-                    fontSize: showLabels ? 10 : 8,
-                    fill: "#475569",
-                    formatter: (v: any) => formatValue(v, isPercentage),
-                  } as any
+                  showLabels
+                    ? {
+                        position: "right",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
+                    : false
                 }
               />
             </BarChart>
@@ -592,12 +596,14 @@ export function ChartGridView({
                 strokeWidth={2}
                 dot={{ r: showLabels ? 5 : 3 }}
                 label={
-                  {
-                    position: "top",
-                    fontSize: showLabels ? 11 : 9,
-                    fill: "#475569",
-                    formatter: (v: any) => formatValue(v, isPercentage),
-                  } as any
+                  showLabels
+                    ? {
+                        position: "top",
+                        fontSize: 11,
+                        fill: "#475569",
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
+                    : false
                 }
               />
             </RechartsLineChart>
@@ -639,12 +645,14 @@ export function ChartGridView({
                 fill={chart.colors[0]}
                 fillOpacity={0.3}
                 label={
-                  {
-                    position: "top",
-                    fontSize: showLabels ? 11 : 9,
-                    fill: "#475569",
-                    formatter: (v: any) => formatValue(v, isPercentage),
-                  } as any
+                  showLabels
+                    ? {
+                        position: "top",
+                        fontSize: 11,
+                        fill: "#475569",
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
+                    : false
                 }
               />
             </AreaChart>
@@ -688,10 +696,10 @@ export function ChartGridView({
                   fill={chart.colors[i]}
                   name={getColumnLabel(key)}
                   label={
-                    i === chart.dataKeys.length - 1
+                    showLabels && i === chart.dataKeys.length - 1
                       ? ({
                           position: "top",
-                          fontSize: showLabels ? 11 : 9,
+                          fontSize: 11,
                           fill: "#475569",
                           formatter: (v: any, entry: any, index: number) => {
                             // Show total of stacked values for the top segment only
@@ -746,12 +754,14 @@ export function ChartGridView({
                 fill={chart.colors[0]}
                 name={getColumnLabel(chart.dataKeys[0])}
                 label={
-                  {
-                    position: "top",
-                    fontSize: showLabels ? 11 : 9,
-                    fill: "#475569",
-                    formatter: (v: any) => formatValue(v, isPercentage),
-                  } as any
+                  showLabels
+                    ? {
+                        position: "top",
+                        fontSize: 11,
+                        fill: "#475569",
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
+                    : false
                 }
               />
               {chart.dataKeys[1] && (
@@ -762,12 +772,14 @@ export function ChartGridView({
                   strokeWidth={2}
                   name={getColumnLabel(chart.dataKeys[1])}
                   label={
-                    {
-                      position: "top",
-                      fontSize: showLabels ? 11 : 9,
-                      fill: chart.colors[1],
-                      formatter: (v: any) => formatValue(v, isPercentage),
-                    } as any
+                    showLabels
+                      ? {
+                          position: "top",
+                          fontSize: 11,
+                          fill: chart.colors[1],
+                          formatter: (v: any) => formatValue(v, isPercentage),
+                        }
+                      : false
                   }
                 />
               )}
@@ -860,12 +872,14 @@ export function ChartGridView({
                   fill={chart.colors[i]}
                   name={getColumnLabel(key)}
                   label={
-                    {
-                      position: "top",
-                      fontSize: showLabels ? 10 : 8,
-                      fill: "#475569",
-                      formatter: (v: any) => formatValue(v, isPercentage),
-                    } as any
+                    showLabels
+                      ? {
+                          position: "top",
+                          fontSize: 10,
+                          fill: "#475569",
+                          formatter: (v: any) => formatValue(v, isPercentage),
+                        }
+                      : false
                   }
                 />
               ))}
