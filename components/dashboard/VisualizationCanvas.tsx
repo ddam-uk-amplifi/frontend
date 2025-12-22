@@ -1542,11 +1542,12 @@ export function VisualizationCanvas({
             </div>
 
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
                   layout="vertical"
+                  margin={{ top: 20, right: 80, left: 20, bottom: 5 }}
                   onClick={(e: any) =>
                     e &&
                     e.activePayload &&
@@ -1554,7 +1555,11 @@ export function VisualizationCanvas({
                   }
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <YAxis
                     type="category"
                     dataKey="name"
@@ -1605,12 +1610,16 @@ export function VisualizationCanvas({
             </div>
 
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
-                <BarChart data={sampleData}>
+                <BarChart data={sampleData} margin={{ top: 60, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <Tooltip
                     formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
@@ -1625,8 +1634,11 @@ export function VisualizationCanvas({
                       name={getFieldLabel(field)}
                       label={{
                         position: "top",
-                        fontSize: 10,
+                        fontSize: 9,
                         fill: "#475569",
+                        angle: -90,
+                        textAnchor: "start",
+                        dy: -5,
                         formatter: (value: any) => formatValue(value, field),
                       }}
                     />
@@ -1642,8 +1654,11 @@ export function VisualizationCanvas({
                       name={getFieldLabel(field)}
                       label={{
                         position: "top",
-                        fontSize: 10,
+                        fontSize: 9,
                         fill: CHART_COLORS[(index + Math.ceil((dataKeys.apiFields.length || 2) / 2)) % CHART_COLORS.length],
+                        angle: -90,
+                        textAnchor: "start",
+                        dy: -5,
                         formatter: (value: any) => formatValue(value, field),
                       }}
                     />
@@ -1675,10 +1690,11 @@ export function VisualizationCanvas({
             </div>
 
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
+                  margin={{ top: 60, right: 30, left: 20, bottom: 5 }}
                   onClick={(e: any) =>
                     e &&
                     e.activePayload &&
@@ -1687,7 +1703,11 @@ export function VisualizationCanvas({
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <Tooltip />
                   <Legend />
                   {hasIndexData && (
@@ -1713,8 +1733,11 @@ export function VisualizationCanvas({
                       style={{ cursor: "pointer" }}
                       label={{
                         position: "top",
-                        fontSize: 10,
+                        fontSize: 9,
                         fill: "#475569",
+                        angle: -90,
+                        textAnchor: "start",
+                        dy: -5,
                         formatter: (value: any) => formatValue(value, field),
                       }}
                     />
@@ -1741,12 +1764,16 @@ export function VisualizationCanvas({
               </button>
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
-                <BarChart data={sampleData}>
+                <BarChart data={sampleData} margin={{ top: 60, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <Tooltip
                     formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
@@ -1762,6 +1789,9 @@ export function VisualizationCanvas({
                         position: "top",
                         fontSize: 9,
                         fill: "#475569",
+                        angle: -90,
+                        textAnchor: "start",
+                        dy: -5,
                         formatter: (value: any) => formatValue(value, field),
                       }}
                     />
@@ -1788,12 +1818,16 @@ export function VisualizationCanvas({
               </button>
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
-                <BarChart data={sampleData}>
+                <BarChart data={sampleData} margin={{ top: 60, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <Tooltip
                     formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
@@ -1808,8 +1842,11 @@ export function VisualizationCanvas({
                       name={getFieldLabel(field)}
                       label={index === arr.length - 1 ? {
                         position: "top",
-                        fontSize: 10,
+                        fontSize: 9,
                         fill: "#475569",
+                        angle: -90,
+                        textAnchor: "start",
+                        dy: -5,
                         formatter: (value: any) => formatValue(value, field),
                       } : undefined}
                     />
@@ -1836,12 +1873,16 @@ export function VisualizationCanvas({
               </button>
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
-                <LineChart data={sampleData}>
+                <LineChart data={sampleData} margin={{ top: 40, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <Tooltip
                     formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
@@ -1884,12 +1925,16 @@ export function VisualizationCanvas({
               </button>
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
+            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
               <ResponsiveContainer width="100%" height={450}>
-                <AreaChart data={sampleData}>
+                <AreaChart data={sampleData} margin={{ top: 40, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value.toString();
+                  }} />
                   <Tooltip
                     formatter={(value: number, name: string) => formatValue(value, name as string)}
                   />
