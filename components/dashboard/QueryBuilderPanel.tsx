@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown, X, Trash2, Database } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { ChevronRight, ChevronDown, X, Trash2, Database, Loader2 } from "lucide-react";
 import { FieldTypeIndicator } from "./FieldTypeIndicator";
 import { getFieldType } from "./utils/dataProcessing";
+import {
+  fetchTrackerFields,
+  TrackerFieldsResponse,
+  TrackerMediaType,
+} from "@/lib/api/dashboard";
 
 interface QueryBuilderPanelProps {
   isOpen: boolean;
@@ -13,6 +18,9 @@ interface QueryBuilderPanelProps {
   onClearAll?: () => void;
   dataSource?: "summary" | "trackers" | "";
   selectedClient?: string;
+  clientId?: number;
+  selectedMarkets?: string;
+  onDynamicFieldSelect?: (mediaType: TrackerMediaType, generalIds: number[], fieldName: string, fieldValue: string) => void;
 }
 
 interface FieldGroup {
@@ -56,116 +64,115 @@ const arlaSummaryGroups: FieldGroup[] = [
   },
 ];
 
-// Tracker-specific fields for each media type
-const trackerTVFields = [
-  // FY/General fields
-  { id: "fy-net-net-spend", label: "FY Net Net Spend" },
-  { id: "fy-measured-spend", label: "FY Measured Spend" },
-  { id: "fy-actual-units", label: "FY Actual Units" },
-  { id: "fy-benchmark-spend", label: "FY Benchmark Spend" },
-  { id: "fy-savings", label: "FY Savings" },
-  { id: "fy-savings-pct", label: "FY Savings %" },
-  // Monthly fields
-  { id: "net-net-spend", label: "Net Net Spend (Monthly)" },
-  { id: "seasonality", label: "Seasonality" },
-  { id: "rate-card-spend", label: "Rate Card Spend" },
-  { id: "actual-30", label: "Actual 30s" },
-  { id: "prime-time-30", label: "Prime Time 30s" },
-  { id: "cpu-discount", label: "CPU/Discount Achieved" },
-  { id: "benchmark-spend", label: "Benchmark Spend" },
-  { id: "value-loss", label: "Value Loss" },
-  { id: "value-loss-pct", label: "Value Loss %" },
-  { id: "qecs-pct", label: "QECs %" },
-  // YTD fields
+// Tracker-specific fields for each media type - organized by category
+// Monthly fields (ytd_* fields from the monthly data)
+const trackerTVMonthlyFields = [
   { id: "ytd-net-net-spend", label: "YTD Net Net Spend" },
-  { id: "ytd-savings", label: "YTD Savings" },
+  { id: "ytd-measured-spend", label: "YTD Measured Spend" },
+  { id: "ytd-cg-equivalent", label: "YTD CG Equivalent" },
   { id: "ytd-savings-pct", label: "YTD Savings %" },
+  { id: "ytd-units", label: "YTD Units" },
+  { id: "ytd-savings", label: "YTD Savings" },
 ];
 
-const trackerRadioFields = [
-  // FY/General fields
+// Buy Specifics fields (fy_* fields from the general/buy specifics data)
+const trackerTVBuySpecificsFields = [
   { id: "fy-net-net-spend", label: "FY Net Net Spend" },
   { id: "fy-measured-spend", label: "FY Measured Spend" },
-  { id: "fy-insertions", label: "FY Insertions" },
   { id: "fy-cg-equivalent", label: "FY CG Equivalent" },
-  { id: "fy-savings", label: "FY Savings" },
   { id: "fy-savings-pct", label: "FY Savings %" },
-  // Monthly fields
-  { id: "net-net-spend", label: "Net Net Spend (Monthly)" },
-  { id: "seasonality", label: "Seasonality" },
-  { id: "actual-30", label: "Actual 30s" },
-  { id: "drive-time-30", label: "Drive Time 30s" },
-  { id: "cpu-discount-pct", label: "CPU/Discount %" },
-  { id: "benchmark-spend", label: "Benchmark Spend" },
-  { id: "value-loss", label: "Value Loss" },
-  { id: "value-loss-pct", label: "Value Loss %" },
-  // YTD fields
+  { id: "fy-units", label: "FY Units" },
+  { id: "fy-savings", label: "FY Savings" },
+];
+
+const trackerRadioMonthlyFields = [
   { id: "ytd-net-net-spend", label: "YTD Net Net Spend" },
-  { id: "ytd-insertions", label: "YTD Insertions" },
-  { id: "ytd-savings", label: "YTD Savings" },
+  { id: "ytd-measured-spend", label: "YTD Measured Spend" },
+  { id: "ytd-cg-equivalent", label: "YTD CG Equivalent" },
   { id: "ytd-savings-pct", label: "YTD Savings %" },
+  { id: "ytd-units", label: "YTD Units" },
+  { id: "ytd-savings", label: "YTD Savings" },
 ];
 
-const trackerPrintFields = [
-  // FY/General fields
-  { id: "fy-gross-spend", label: "FY Gross Spend" },
-  { id: "fy-net-spend", label: "FY Net Spend" },
-  { id: "fy-discount-pct", label: "FY Discount %" },
+const trackerRadioBuySpecificsFields = [
   { id: "fy-net-net-spend", label: "FY Net Net Spend" },
   { id: "fy-measured-spend", label: "FY Measured Spend" },
-  { id: "fy-savings", label: "FY Savings" },
+  { id: "fy-cg-equivalent", label: "FY CG Equivalent" },
   { id: "fy-savings-pct", label: "FY Savings %" },
-  // Monthly fields
-  { id: "net-net-spend", label: "Net Net Spend (Monthly)" },
-  { id: "gross-spend", label: "Gross Spend" },
-  { id: "net-spend", label: "Net Spend" },
-  { id: "discount-pct", label: "Discount %" },
-  { id: "insertions", label: "No. of Insertions" },
-  // YTD fields
-  { id: "ytd-gross-spend", label: "YTD Gross Spend" },
+  { id: "fy-units", label: "FY Units" },
+  { id: "fy-savings", label: "FY Savings" },
+];
+
+const trackerPrintMonthlyFields = [
   { id: "ytd-net-net-spend", label: "YTD Net Net Spend" },
-  { id: "ytd-savings", label: "YTD Savings" },
+  { id: "ytd-measured-spend", label: "YTD Measured Spend" },
+  { id: "ytd-cg-equivalent", label: "YTD CG Equivalent" },
   { id: "ytd-savings-pct", label: "YTD Savings %" },
+  { id: "ytd-units", label: "YTD Units" },
+  { id: "ytd-savings", label: "YTD Savings" },
 ];
 
-const trackerOOHFields = [
-  // FY/General fields
+const trackerPrintBuySpecificsFields = [
   { id: "fy-net-net-spend", label: "FY Net Net Spend" },
   { id: "fy-measured-spend", label: "FY Measured Spend" },
-  { id: "fy-benchmark-spend", label: "FY Benchmark Spend" },
-  { id: "fy-savings", label: "FY Savings" },
+  { id: "fy-cg-equivalent", label: "FY CG Equivalent" },
   { id: "fy-savings-pct", label: "FY Savings %" },
-  // Monthly fields
-  { id: "net-net-spend", label: "Net Net Spend (Monthly)" },
-  { id: "measured-spend", label: "Measured Spend" },
-  { id: "benchmark-spend", label: "Benchmark Spend" },
-  { id: "savings", label: "Savings" },
-  { id: "savings-pct", label: "Savings %" },
+  { id: "fy-units", label: "FY Units" },
+  { id: "fy-savings", label: "FY Savings" },
 ];
 
-const trackerOnlineFields = [
-  // FY/General fields
-  { id: "fy-net-net-spend", label: "FY Net Net Spend" },
-  { id: "fy-measured-spend", label: "FY Measured Spend" },
-  { id: "fy-savings", label: "FY Savings" },
-  { id: "fy-savings-pct", label: "FY Savings %" },
-  // Monthly fields
-  { id: "net-net-spend", label: "Net Net Spend (Monthly)" },
-  { id: "measured-spend", label: "Measured Spend" },
-  { id: "impressions", label: "Impressions" },
-  { id: "cpm", label: "CPM" },
+const trackerOOHMonthlyFields = [
+  { id: "ytd-net-net-spend", label: "YTD Net Net Spend" },
+  { id: "ytd-measured-spend", label: "YTD Measured Spend" },
+  { id: "ytd-cg-equivalent", label: "YTD CG Equivalent" },
+  { id: "ytd-savings-pct", label: "YTD Savings %" },
+  { id: "ytd-units", label: "YTD Units" },
+  { id: "ytd-savings", label: "YTD Savings" },
 ];
 
-const trackerCinemaFields = [
-  // FY/General fields
+const trackerOOHBuySpecificsFields = [
   { id: "fy-net-net-spend", label: "FY Net Net Spend" },
   { id: "fy-measured-spend", label: "FY Measured Spend" },
-  { id: "fy-savings", label: "FY Savings" },
+  { id: "fy-cg-equivalent", label: "FY CG Equivalent" },
   { id: "fy-savings-pct", label: "FY Savings %" },
-  // Monthly fields
-  { id: "net-net-spend", label: "Net Net Spend (Monthly)" },
-  { id: "admissions", label: "Admissions" },
-  { id: "cpa", label: "CPA" },
+  { id: "fy-units", label: "FY Units" },
+  { id: "fy-savings", label: "FY Savings" },
+];
+
+const trackerOnlineMonthlyFields = [
+  { id: "ytd-net-net-spend", label: "YTD Net Net Spend" },
+  { id: "ytd-measured-spend", label: "YTD Measured Spend" },
+  { id: "ytd-cg-equivalent", label: "YTD CG Equivalent" },
+  { id: "ytd-savings-pct", label: "YTD Savings %" },
+  { id: "ytd-units", label: "YTD Units" },
+  { id: "ytd-savings", label: "YTD Savings" },
+];
+
+const trackerOnlineBuySpecificsFields = [
+  { id: "fy-net-net-spend", label: "FY Net Net Spend" },
+  { id: "fy-measured-spend", label: "FY Measured Spend" },
+  { id: "fy-cg-equivalent", label: "FY CG Equivalent" },
+  { id: "fy-savings-pct", label: "FY Savings %" },
+  { id: "fy-units", label: "FY Units" },
+  { id: "fy-savings", label: "FY Savings" },
+];
+
+const trackerCinemaMonthlyFields = [
+  { id: "ytd-net-net-spend", label: "YTD Net Net Spend" },
+  { id: "ytd-measured-spend", label: "YTD Measured Spend" },
+  { id: "ytd-cg-equivalent", label: "YTD CG Equivalent" },
+  { id: "ytd-savings-pct", label: "YTD Savings %" },
+  { id: "ytd-units", label: "YTD Units" },
+  { id: "ytd-savings", label: "YTD Savings" },
+];
+
+const trackerCinemaBuySpecificsFields = [
+  { id: "fy-net-net-spend", label: "FY Net Net Spend" },
+  { id: "fy-measured-spend", label: "FY Measured Spend" },
+  { id: "fy-cg-equivalent", label: "FY CG Equivalent" },
+  { id: "fy-savings-pct", label: "FY Savings %" },
+  { id: "fy-units", label: "FY Units" },
+  { id: "fy-savings", label: "FY Savings" },
 ];
 
 // Summary fields (from Summary_YTD sheets - aggregated by media type)
@@ -192,32 +199,134 @@ const arlaTrackerGroups: FieldGroup[] = [
   {
     id: "arla-tracker-tv",
     title: "TV",
-    fields: trackerTVFields.map((f) => ({ ...f, id: `tv-${f.id}` })),
+    fields: [],
+    subgroups: [
+      {
+        id: "arla-tracker-tv-monthly",
+        title: "Monthly",
+        fields: trackerTVMonthlyFields.map((f) => ({ ...f, id: `tv-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-tv-buy-specifics",
+        title: "Buy Specifics",
+        fields: trackerTVBuySpecificsFields.map((f) => ({ ...f, id: `tv-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-tv-percentile",
+        title: "Percentile",
+        fields: [],
+      },
+    ],
   },
   {
     id: "arla-tracker-radio",
     title: "Radio",
-    fields: trackerRadioFields.map((f) => ({ ...f, id: `radio-${f.id}` })),
+    fields: [],
+    subgroups: [
+      {
+        id: "arla-tracker-radio-monthly",
+        title: "Monthly",
+        fields: trackerRadioMonthlyFields.map((f) => ({ ...f, id: `radio-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-radio-buy-specifics",
+        title: "Buy Specifics",
+        fields: trackerRadioBuySpecificsFields.map((f) => ({ ...f, id: `radio-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-radio-percentile",
+        title: "Percentile",
+        fields: [],
+      },
+    ],
   },
   {
     id: "arla-tracker-print",
     title: "Print",
-    fields: trackerPrintFields.map((f) => ({ ...f, id: `print-${f.id}` })),
+    fields: [],
+    subgroups: [
+      {
+        id: "arla-tracker-print-monthly",
+        title: "Monthly",
+        fields: trackerPrintMonthlyFields.map((f) => ({ ...f, id: `print-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-print-buy-specifics",
+        title: "Buy Specifics",
+        fields: trackerPrintBuySpecificsFields.map((f) => ({ ...f, id: `print-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-print-percentile",
+        title: "Percentile",
+        fields: [],
+      },
+    ],
   },
   {
     id: "arla-tracker-ooh",
     title: "OOH",
-    fields: trackerOOHFields.map((f) => ({ ...f, id: `ooh-${f.id}` })),
+    fields: [],
+    subgroups: [
+      {
+        id: "arla-tracker-ooh-monthly",
+        title: "Monthly",
+        fields: trackerOOHMonthlyFields.map((f) => ({ ...f, id: `ooh-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-ooh-buy-specifics",
+        title: "Buy Specifics",
+        fields: trackerOOHBuySpecificsFields.map((f) => ({ ...f, id: `ooh-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-ooh-percentile",
+        title: "Percentile",
+        fields: [],
+      },
+    ],
   },
   {
     id: "arla-tracker-online",
     title: "Online",
-    fields: trackerOnlineFields.map((f) => ({ ...f, id: `online-${f.id}` })),
+    fields: [],
+    subgroups: [
+      {
+        id: "arla-tracker-online-monthly",
+        title: "Monthly",
+        fields: trackerOnlineMonthlyFields.map((f) => ({ ...f, id: `online-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-online-buy-specifics",
+        title: "Buy Specifics",
+        fields: trackerOnlineBuySpecificsFields.map((f) => ({ ...f, id: `online-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-online-percentile",
+        title: "Percentile",
+        fields: [],
+      },
+    ],
   },
   {
     id: "arla-tracker-cinema",
     title: "Cinema",
-    fields: trackerCinemaFields.map((f) => ({ ...f, id: `cinema-${f.id}` })),
+    fields: [],
+    subgroups: [
+      {
+        id: "arla-tracker-cinema-monthly",
+        title: "Monthly",
+        fields: trackerCinemaMonthlyFields.map((f) => ({ ...f, id: `cinema-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-cinema-buy-specifics",
+        title: "Buy Specifics",
+        fields: trackerCinemaBuySpecificsFields.map((f) => ({ ...f, id: `cinema-${f.id}` })),
+      },
+      {
+        id: "arla-tracker-cinema-percentile",
+        title: "Percentile",
+        fields: [],
+      },
+    ],
   },
 ];
 
@@ -634,6 +743,16 @@ const clientDataSchemas: Record<
   },
 };
 
+// Map group IDs to media types
+const ARLA_TRACKER_MEDIA_TYPES: Record<string, TrackerMediaType> = {
+  "arla-tracker-tv": "tv",
+  "arla-tracker-radio": "radio",
+  "arla-tracker-print": "print",
+  "arla-tracker-ooh": "ooh",
+  "arla-tracker-online": "online",
+  "arla-tracker-cinema": "cinema",
+};
+
 export function QueryBuilderPanel({
   isOpen,
   onClose,
@@ -642,15 +761,137 @@ export function QueryBuilderPanel({
   onClearAll,
   dataSource = "",
   selectedClient = "",
+  clientId,
+  selectedMarkets,
+  onDynamicFieldSelect,
 }: QueryBuilderPanelProps) {
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
+  // State for dynamically loaded tracker fields
+  const [dynamicFields, setDynamicFields] = useState<Record<string, TrackerFieldsResponse>>({});
+  const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Track selected dynamic field values (fieldName -> fieldValue -> generalIds)
+  const [selectedDynamicFields, setSelectedDynamicFields] = useState<Record<string, { fieldName: string; fieldValue: string; generalIds: number[] }[]>>({});
+
+  // Check if we should use dynamic fields for Arla trackers
+  const usesDynamicFields = selectedClient === "Arla" && dataSource === "trackers";
+
+  // Fetch dynamic fields when a media type group is expanded
+  const fetchDynamicFields = useCallback(async (groupId: string) => {
+    const mediaType = ARLA_TRACKER_MEDIA_TYPES[groupId];
+    if (!mediaType || !clientId || !usesDynamicFields) return;
+
+    // Already loaded or loading
+    if (dynamicFields[mediaType] || loadingFields[mediaType]) return;
+
+    setLoadingFields(prev => ({ ...prev, [mediaType]: true }));
+    setFieldErrors(prev => ({ ...prev, [mediaType]: "" }));
+
+    try {
+      const response = await fetchTrackerFields(
+        selectedClient,
+        mediaType,
+        clientId,
+        selectedMarkets
+      );
+      setDynamicFields(prev => ({ ...prev, [mediaType]: response }));
+    } catch (error) {
+      console.error(`Failed to fetch fields for ${mediaType}:`, error);
+      setFieldErrors(prev => ({
+        ...prev,
+        [mediaType]: error instanceof Error ? error.message : "Failed to load fields"
+      }));
+    } finally {
+      setLoadingFields(prev => ({ ...prev, [mediaType]: false }));
+    }
+  }, [clientId, selectedClient, selectedMarkets, dynamicFields, loadingFields, usesDynamicFields]);
+
+  // Clear dynamic fields when client/source/markets change
+  useEffect(() => {
+    setDynamicFields({});
+    setLoadingFields({});
+    setFieldErrors({});
+    setSelectedDynamicFields({});
+  }, [selectedClient, dataSource, selectedMarkets]);
+
   const toggleGroup = (groupId: string) => {
+    const isExpanding = !expandedGroups.includes(groupId);
+
     setExpandedGroups((prev) =>
       prev.includes(groupId)
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId],
     );
+
+    // Fetch dynamic fields when expanding an Arla tracker media type group
+    if (isExpanding && usesDynamicFields && ARLA_TRACKER_MEDIA_TYPES[groupId]) {
+      fetchDynamicFields(groupId);
+    }
+  };
+
+  // Handle dynamic field value selection
+  const handleDynamicFieldSelect = (
+    mediaType: TrackerMediaType,
+    fieldName: string,
+    fieldValue: string,
+    generalIds: number[]
+  ) => {
+    // Calculate the new selection state first
+    const mediaSelections = selectedDynamicFields[mediaType] || [];
+    const existingIndex = mediaSelections.findIndex(
+      s => s.fieldName === fieldName && s.fieldValue === fieldValue
+    );
+
+    let newMediaSelections: typeof mediaSelections;
+    if (existingIndex >= 0) {
+      // Deselect - remove this selection
+      newMediaSelections = [...mediaSelections];
+      newMediaSelections.splice(existingIndex, 1);
+    } else {
+      // Select - add this selection
+      newMediaSelections = [...mediaSelections, { fieldName, fieldValue, generalIds }];
+    }
+
+    // Update state
+    setSelectedDynamicFields(prev => ({
+      ...prev,
+      [mediaType]: newMediaSelections
+    }));
+
+    // Calculate ALL accumulated general_ids from the new selections
+    const allGeneralIds = new Set<number>();
+    newMediaSelections.forEach(selection => {
+      selection.generalIds.forEach(id => allGeneralIds.add(id));
+    });
+
+    // Notify parent component with ALL accumulated general_ids
+    if (onDynamicFieldSelect) {
+      onDynamicFieldSelect(
+        mediaType,
+        Array.from(allGeneralIds),
+        fieldName,
+        fieldValue
+      );
+    }
+  };
+
+  // Check if a dynamic field value is selected
+  const isDynamicFieldSelected = (
+    mediaType: TrackerMediaType,
+    fieldName: string,
+    fieldValue: string
+  ): boolean => {
+    const mediaSelections = selectedDynamicFields[mediaType] || [];
+    return mediaSelections.some(
+      s => s.fieldName === fieldName && s.fieldValue === fieldValue
+    );
+  };
+
+  // Get count of selected dynamic fields for a media type
+  const getDynamicFieldSelectionCount = (mediaType: TrackerMediaType): number => {
+    return (selectedDynamicFields[mediaType] || []).length;
   };
 
   // Determine which field groups to show based on client and data source
@@ -725,6 +966,126 @@ export function QueryBuilderPanel({
     return false;
   };
 
+  // Render dynamic fields for Arla tracker media types
+  const renderDynamicFields = (mediaType: TrackerMediaType) => {
+    const fieldsData = dynamicFields[mediaType];
+    const isLoading = loadingFields[mediaType];
+    const error = fieldErrors[mediaType];
+
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
+          <span className="ml-2 text-sm text-slate-500">Loading fields...</span>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="text-center py-4">
+          <p className="text-sm text-rose-500">{error}</p>
+        </div>
+      );
+    }
+
+    if (!fieldsData || Object.keys(fieldsData.fields).length === 0) {
+      return (
+        <div className="text-center py-4">
+          <p className="text-sm text-slate-400">No fields available</p>
+        </div>
+      );
+    }
+
+    // Render each field name as a subgroup, with field values as selectable items
+    return (
+      <>
+        {Object.entries(fieldsData.fields).map(([fieldName, fieldValues]) => {
+          const subgroupId = `${mediaType}-dynamic-${fieldName}`;
+          const isSubgroupExpanded = expandedGroups.includes(subgroupId);
+
+          // Count selected values for this field
+          const selectedValuesCount = fieldValues.filter(fv =>
+            isDynamicFieldSelected(mediaType, fieldName, fv.value)
+          ).length;
+
+          return (
+            <div
+              key={subgroupId}
+              className="ml-3 mt-2 bg-slate-50/80 rounded-xl overflow-hidden border border-slate-100"
+            >
+              <button
+                onClick={() => toggleGroup(subgroupId)}
+                className="w-full flex items-center justify-between p-3 py-2.5 hover:bg-slate-100/80 transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`w-5 h-5 rounded-md flex items-center justify-center ${isSubgroupExpanded ? "bg-violet-100" : "bg-slate-200/60"}`}
+                  >
+                    {isSubgroupExpanded ? (
+                      <ChevronDown className="w-3.5 h-3.5 text-violet-600" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                    )}
+                  </div>
+                  <span className="font-medium text-slate-700 text-sm">
+                    {fieldName}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">
+                    {fieldValues.length} options
+                  </span>
+                  {selectedValuesCount > 0 && (
+                    <span className="px-2 py-0.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-medium rounded-full shadow-sm">
+                      {selectedValuesCount}
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              {isSubgroupExpanded && (
+                <div className="px-3 pb-3 space-y-1.5">
+                  {fieldValues.map((fieldValue) => {
+                    const isSelected = isDynamicFieldSelected(
+                      mediaType,
+                      fieldName,
+                      fieldValue.value
+                    );
+
+                    return (
+                      <button
+                        key={`${fieldName}-${fieldValue.value}`}
+                        onClick={() =>
+                          handleDynamicFieldSelect(
+                            mediaType,
+                            fieldName,
+                            fieldValue.value,
+                            fieldValue.general_ids
+                          )
+                        }
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                          isSelected
+                            ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
+                            : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-sm truncate">{fieldValue.value}</span>
+                        <span className={`text-xs ${isSelected ? "text-violet-200" : "text-slate-400"}`}>
+                          {fieldValue.general_ids.length} record{fieldValue.general_ids.length !== 1 ? "s" : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
   const renderFieldGroup = (group: FieldGroup, depth: number = 0) => {
     const isExpanded = expandedGroups.includes(group.id);
     const groupSelections = selectedFields[group.id] || [];
@@ -732,12 +1093,19 @@ export function QueryBuilderPanel({
     const hasSubgroups = group.subgroups && group.subgroups.length > 0;
     const hasFields = group.fields && group.fields.length > 0;
 
-    // Calculate total selections including subgroups
+    // Check if this is an Arla tracker media type group that uses dynamic fields
+    const mediaType = ARLA_TRACKER_MEDIA_TYPES[group.id];
+    const shouldUseDynamicFields = usesDynamicFields && mediaType && depth === 0;
+
+    // Calculate total selections including subgroups and dynamic fields
     let totalSubgroupSelections = selectedCount;
-    if (hasSubgroups) {
+    if (hasSubgroups && !shouldUseDynamicFields) {
       group.subgroups?.forEach((sub) => {
         totalSubgroupSelections += (selectedFields[sub.id] || []).length;
       });
+    }
+    if (shouldUseDynamicFields && mediaType) {
+      totalSubgroupSelections += getDynamicFieldSelectionCount(mediaType);
     }
 
     return (
@@ -774,45 +1142,52 @@ export function QueryBuilderPanel({
 
         {isExpanded && (
           <div className="px-3 pb-3 space-y-1.5">
-            {/* Render fields if present */}
-            {hasFields &&
-              group.fields.map((field) => {
-                const isSelected =
-                  selectedFields[group.id]?.includes(field.id) || false;
-                const fieldType = getFieldType(field.id);
-                const isDisabled = isFieldDisabled(field.id);
+            {/* For Arla tracker media types, render dynamic fields from API */}
+            {shouldUseDynamicFields && mediaType ? (
+              renderDynamicFields(mediaType)
+            ) : (
+              <>
+                {/* Render static fields if present */}
+                {hasFields &&
+                  group.fields.map((field) => {
+                    const isSelected =
+                      selectedFields[group.id]?.includes(field.id) || false;
+                    const fieldType = getFieldType(field.id);
+                    const isDisabled = isFieldDisabled(field.id);
 
-                return (
-                  <button
-                    key={field.id}
-                    onClick={() =>
-                      !isDisabled && onFieldToggle(group.id, field.id)
-                    }
-                    disabled={isDisabled}
-                    title={
-                      isDisabled
-                        ? `Cannot mix ${lockedScaleType === "percentage" ? "absolute values" : "percentages"} with ${lockedScaleType === "percentage" ? "percentages" : "absolute values"}. Clear selection first.`
-                        : undefined
-                    }
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
-                      isSelected
-                        ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
-                        : isDisabled
-                          ? "bg-slate-100 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-50"
-                          : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
-                    }`}
-                  >
-                    <span className="text-sm">{field.label}</span>
-                    <FieldTypeIndicator type={fieldType} />
-                  </button>
-                );
-              })}
+                    return (
+                      <button
+                        key={field.id}
+                        onClick={() =>
+                          !isDisabled && onFieldToggle(group.id, field.id)
+                        }
+                        disabled={isDisabled}
+                        title={
+                          isDisabled
+                            ? `Cannot mix ${lockedScaleType === "percentage" ? "absolute values" : "percentages"} with ${lockedScaleType === "percentage" ? "percentages" : "absolute values"}. Clear selection first.`
+                            : undefined
+                        }
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                          isSelected
+                            ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
+                            : isDisabled
+                              ? "bg-slate-100 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-50"
+                              : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-sm">{field.label}</span>
+                        <FieldTypeIndicator type={fieldType} />
+                      </button>
+                    );
+                  })}
 
-            {/* Render subgroups if present */}
-            {hasSubgroups &&
-              group.subgroups?.map((subgroup) =>
-                renderFieldGroup(subgroup, depth + 1),
-              )}
+                {/* Render subgroups if present */}
+                {hasSubgroups &&
+                  group.subgroups?.map((subgroup) =>
+                    renderFieldGroup(subgroup, depth + 1),
+                  )}
+              </>
+            )}
           </div>
         )}
       </div>

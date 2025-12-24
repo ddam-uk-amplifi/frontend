@@ -15,7 +15,10 @@ import {
   fetchLatestJob,
   generateDashboardPPTX,
   captureChartAsBase64,
+  fetchTrackerFieldData,
   type ChartImageForPPT,
+  type TrackerMediaType,
+  type TrackerFieldDataResponse,
 } from "@/lib/api/dashboard";
 import { consolidationApi } from "@/lib/api/consolidation";
 import { tokenUtils } from "@/lib/utils/token";
@@ -58,6 +61,11 @@ export default function Dashboard() {
   const [isRecommendationsPanelOpen, setIsRecommendationsPanelOpen] =
     useState(false);
   const [viewMode, setViewMode] = useState<"table" | "visualization">("table");
+
+  // Dynamic tracker field data (for Arla trackers)
+  const [dynamicTrackerData, setDynamicTrackerData] = useState<TrackerFieldDataResponse | null>(null);
+  const [isLoadingDynamicData, setIsLoadingDynamicData] = useState(false);
+  const [dynamicDataError, setDynamicDataError] = useState<string | null>(null);
 
   // PPT Report State - Using Zustand for persistence
   const {
@@ -178,7 +186,83 @@ export default function Dashboard() {
   const handleClearAll = () => {
     setSelectedFields({});
     setSelectedGraphType(null);
+    setDynamicTrackerData(null);
+    setDynamicDataError(null);
   };
+
+  // Handle dynamic field selection from QueryBuilderPanel (for Arla trackers)
+  const handleDynamicFieldSelect = useCallback(
+    async (
+      mediaType: TrackerMediaType,
+      generalIds: number[],
+      fieldName: string,
+      fieldValue: string
+    ) => {
+      console.log("[handleDynamicFieldSelect] Called:", {
+        mediaType,
+        generalIds,
+        fieldName,
+        fieldValue,
+      });
+
+      // Also update selectedFields so the graph recommendations panel shows
+      // Use a synthetic group ID for dynamic tracker fields
+      // Include "spend" in the field ID so chart compatibility logic recognizes it as a metric
+      const syntheticGroupId = `arla-tracker-${mediaType}-dynamic`;
+      const syntheticFieldId = `${mediaType}-spend-${fieldName}-${fieldValue}`;
+
+      setSelectedFields((prev) => {
+        const groupFields = prev[syntheticGroupId] || [];
+        const isSelected = groupFields.includes(syntheticFieldId);
+
+        if (isSelected) {
+          // Deselect
+          const newFields = groupFields.filter((id) => id !== syntheticFieldId);
+          if (newFields.length === 0) {
+            const { [syntheticGroupId]: _, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [syntheticGroupId]: newFields };
+        } else {
+          // Select
+          return { ...prev, [syntheticGroupId]: [...groupFields, syntheticFieldId] };
+        }
+      });
+
+      // If no generalIds (all fields deselected) or no client, clear data
+      if (!selectedClient || generalIds.length === 0) {
+        console.log("[handleDynamicFieldSelect] No client or all fields deselected, clearing data");
+        setDynamicTrackerData(null);
+        setIsLoadingDynamicData(false);
+        return;
+      }
+
+      setIsLoadingDynamicData(true);
+      setDynamicDataError(null);
+
+      try {
+        const response = await fetchTrackerFieldData(
+          selectedClient,
+          mediaType,
+          generalIds,
+          fieldName, // Pass the field name for normalized response
+          true // include general record data
+        );
+
+        console.log("[handleDynamicFieldSelect] Data received:", response);
+        setDynamicTrackerData(response);
+      } catch (error) {
+        console.error("[handleDynamicFieldSelect] Error:", error);
+        setDynamicDataError(
+          error instanceof Error ? error.message : "Failed to fetch tracker data"
+        );
+        setDynamicTrackerData(null);
+      } finally {
+        setIsLoadingDynamicData(false);
+      }
+    },
+    [selectedClient]
+  );
 
   // When data source changes, clear market selection if switching to summary
   const handleDataSourceChange = (source: "summary" | "trackers" | "") => {
@@ -694,6 +778,9 @@ export default function Dashboard() {
             onClearAll={handleClearAll}
             dataSource={selectedDataSource}
             selectedClient={selectedClient}
+            clientId={selectedClientId}
+            selectedMarkets={selectedMarket || undefined}
+            onDynamicFieldSelect={handleDynamicFieldSelect}
           />
 
           {/* Visualization Canvas */}
@@ -711,6 +798,9 @@ export default function Dashboard() {
             onUpdateSlideNumber={handleUpdateSlideNumber}
             getSlideNumber={getSlideNumber}
             registerChartElement={registerChartElement}
+            dynamicTrackerData={dynamicTrackerData}
+            isLoadingDynamicData={isLoadingDynamicData}
+            dynamicDataError={dynamicDataError}
           />
 
           {/* Graph Recommendations Panel */}

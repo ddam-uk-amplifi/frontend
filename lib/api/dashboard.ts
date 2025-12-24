@@ -207,6 +207,43 @@ export interface TrackerAvailableFieldsResponse {
   media_types?: Record<string, string[]>;
 }
 
+// ============================================
+// TRACKER FIELDS/DATA ENDPOINT TYPES (New)
+// ============================================
+
+export interface TrackerFieldValue {
+  value: string;
+  general_ids: number[];
+}
+
+export interface TrackerFieldsResponse {
+  media_type: string;
+  consolidation_job_id: string;
+  has_percentile: boolean;
+  total_records: number;
+  fields: Record<string, TrackerFieldValue[]>;
+}
+
+// New normalized response format - chart-ready with field_value in each record
+export interface TrackerFieldDataItem {
+  field_value: string;
+  month?: string;
+  [key: string]: string | number | null | undefined;
+}
+
+export interface TrackerFieldDataResponse {
+  media_type: string;
+  field_name: string;
+  general?: TrackerFieldDataItem[];
+  monthly: TrackerFieldDataItem[];
+  percentile?: TrackerFieldDataItem[];
+  counts: {
+    general?: number;
+    monthly: number;
+    percentile?: number;
+  };
+}
+
 // Tracker field mapping from frontend to backend
 export const TRACKER_FRONTEND_TO_BACKEND_FIELD_MAP: Record<
   string,
@@ -827,6 +864,68 @@ export async function fetchTrackerAvailableFields(
 
   const response = await apiClient.get<TrackerAvailableFieldsResponse>(
     `/api/v1/client/${clientName.toLowerCase()}/tracker/available-fields${queryParams}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch tracker buy_specifics fields with their unique values and associated general_ids
+ * Uses the new /tracker/{media_type}/fields endpoint
+ * @param clientName - Client name (e.g., "arla")
+ * @param mediaType - Media type (e.g., "tv", "radio", "print")
+ * @param clientId - Client ID for auto-resolving latest consolidation job
+ * @param markets - Comma-separated market codes (e.g., "UK,DK,SE")
+ */
+export async function fetchTrackerFields(
+  clientName: string,
+  mediaType: TrackerMediaType,
+  clientId: number,
+  markets?: string,
+): Promise<TrackerFieldsResponse> {
+  const queryParams = new URLSearchParams({
+    client_id: clientId.toString(),
+  });
+
+  if (markets) {
+    queryParams.append("markets", markets);
+  }
+
+  const response = await apiClient.get<TrackerFieldsResponse>(
+    `/api/v1/client/${clientName.toLowerCase()}/tracker/${mediaType}/fields?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch tracker monthly and percentile data for selected general_id(s)
+ * Uses the new /tracker/{media_type}/data endpoint
+ * Returns normalized, chart-ready data with field_value in each record
+ * @param clientName - Client name (e.g., "arla")
+ * @param mediaType - Media type (e.g., "tv", "radio", "print")
+ * @param generalIds - Array of general_ids to fetch data for
+ * @param fieldName - The buy_specifics field name to extract (e.g., "Channel", "Sales House")
+ * @param includeGeneral - Whether to include general record data (default: true)
+ */
+export async function fetchTrackerFieldData(
+  clientName: string,
+  mediaType: TrackerMediaType,
+  generalIds: number[],
+  fieldName: string,
+  includeGeneral: boolean = true,
+): Promise<TrackerFieldDataResponse> {
+  const queryParams = new URLSearchParams({
+    general_ids: generalIds.join(","),
+    field_name: fieldName,
+  });
+
+  if (includeGeneral) {
+    queryParams.append("include_general", "true");
+  }
+
+  const response = await apiClient.get<TrackerFieldDataResponse>(
+    `/api/v1/client/${clientName.toLowerCase()}/tracker/${mediaType}/data?${queryParams.toString()}`,
   );
 
   return response.data;
