@@ -1174,9 +1174,21 @@ export async function captureChartAsBase64(
       element.scrollHeight > element.offsetHeight;
 
     if (hasScrollableContent) {
-      console.log("[captureChartAsBase64] Element has scrollable content, expanding...");
-      console.log("[captureChartAsBase64] ScrollWidth:", element.scrollWidth, "OffsetWidth:", element.offsetWidth);
-      console.log("[captureChartAsBase64] ScrollHeight:", element.scrollHeight, "OffsetHeight:", element.offsetHeight);
+      console.log(
+        "[captureChartAsBase64] Element has scrollable content, expanding...",
+      );
+      console.log(
+        "[captureChartAsBase64] ScrollWidth:",
+        element.scrollWidth,
+        "OffsetWidth:",
+        element.offsetWidth,
+      );
+      console.log(
+        "[captureChartAsBase64] ScrollHeight:",
+        element.scrollHeight,
+        "OffsetHeight:",
+        element.offsetHeight,
+      );
 
       // Store original styles
       originalStyles.set(element, element.style.cssText);
@@ -1192,7 +1204,10 @@ export async function captureChartAsBase64(
       let parent = element.parentElement;
       while (parent && parent !== document.body) {
         const parentStyle = window.getComputedStyle(parent);
-        if (parentStyle.overflow !== "visible" || parentStyle.maxHeight !== "none") {
+        if (
+          parentStyle.overflow !== "visible" ||
+          parentStyle.maxHeight !== "none"
+        ) {
           originalStyles.set(parent, parent.style.cssText);
           parent.style.overflow = "visible";
           parent.style.maxHeight = "none";
@@ -1300,7 +1315,9 @@ export async function captureChartAsBase64(
       clonedChart.style.position = "static";
 
       // Also fix any nested scrollable containers
-      const scrollContainers = clonedChart.querySelectorAll("[class*='overflow']");
+      const scrollContainers = clonedChart.querySelectorAll(
+        "[class*='overflow']",
+      );
       scrollContainers.forEach((container) => {
         const el = container as HTMLElement;
         el.style.overflow = "visible";
@@ -1540,7 +1557,9 @@ export async function captureChartAsBase64(
 
     // Restore original styles even on error
     if (originalStyles.size > 0) {
-      console.log("[captureChartAsBase64] Restoring original styles after error...");
+      console.log(
+        "[captureChartAsBase64] Restoring original styles after error...",
+      );
       originalStyles.forEach((cssText, el) => {
         el.style.cssText = cssText;
       });

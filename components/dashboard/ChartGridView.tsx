@@ -491,7 +491,11 @@ export function ChartGridView({
                 data={pieData}
                 cx="50%"
                 cy="50%"
-                outerRadius={showLabels ? Math.min(height * 0.32, 140) : Math.min(height * 0.38, 55)}
+                outerRadius={
+                  showLabels
+                    ? Math.min(height * 0.32, 140)
+                    : Math.min(height * 0.38, 55)
+                }
                 dataKey={chart.dataKeys[0]}
                 label={showLabels ? renderPieLabel : false}
                 labelLine={showLabels}
@@ -533,8 +537,16 @@ export function ChartGridView({
                 data={donutData}
                 cx="50%"
                 cy="50%"
-                innerRadius={showLabels ? Math.min(height * 0.18, 70) : Math.min(height * 0.2, 25)}
-                outerRadius={showLabels ? Math.min(height * 0.32, 140) : Math.min(height * 0.38, 55)}
+                innerRadius={
+                  showLabels
+                    ? Math.min(height * 0.18, 70)
+                    : Math.min(height * 0.2, 25)
+                }
+                outerRadius={
+                  showLabels
+                    ? Math.min(height * 0.32, 140)
+                    : Math.min(height * 0.38, 55)
+                }
                 dataKey={chart.dataKeys[0]}
                 label={showLabels ? renderDonutLabel : false}
                 labelLine={showLabels}
@@ -795,9 +807,19 @@ export function ChartGridView({
             const item = radarData.find((d) => d.name === payload.value);
             const val = item ? formatValue(item.value, isPercentage) : "";
             return (
-              <text x={x} y={y} textAnchor="middle" fill="#475569" fontSize={10}>
-                <tspan x={x} dy="0">{payload.value}</tspan>
-                <tspan x={x} dy="12" fontWeight="600">{val}</tspan>
+              <text
+                x={x}
+                y={y}
+                textAnchor="middle"
+                fill="#475569"
+                fontSize={10}
+              >
+                <tspan x={x} dy="0">
+                  {payload.value}
+                </tspan>
+                <tspan x={x} dy="12" fontWeight="600">
+                  {val}
+                </tspan>
               </text>
             );
           }
@@ -945,9 +967,7 @@ export function ChartGridView({
               </div>
 
               {/* Chart Content */}
-              <div className="p-3 bg-white h-44">
-                {renderChart(chart, 160)}
-              </div>
+              <div className="p-3 bg-white h-44">{renderChart(chart, 160)}</div>
             </Card>
           ))}
         </div>

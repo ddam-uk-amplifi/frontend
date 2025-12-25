@@ -67,7 +67,8 @@ export const extractZipFiles = async (zipFile: File): Promise<File[]> => {
       if (zipEntry.dir) continue;
 
       // Skip macOS metadata folders
-      if (filename.startsWith("__MACOSX/") || filename.includes("/__MACOSX/")) continue;
+      if (filename.startsWith("__MACOSX/") || filename.includes("/__MACOSX/"))
+        continue;
 
       // Skip hidden files (starting with .)
       const baseName = filename.split("/").pop() || filename;

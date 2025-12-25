@@ -63,7 +63,8 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<"table" | "visualization">("table");
 
   // Dynamic tracker field data (for Arla trackers)
-  const [dynamicTrackerData, setDynamicTrackerData] = useState<TrackerFieldDataResponse | null>(null);
+  const [dynamicTrackerData, setDynamicTrackerData] =
+    useState<TrackerFieldDataResponse | null>(null);
   const [isLoadingDynamicData, setIsLoadingDynamicData] = useState(false);
   const [dynamicDataError, setDynamicDataError] = useState<string | null>(null);
 
@@ -116,7 +117,7 @@ export default function Dashboard() {
 
           // Fetch job details to get trackers with market info
           const jobDetail = await consolidationApi.getJobDetail(jobId);
-          
+
           // Extract unique markets from trackers
           const marketsMap = new Map<string, MarketOption>();
           jobDetail.trackers.forEach((tracker) => {
@@ -127,10 +128,10 @@ export default function Dashboard() {
               });
             }
           });
-          
+
           // Sort markets by name
           const markets = Array.from(marketsMap.values()).sort((a, b) =>
-            a.name.localeCompare(b.name)
+            a.name.localeCompare(b.name),
           );
           setAvailableMarkets(markets);
         } catch (error) {
@@ -196,7 +197,7 @@ export default function Dashboard() {
       mediaType: TrackerMediaType,
       generalIds: number[],
       fieldName: string,
-      fieldValue: string
+      fieldValue: string,
     ) => {
       console.log("[handleDynamicFieldSelect] Called:", {
         mediaType,
@@ -225,13 +226,18 @@ export default function Dashboard() {
           return { ...prev, [syntheticGroupId]: newFields };
         } else {
           // Select
-          return { ...prev, [syntheticGroupId]: [...groupFields, syntheticFieldId] };
+          return {
+            ...prev,
+            [syntheticGroupId]: [...groupFields, syntheticFieldId],
+          };
         }
       });
 
       // If no generalIds (all fields deselected) or no client, clear data
       if (!selectedClient || generalIds.length === 0) {
-        console.log("[handleDynamicFieldSelect] No client or all fields deselected, clearing data");
+        console.log(
+          "[handleDynamicFieldSelect] No client or all fields deselected, clearing data",
+        );
         setDynamicTrackerData(null);
         setIsLoadingDynamicData(false);
         return;
@@ -246,7 +252,7 @@ export default function Dashboard() {
           mediaType,
           generalIds,
           fieldName, // Pass the field name for normalized response
-          true // include general record data
+          true, // include general record data
         );
 
         console.log("[handleDynamicFieldSelect] Data received:", response);
@@ -254,14 +260,16 @@ export default function Dashboard() {
       } catch (error) {
         console.error("[handleDynamicFieldSelect] Error:", error);
         setDynamicDataError(
-          error instanceof Error ? error.message : "Failed to fetch tracker data"
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch tracker data",
         );
         setDynamicTrackerData(null);
       } finally {
         setIsLoadingDynamicData(false);
       }
     },
-    [selectedClient]
+    [selectedClient],
   );
 
   // When data source changes, clear market selection if switching to summary
@@ -960,6 +968,6 @@ function GraphTitleInputDialog({
         </form>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

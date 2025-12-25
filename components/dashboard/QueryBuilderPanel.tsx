@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronRight, ChevronDown, X, Trash2, Database, Loader2 } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  X,
+  Trash2,
+  Database,
+  Loader2,
+} from "lucide-react";
 import { FieldTypeIndicator } from "./FieldTypeIndicator";
 import { getFieldType } from "./utils/dataProcessing";
 import {
@@ -20,7 +27,12 @@ interface QueryBuilderPanelProps {
   selectedClient?: string;
   clientId?: number;
   selectedMarkets?: string;
-  onDynamicFieldSelect?: (mediaType: TrackerMediaType, generalIds: number[], fieldName: string, fieldValue: string) => void;
+  onDynamicFieldSelect?: (
+    mediaType: TrackerMediaType,
+    generalIds: number[],
+    fieldName: string,
+    fieldValue: string,
+  ) => void;
 }
 
 interface FieldGroup {
@@ -209,7 +221,10 @@ const arlaTrackerGroups: FieldGroup[] = [
       {
         id: "arla-tracker-tv-buy-specifics",
         title: "Buy Specifics",
-        fields: trackerTVBuySpecificsFields.map((f) => ({ ...f, id: `tv-${f.id}` })),
+        fields: trackerTVBuySpecificsFields.map((f) => ({
+          ...f,
+          id: `tv-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-tv-percentile",
@@ -226,12 +241,18 @@ const arlaTrackerGroups: FieldGroup[] = [
       {
         id: "arla-tracker-radio-monthly",
         title: "Monthly",
-        fields: trackerRadioMonthlyFields.map((f) => ({ ...f, id: `radio-${f.id}` })),
+        fields: trackerRadioMonthlyFields.map((f) => ({
+          ...f,
+          id: `radio-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-radio-buy-specifics",
         title: "Buy Specifics",
-        fields: trackerRadioBuySpecificsFields.map((f) => ({ ...f, id: `radio-${f.id}` })),
+        fields: trackerRadioBuySpecificsFields.map((f) => ({
+          ...f,
+          id: `radio-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-radio-percentile",
@@ -248,12 +269,18 @@ const arlaTrackerGroups: FieldGroup[] = [
       {
         id: "arla-tracker-print-monthly",
         title: "Monthly",
-        fields: trackerPrintMonthlyFields.map((f) => ({ ...f, id: `print-${f.id}` })),
+        fields: trackerPrintMonthlyFields.map((f) => ({
+          ...f,
+          id: `print-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-print-buy-specifics",
         title: "Buy Specifics",
-        fields: trackerPrintBuySpecificsFields.map((f) => ({ ...f, id: `print-${f.id}` })),
+        fields: trackerPrintBuySpecificsFields.map((f) => ({
+          ...f,
+          id: `print-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-print-percentile",
@@ -270,12 +297,18 @@ const arlaTrackerGroups: FieldGroup[] = [
       {
         id: "arla-tracker-ooh-monthly",
         title: "Monthly",
-        fields: trackerOOHMonthlyFields.map((f) => ({ ...f, id: `ooh-${f.id}` })),
+        fields: trackerOOHMonthlyFields.map((f) => ({
+          ...f,
+          id: `ooh-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-ooh-buy-specifics",
         title: "Buy Specifics",
-        fields: trackerOOHBuySpecificsFields.map((f) => ({ ...f, id: `ooh-${f.id}` })),
+        fields: trackerOOHBuySpecificsFields.map((f) => ({
+          ...f,
+          id: `ooh-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-ooh-percentile",
@@ -292,12 +325,18 @@ const arlaTrackerGroups: FieldGroup[] = [
       {
         id: "arla-tracker-online-monthly",
         title: "Monthly",
-        fields: trackerOnlineMonthlyFields.map((f) => ({ ...f, id: `online-${f.id}` })),
+        fields: trackerOnlineMonthlyFields.map((f) => ({
+          ...f,
+          id: `online-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-online-buy-specifics",
         title: "Buy Specifics",
-        fields: trackerOnlineBuySpecificsFields.map((f) => ({ ...f, id: `online-${f.id}` })),
+        fields: trackerOnlineBuySpecificsFields.map((f) => ({
+          ...f,
+          id: `online-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-online-percentile",
@@ -314,12 +353,18 @@ const arlaTrackerGroups: FieldGroup[] = [
       {
         id: "arla-tracker-cinema-monthly",
         title: "Monthly",
-        fields: trackerCinemaMonthlyFields.map((f) => ({ ...f, id: `cinema-${f.id}` })),
+        fields: trackerCinemaMonthlyFields.map((f) => ({
+          ...f,
+          id: `cinema-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-cinema-buy-specifics",
         title: "Buy Specifics",
-        fields: trackerCinemaBuySpecificsFields.map((f) => ({ ...f, id: `cinema-${f.id}` })),
+        fields: trackerCinemaBuySpecificsFields.map((f) => ({
+          ...f,
+          id: `cinema-${f.id}`,
+        })),
       },
       {
         id: "arla-tracker-cinema-percentile",
@@ -768,45 +813,66 @@ export function QueryBuilderPanel({
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
   // State for dynamically loaded tracker fields
-  const [dynamicFields, setDynamicFields] = useState<Record<string, TrackerFieldsResponse>>({});
-  const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>({});
+  const [dynamicFields, setDynamicFields] = useState<
+    Record<string, TrackerFieldsResponse>
+  >({});
+  const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>(
+    {},
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Track selected dynamic field values (fieldName -> fieldValue -> generalIds)
-  const [selectedDynamicFields, setSelectedDynamicFields] = useState<Record<string, { fieldName: string; fieldValue: string; generalIds: number[] }[]>>({});
+  const [selectedDynamicFields, setSelectedDynamicFields] = useState<
+    Record<
+      string,
+      { fieldName: string; fieldValue: string; generalIds: number[] }[]
+    >
+  >({});
 
   // Check if we should use dynamic fields for Arla trackers
-  const usesDynamicFields = selectedClient === "Arla" && dataSource === "trackers";
+  const usesDynamicFields =
+    selectedClient === "Arla" && dataSource === "trackers";
 
   // Fetch dynamic fields when a media type group is expanded
-  const fetchDynamicFields = useCallback(async (groupId: string) => {
-    const mediaType = ARLA_TRACKER_MEDIA_TYPES[groupId];
-    if (!mediaType || !clientId || !usesDynamicFields) return;
+  const fetchDynamicFields = useCallback(
+    async (groupId: string) => {
+      const mediaType = ARLA_TRACKER_MEDIA_TYPES[groupId];
+      if (!mediaType || !clientId || !usesDynamicFields) return;
 
-    // Already loaded or loading
-    if (dynamicFields[mediaType] || loadingFields[mediaType]) return;
+      // Already loaded or loading
+      if (dynamicFields[mediaType] || loadingFields[mediaType]) return;
 
-    setLoadingFields(prev => ({ ...prev, [mediaType]: true }));
-    setFieldErrors(prev => ({ ...prev, [mediaType]: "" }));
+      setLoadingFields((prev) => ({ ...prev, [mediaType]: true }));
+      setFieldErrors((prev) => ({ ...prev, [mediaType]: "" }));
 
-    try {
-      const response = await fetchTrackerFields(
-        selectedClient,
-        mediaType,
-        clientId,
-        selectedMarkets
-      );
-      setDynamicFields(prev => ({ ...prev, [mediaType]: response }));
-    } catch (error) {
-      console.error(`Failed to fetch fields for ${mediaType}:`, error);
-      setFieldErrors(prev => ({
-        ...prev,
-        [mediaType]: error instanceof Error ? error.message : "Failed to load fields"
-      }));
-    } finally {
-      setLoadingFields(prev => ({ ...prev, [mediaType]: false }));
-    }
-  }, [clientId, selectedClient, selectedMarkets, dynamicFields, loadingFields, usesDynamicFields]);
+      try {
+        const response = await fetchTrackerFields(
+          selectedClient,
+          mediaType,
+          clientId,
+          selectedMarkets,
+        );
+        setDynamicFields((prev) => ({ ...prev, [mediaType]: response }));
+      } catch (error) {
+        console.error(`Failed to fetch fields for ${mediaType}:`, error);
+        setFieldErrors((prev) => ({
+          ...prev,
+          [mediaType]:
+            error instanceof Error ? error.message : "Failed to load fields",
+        }));
+      } finally {
+        setLoadingFields((prev) => ({ ...prev, [mediaType]: false }));
+      }
+    },
+    [
+      clientId,
+      selectedClient,
+      selectedMarkets,
+      dynamicFields,
+      loadingFields,
+      usesDynamicFields,
+    ],
+  );
 
   // Clear dynamic fields when client/source/markets change
   useEffect(() => {
@@ -836,12 +902,12 @@ export function QueryBuilderPanel({
     mediaType: TrackerMediaType,
     fieldName: string,
     fieldValue: string,
-    generalIds: number[]
+    generalIds: number[],
   ) => {
     // Calculate the new selection state first
     const mediaSelections = selectedDynamicFields[mediaType] || [];
     const existingIndex = mediaSelections.findIndex(
-      s => s.fieldName === fieldName && s.fieldValue === fieldValue
+      (s) => s.fieldName === fieldName && s.fieldValue === fieldValue,
     );
 
     let newMediaSelections: typeof mediaSelections;
@@ -851,19 +917,22 @@ export function QueryBuilderPanel({
       newMediaSelections.splice(existingIndex, 1);
     } else {
       // Select - add this selection
-      newMediaSelections = [...mediaSelections, { fieldName, fieldValue, generalIds }];
+      newMediaSelections = [
+        ...mediaSelections,
+        { fieldName, fieldValue, generalIds },
+      ];
     }
 
     // Update state
-    setSelectedDynamicFields(prev => ({
+    setSelectedDynamicFields((prev) => ({
       ...prev,
-      [mediaType]: newMediaSelections
+      [mediaType]: newMediaSelections,
     }));
 
     // Calculate ALL accumulated general_ids from the new selections
     const allGeneralIds = new Set<number>();
-    newMediaSelections.forEach(selection => {
-      selection.generalIds.forEach(id => allGeneralIds.add(id));
+    newMediaSelections.forEach((selection) => {
+      selection.generalIds.forEach((id) => allGeneralIds.add(id));
     });
 
     // Notify parent component with ALL accumulated general_ids
@@ -872,7 +941,7 @@ export function QueryBuilderPanel({
         mediaType,
         Array.from(allGeneralIds),
         fieldName,
-        fieldValue
+        fieldValue,
       );
     }
   };
@@ -881,16 +950,18 @@ export function QueryBuilderPanel({
   const isDynamicFieldSelected = (
     mediaType: TrackerMediaType,
     fieldName: string,
-    fieldValue: string
+    fieldValue: string,
   ): boolean => {
     const mediaSelections = selectedDynamicFields[mediaType] || [];
     return mediaSelections.some(
-      s => s.fieldName === fieldName && s.fieldValue === fieldValue
+      (s) => s.fieldName === fieldName && s.fieldValue === fieldValue,
     );
   };
 
   // Get count of selected dynamic fields for a media type
-  const getDynamicFieldSelectionCount = (mediaType: TrackerMediaType): number => {
+  const getDynamicFieldSelectionCount = (
+    mediaType: TrackerMediaType,
+  ): number => {
     return (selectedDynamicFields[mediaType] || []).length;
   };
 
@@ -1005,8 +1076,8 @@ export function QueryBuilderPanel({
           const isSubgroupExpanded = expandedGroups.includes(subgroupId);
 
           // Count selected values for this field
-          const selectedValuesCount = fieldValues.filter(fv =>
-            isDynamicFieldSelected(mediaType, fieldName, fv.value)
+          const selectedValuesCount = fieldValues.filter((fv) =>
+            isDynamicFieldSelected(mediaType, fieldName, fv.value),
           ).length;
 
           return (
@@ -1050,7 +1121,7 @@ export function QueryBuilderPanel({
                     const isSelected = isDynamicFieldSelected(
                       mediaType,
                       fieldName,
-                      fieldValue.value
+                      fieldValue.value,
                     );
 
                     return (
@@ -1061,7 +1132,7 @@ export function QueryBuilderPanel({
                             mediaType,
                             fieldName,
                             fieldValue.value,
-                            fieldValue.general_ids
+                            fieldValue.general_ids,
                           )
                         }
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
@@ -1070,9 +1141,14 @@ export function QueryBuilderPanel({
                             : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
                         }`}
                       >
-                        <span className="text-sm truncate">{fieldValue.value}</span>
-                        <span className={`text-xs ${isSelected ? "text-violet-200" : "text-slate-400"}`}>
-                          {fieldValue.general_ids.length} record{fieldValue.general_ids.length !== 1 ? "s" : ""}
+                        <span className="text-sm truncate">
+                          {fieldValue.value}
+                        </span>
+                        <span
+                          className={`text-xs ${isSelected ? "text-violet-200" : "text-slate-400"}`}
+                        >
+                          {fieldValue.general_ids.length} record
+                          {fieldValue.general_ids.length !== 1 ? "s" : ""}
                         </span>
                       </button>
                     );
@@ -1095,7 +1171,8 @@ export function QueryBuilderPanel({
 
     // Check if this is an Arla tracker media type group that uses dynamic fields
     const mediaType = ARLA_TRACKER_MEDIA_TYPES[group.id];
-    const shouldUseDynamicFields = usesDynamicFields && mediaType && depth === 0;
+    const shouldUseDynamicFields =
+      usesDynamicFields && mediaType && depth === 0;
 
     // Calculate total selections including subgroups and dynamic fields
     let totalSubgroupSelections = selectedCount;
