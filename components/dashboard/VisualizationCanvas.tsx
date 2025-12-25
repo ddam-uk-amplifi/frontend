@@ -1579,15 +1579,17 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
@@ -1641,15 +1643,17 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
@@ -1709,15 +1713,17 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
@@ -1777,15 +1783,17 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
@@ -1860,18 +1868,20 @@ export function VisualizationCanvas({
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
                 onClick={() => setShowDataLabels(!showDataLabels)}
-                className={`p-2 rounded-lg transition-colors ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
                 title={showDataLabels ? "Hide labels" : "Show labels"}
               >
                 {showDataLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
 
             {/* Chart content for PPT capture */}
@@ -1952,17 +1962,19 @@ export function VisualizationCanvas({
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
                 onClick={() => setShowDataLabels(!showDataLabels)}
-                className={`p-2 rounded-lg transition-colors ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
                 title={showDataLabels ? "Hide labels" : "Show labels"}
               >
                 {showDataLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
@@ -2022,17 +2034,19 @@ export function VisualizationCanvas({
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
                 onClick={() => setShowDataLabels(!showDataLabels)}
-                className={`p-2 rounded-lg transition-colors ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
                 title={showDataLabels ? "Hide labels" : "Show labels"}
               >
                 {showDataLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
@@ -2096,14 +2110,16 @@ export function VisualizationCanvas({
                 className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
                 title={showDataLabels ? "Hide labels" : "Show labels"}
               >
-                {showDataLabels ? <Eye className="w-4 h-4 cursor-pointer" /> : <EyeOff className="w-4 h-4" />}
+                {showDataLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
@@ -2152,17 +2168,19 @@ export function VisualizationCanvas({
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
                 onClick={() => setShowDataLabels(!showDataLabels)}
-                className={`p-2 rounded-lg transition-colors ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-500'}`}
                 title={showDataLabels ? "Hide labels" : "Show labels"}
               >
                 {showDataLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
