@@ -60,19 +60,35 @@ export const extractZipFiles = async (zipFile: File): Promise<File[]> => {
   try {
     const zip = await JSZip.loadAsync(zipFile);
     const files: File[] = [];
+    const seenFileNames = new Set<string>();
 
     for (const [filename, zipEntry] of Object.entries(zip.files)) {
       // Skip directories and non-tracker files
       if (zipEntry.dir) continue;
+
+      // Skip macOS metadata folders
+      if (filename.startsWith("__MACOSX/") || filename.includes("/__MACOSX/"))
+        continue;
+
+      // Skip hidden files (starting with .)
+      const baseName = filename.split("/").pop() || filename;
+      if (baseName.startsWith(".")) continue;
 
       // Only extract Excel and CSV files
       if (/\.(xlsx|xls|xlsb|csv)$/i.test(filename)) {
         // Skip temporary Excel files (those with $ in the name)
         if (filename.includes("$")) continue;
 
+        // Use the base filename (without path) for the extracted file
+        const extractedFileName = baseName;
+
+        // Skip if we've already seen this filename (avoid duplicates from nested folders)
+        if (seenFileNames.has(extractedFileName.toLowerCase())) continue;
+        seenFileNames.add(extractedFileName.toLowerCase());
+
         const blob = await zipEntry.async("blob");
-        const file = new File([blob], filename, {
-          type: getFileType(filename),
+        const file = new File([blob], extractedFileName, {
+          type: getFileType(extractedFileName),
         });
         files.push(file);
       }

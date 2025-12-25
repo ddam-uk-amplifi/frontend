@@ -8,6 +8,8 @@ import {
   FileText,
   Check,
   Loader2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   BarChart,
@@ -39,6 +41,7 @@ import {
   TrackerCompleteResponse,
   TrackerSummaryItem,
   TrackerMediaType,
+  TrackerFieldDataResponse,
   getTrackerMediaTypeFromFields,
 } from "@/lib/api/dashboard";
 
@@ -80,7 +83,11 @@ const getFieldLabel = (fieldName: string): string => {
 // Check if a field is a percentage field
 const isPercentageField = (fieldName: string): boolean => {
   const lowerName = fieldName.toLowerCase();
-  return lowerName.includes("pct") || lowerName.includes("percent") || lowerName.includes("%");
+  return (
+    lowerName.includes("pct") ||
+    lowerName.includes("percent") ||
+    lowerName.includes("%")
+  );
 };
 
 // Format value based on field type (percentage vs currency)
@@ -137,6 +144,10 @@ interface VisualizationCanvasProps {
   ) => void;
   getSlideNumber?: (graphId: string) => number | undefined;
   registerChartElement?: (graphId: string, element: HTMLElement | null) => void;
+  // Dynamic tracker field data (from /tracker/{media}/data endpoint)
+  dynamicTrackerData?: TrackerFieldDataResponse | null;
+  isLoadingDynamicData?: boolean;
+  dynamicDataError?: string | null;
 }
 
 export function VisualizationCanvas({
@@ -154,10 +165,14 @@ export function VisualizationCanvas({
   onUpdateSlideNumber,
   getSlideNumber,
   registerChartElement,
+  dynamicTrackerData,
+  isLoadingDynamicData = false,
+  dynamicDataError,
 }: VisualizationCanvasProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isChartReady, setIsChartReady] = useState(false);
+  const [showDataLabels, setShowDataLabels] = useState(true); // Toggle for data labels
 
   // Ref to hold the current chart container element for PPT capture
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -242,7 +257,9 @@ export function VisualizationCanvas({
           onToggleGraphForPPT(graphId, graphTitle, chartOnlyRef.current);
         }
       } else {
-        console.warn("[VisualizationCanvas] Cannot add to PPT - chart element not found");
+        console.warn(
+          "[VisualizationCanvas] Cannot add to PPT - chart element not found",
+        );
       }
     }, 100);
   }, [
@@ -252,6 +269,15 @@ export function VisualizationCanvas({
     isModalOpen,
     selectedGraphsForPPT,
   ]);
+
+  // Check if we're using dynamic tracker fields (selected via the new /fields endpoint)
+  // Dynamic fields have group IDs like "arla-tracker-tv-dynamic"
+  const hasDynamicTrackerFields = useMemo(() => {
+    return Object.keys(selectedFields).some(
+      (groupId) =>
+        groupId.includes("-dynamic") && selectedFields[groupId].length > 0,
+    );
+  }, [selectedFields]);
 
   // Fetch data from API when data source is selected and fields change
   useEffect(() => {
@@ -272,6 +298,18 @@ export function VisualizationCanvas({
       if (client !== "Arla") {
         setApiData(null);
         setTrackerData(null);
+        return;
+      }
+
+      // Skip fetching via old endpoints if we're using dynamic tracker fields
+      // The data is already fetched via the /tracker/{media}/data endpoint in the parent component
+      if (dataSource === "trackers" && hasDynamicTrackerFields) {
+        console.log(
+          "[VisualizationCanvas] Using dynamic tracker data, skipping /complete fetch",
+        );
+        setTrackerData(null);
+        setTrackerSummaryData(null);
+        setApiData(null);
         return;
       }
 
@@ -368,6 +406,7 @@ export function VisualizationCanvas({
     trackerMediaType,
     selectedFields,
     market,
+    hasDynamicTrackerFields,
   ]);
 
   const getTotalSelected = () => {
@@ -560,9 +599,14 @@ export function VisualizationCanvas({
     if (!trackerSummaryData || trackerSummaryData.length === 0) return null;
 
     // Get numeric field names from first row (excluding id, market_id)
-    const sampleRow = trackerSummaryData[0] as unknown as Record<string, unknown>;
+    const sampleRow = trackerSummaryData[0] as unknown as Record<
+      string,
+      unknown
+    >;
     const numericFields = Object.keys(sampleRow).filter((key) => {
-      return !["id", "market_id", "period", "data_type", "media_type"].includes(key);
+      return !["id", "market_id", "period", "data_type", "media_type"].includes(
+        key,
+      );
     });
 
     // Group by media_type and aggregate numeric values
@@ -578,13 +622,33 @@ export function VisualizationCanvas({
       if (mediaType === "GRAND TOTAL") return;
 
       // Use the latest period data (prefer Dec, then Nov, etc.)
-      const periodOrder = ["Dec", "Nov", "Oct", "Sep", "Aug", "Jul", "Jun", "May", "Apr", "Mar", "Feb", "Jan"];
+      const periodOrder = [
+        "Dec",
+        "Nov",
+        "Oct",
+        "Sep",
+        "Aug",
+        "Jul",
+        "Jun",
+        "May",
+        "Apr",
+        "Mar",
+        "Feb",
+        "Jan",
+      ];
       const currentPeriodIndex = periodOrder.indexOf(period);
-      const existingPeriod = mediaAggregates[mediaType]?._period as string | undefined;
-      const existingPeriodIndex = existingPeriod ? periodOrder.indexOf(existingPeriod) : 999;
+      const existingPeriod = mediaAggregates[mediaType]?._period as
+        | string
+        | undefined;
+      const existingPeriodIndex = existingPeriod
+        ? periodOrder.indexOf(existingPeriod)
+        : 999;
 
       // Only update if this is a later period (lower index = later in year)
-      if (currentPeriodIndex < existingPeriodIndex || !mediaAggregates[mediaType]) {
+      if (
+        currentPeriodIndex < existingPeriodIndex ||
+        !mediaAggregates[mediaType]
+      ) {
         mediaAggregates[mediaType] = {
           name: mediaType,
           _period: period,
@@ -670,7 +734,201 @@ export function VisualizationCanvas({
       return [];
     }
 
-    // For Arla tracker data
+    // For Arla tracker data with dynamic field selection (new normalized flow)
+    // The API now returns field_value directly in each record - no lookup needed!
+    if (client === "Arla" && dataSource === "trackers" && dynamicTrackerData) {
+      const monthlyData = dynamicTrackerData.monthly || [];
+      const generalData = dynamicTrackerData.general || [];
+
+      // Debug: log first item to verify field_value is present
+      if (monthlyData.length > 0) {
+        console.log("[getChartData] First monthly item (normalized):", {
+          field_value: monthlyData[0].field_value,
+          month: monthlyData[0].month,
+          allKeys: Object.keys(monthlyData[0]),
+        });
+      }
+
+      // Get unique field values (channel names) from the data
+      const uniqueFieldValues = new Set<string>();
+      monthlyData.forEach((item) => {
+        if (item.field_value) {
+          uniqueFieldValues.add(item.field_value);
+        }
+      });
+
+      // Auto-detect numeric fields from the data (excluding metadata fields)
+      const excludedFields = [
+        "field_value",
+        "month",
+        "id",
+        "market_id",
+        "general_id",
+        "tv_data_general_id",
+        "print_data_general_id",
+        "ooh_data_general_id",
+        "radio_data_general_id",
+        "online_data_general_id",
+        "cinema_data_general_id",
+        "row_index",
+        "extracted_file_id",
+      ];
+      const getNumericFields = (item: Record<string, unknown>): string[] => {
+        return Object.keys(item).filter(
+          (key) =>
+            typeof item[key] === "number" && !excludedFields.includes(key),
+        );
+      };
+
+      // Get the first numeric field to use as the metric
+      const sampleItem = monthlyData[0] || generalData[0];
+      const numericFields = sampleItem
+        ? getNumericFields(sampleItem as Record<string, unknown>)
+        : [];
+      const metricField = numericFields[0] || "value"; // fallback to "value" if no numeric field found
+
+      // Helper to get the metric value from an item
+      const getMetricValue = (item: Record<string, unknown>): number => {
+        // Try each numeric field until we find a value
+        for (const field of numericFields) {
+          if (typeof item[field] === "number") return item[field] as number;
+        }
+        return 0;
+      };
+
+      // Check if multiple channels - show grouped comparison
+      if (uniqueFieldValues.size > 1 && monthlyData.length > 0) {
+        // Group data by month, with each field_value (channel) as a separate key
+        const monthlyMap = new Map<string, Record<string, string | number>>();
+        const channelNames = Array.from(uniqueFieldValues);
+
+        monthlyData.forEach((item) => {
+          const month = String(item.month || "Unknown");
+          const channelName = item.field_value || "Unknown";
+          const value = getMetricValue(item as Record<string, unknown>);
+
+          if (!monthlyMap.has(month)) {
+            monthlyMap.set(month, { name: month });
+          }
+          const existing = monthlyMap.get(month)!;
+
+          // Add or accumulate the value for this channel
+          const currentValue = existing[channelName];
+          const numericCurrent =
+            typeof currentValue === "number" ? currentValue : 0;
+          existing[channelName] = numericCurrent + value;
+        });
+
+        console.log(
+          "[getChartData] Multi-channel monthlyMap:",
+          Object.fromEntries(monthlyMap),
+        );
+
+        // Sort by month order
+        const monthOrder = [
+          "JAN",
+          "FEB",
+          "MAR",
+          "APR",
+          "MAY",
+          "JUN",
+          "JUL",
+          "AUG",
+          "SEP",
+          "OCT",
+          "NOV",
+          "DEC",
+        ];
+        const result = Array.from(monthlyMap.values()).sort((a, b) => {
+          const aIdx = monthOrder.indexOf(String(a.name).toUpperCase());
+          const bIdx = monthOrder.indexOf(String(b.name).toUpperCase());
+          return aIdx - bIdx;
+        });
+
+        // Check if all values are 0 - return empty array to show "No data" state
+        const hasNonZeroValue = result.some((row) => {
+          return channelNames.some((channel) => {
+            const value = row[channel];
+            return typeof value === "number" && value !== 0;
+          });
+        });
+        if (!hasNonZeroValue) {
+          console.log("[getChartData] All values are 0, returning empty array");
+          return [];
+        }
+
+        return result;
+      }
+
+      // Single channel: show monthly trend using channel name as key (for legend consistency)
+      if (monthlyData.length > 0) {
+        // Get the single channel name from the data
+        const singleChannelName =
+          Array.from(uniqueFieldValues)[0] || metricField;
+
+        const monthlyMap = new Map<string, Record<string, string | number>>();
+        monthlyData.forEach((item) => {
+          const month = String(item.month || "Unknown");
+          if (!monthlyMap.has(month)) {
+            monthlyMap.set(month, { name: month });
+          }
+          const existing = monthlyMap.get(month)!;
+
+          const value = getMetricValue(item as Record<string, unknown>);
+          // Use channel name as key for legend consistency
+          const currentValue = existing[singleChannelName];
+          const numericCurrent =
+            typeof currentValue === "number" ? currentValue : 0;
+          existing[singleChannelName] = numericCurrent + value;
+        });
+
+        const monthOrder = [
+          "JAN",
+          "FEB",
+          "MAR",
+          "APR",
+          "MAY",
+          "JUN",
+          "JUL",
+          "AUG",
+          "SEP",
+          "OCT",
+          "NOV",
+          "DEC",
+        ];
+        const result = Array.from(monthlyMap.values()).sort((a, b) => {
+          const aIdx = monthOrder.indexOf(String(a.name).toUpperCase());
+          const bIdx = monthOrder.indexOf(String(b.name).toUpperCase());
+          return aIdx - bIdx;
+        });
+
+        // Check if all values are 0 - return empty array to show "No data" state
+        const hasNonZeroValue = result.some((row) => {
+          const value = row[singleChannelName];
+          return typeof value === "number" && value !== 0;
+        });
+        if (!hasNonZeroValue) {
+          console.log("[getChartData] All values are 0, returning empty array");
+          return [];
+        }
+
+        return result;
+      }
+
+      // Fallback to general data
+      if (generalData.length > 0) {
+        return generalData.map((item, idx) => {
+          const itemName = item.field_value || `Record ${idx + 1}`;
+          const value = getMetricValue(item as Record<string, unknown>);
+          return {
+            name: itemName,
+            [metricField]: value,
+          };
+        });
+      }
+    }
+
+    // For Arla tracker data (existing flow - static field selection)
     if (client === "Arla" && dataSource === "trackers") {
       if (getArlaData && getArlaData.length > 0) {
         return getArlaData;
@@ -692,7 +950,7 @@ export function VisualizationCanvas({
   // Determine which data keys to use based on data type
   const isArlaData = client === "Arla" && getArlaData && getArlaData.length > 0;
   const isApiData = apiData && apiData.data.length > 0;
-  const isTrackerApiData =
+  const _isTrackerApiData =
     (trackerData &&
       ((trackerData.general && trackerData.general.length > 0) ||
         (trackerData.monthly && trackerData.monthly.length > 0) ||
@@ -700,16 +958,16 @@ export function VisualizationCanvas({
     (trackerSummaryData && trackerSummaryData.length > 0);
 
   // Get available fields from tracker data (complete or summary)
-  const trackerAvailableFields = useMemo(() => {
+  const _trackerAvailableFields = useMemo(() => {
     // Check tracker summary data first
     if (trackerSummaryData && trackerSummaryData.length > 0) {
-      const sampleRow = trackerSummaryData[0] as unknown as Record<string, unknown>;
+      const sampleRow = trackerSummaryData[0] as unknown as Record<
+        string,
+        unknown
+      >;
       return Object.keys(sampleRow).filter((key) => {
         const val = sampleRow[key];
-        return (
-          typeof val === "number" &&
-          !["id", "market_id"].includes(key)
-        );
+        return typeof val === "number" && !["id", "market_id"].includes(key);
       });
     }
 
@@ -754,7 +1012,15 @@ export function VisualizationCanvas({
     if (dataSource === "trackers") {
       return rawFields.map((field) => {
         // Remove prefixes like "summary-", "tv-", "radio-", etc.
-        const prefixes = ["summary-", "tv-", "radio-", "print-", "ooh-", "online-", "cinema-"];
+        const prefixes = [
+          "summary-",
+          "tv-",
+          "radio-",
+          "print-",
+          "ooh-",
+          "online-",
+          "cinema-",
+        ];
         let cleanField = field;
         for (const prefix of prefixes) {
           if (field.startsWith(prefix)) {
@@ -771,53 +1037,113 @@ export function VisualizationCanvas({
     return rawFields;
   }, [selectedFields, dataSource]);
 
+  // Priority order for tracker metrics - show these first/only
+  const _PRIORITY_TRACKER_FIELDS = [
+    "ytd_net_net_spend",
+    "ytd_total_net_net_spend",
+    "ytd_savings",
+    "ytd_savings_pct",
+    "ytd_measured_spend",
+    "ytd_cg_equivalent",
+    "fy_net_net_spend",
+    "fy_total_net_net_spend",
+    "fy_savings",
+    "fy_savings_pct",
+    "benchmark_spend",
+    "calculated_value_loss",
+  ];
+
+  // Extract unique channel names from dynamic tracker data (using field_value from normalized API)
+  const selectedDynamicChannels = useMemo(() => {
+    if (!dynamicTrackerData) return [];
+
+    // Get unique field_value from monthly data
+    const channels = new Set<string>();
+    (dynamicTrackerData.monthly || []).forEach((item) => {
+      if (item.field_value) {
+        channels.add(item.field_value);
+      }
+    });
+    return Array.from(channels);
+  }, [dynamicTrackerData]);
+
   // Get the first field from API response for primary data key (for charts)
+  // For dynamic tracker data with multiple channels, return channel names as fields
+  // For single channel, return the metric field names
+  const dynamicTrackerNumericFields = useMemo(() => {
+    if (!dynamicTrackerData) return [];
+
+    // Always return channel names as the fields for legend consistency
+    // This ensures single channel shows "Channel Name" instead of "ytd_total_net_net_spend"
+    if (selectedDynamicChannels.length >= 1) {
+      return selectedDynamicChannels;
+    }
+
+    return [];
+  }, [dynamicTrackerData, selectedDynamicChannels]);
+
   const primaryApiField =
     isApiData && apiData.requested_fields.length > 0
       ? apiData.requested_fields[0]
-      : dataSource === "trackers" && selectedFieldNames.length > 0
-        ? selectedFieldNames[0]
-        : null;
+      : dynamicTrackerData && dynamicTrackerNumericFields.length > 0
+        ? dynamicTrackerNumericFields.find(
+            (f) =>
+              f.includes("net_net_spend") || f.includes("ytd_net_net_spend"),
+          ) || dynamicTrackerNumericFields[0]
+        : dataSource === "trackers" && selectedFieldNames.length > 0
+          ? selectedFieldNames[0]
+          : null;
 
   // Get all requested fields from either API source
   // For summary: use apiData.requested_fields
-  // For trackers: use the selected fields from Query Builder
+  // For dynamic trackers: use actual numeric fields from the response
+  // For static trackers: use the selected fields from Query Builder
   const allApiFields = isApiData
     ? apiData.requested_fields
-    : dataSource === "trackers" && selectedFieldNames.length > 0
-      ? selectedFieldNames
-      : [];
+    : dynamicTrackerData && dynamicTrackerNumericFields.length > 0
+      ? dynamicTrackerNumericFields
+      : dataSource === "trackers" && selectedFieldNames.length > 0
+        ? selectedFieldNames
+        : [];
+
+  // Helper to find field in allApiFields
+  const findField = (patterns: string[]) => {
+    for (const pattern of patterns) {
+      const found = allApiFields.find((f) => f.includes(pattern));
+      if (found) return found;
+    }
+    return null;
+  };
 
   const dataKeys = {
-    spend: primaryApiField || (isArlaData ? "total_net_net_spend" : "spend"),
-    savings: allApiFields.includes("savings_value")
-      ? "savings_value"
-      : allApiFields.includes("fy_total_savings")
-        ? "fy_total_savings"
-        : allApiFields.includes("fy_savings")
-          ? "fy_savings"
-          : isArlaData
-            ? "savings_value"
-            : "savings",
-    savingsPct: allApiFields.includes("savings_pct")
-      ? "savings_pct"
-      : allApiFields.includes("fy_total_savings_pct")
-        ? "fy_total_savings_pct"
-        : allApiFields.includes("fy_savings_pct")
-          ? "fy_savings_pct"
-          : isArlaData
-            ? "savings_pct"
-            : "savingsPct",
-    inflationPct: allApiFields.includes("inflation_pct")
-      ? "inflation_pct"
-      : isArlaData
-        ? "inflation_pct"
-        : "inflation",
-    measuredPct: allApiFields.includes("measured_spend_pct")
-      ? "measured_spend_pct"
-      : isArlaData
-        ? "measured_spend_pct"
-        : "measuredPct",
+    spend:
+      primaryApiField ||
+      findField([
+        "ytd_net_net_spend",
+        "net_net_spend",
+        "total_net_net_spend",
+      ]) ||
+      (isArlaData ? "total_net_net_spend" : "spend"),
+    savings:
+      findField([
+        "ytd_savings",
+        "savings_value",
+        "fy_total_savings",
+        "fy_savings",
+      ]) || (isArlaData ? "savings_value" : "savings"),
+    savingsPct:
+      findField([
+        "ytd_savings_pct",
+        "savings_pct",
+        "fy_total_savings_pct",
+        "fy_savings_pct",
+      ]) || (isArlaData ? "savings_pct" : "savingsPct"),
+    inflationPct:
+      findField(["inflation_pct"]) ||
+      (isArlaData ? "inflation_pct" : "inflation"),
+    measuredPct:
+      findField(["measured_spend_pct", "ytd_measured_spend"]) ||
+      (isArlaData ? "measured_spend_pct" : "measuredPct"),
     index: isArlaData ? "index" : "index",
     // All API fields for multi-field charts
     apiFields: allApiFields,
@@ -845,6 +1171,18 @@ export function VisualizationCanvas({
   };
 
   const sampleData = getProcessedData(selectedGraphType || "");
+
+  // Debug logging for dynamic tracker data
+  if (dynamicTrackerData && selectedDynamicChannels.length > 0) {
+    console.log("[VisualizationCanvas] Debug:", {
+      selectedDynamicChannels,
+      dynamicTrackerNumericFields,
+      allApiFields,
+      dataKeysApiFields: dataKeys.apiFields,
+      rawDataSample: rawData.slice(0, 3),
+      sampleDataSample: sampleData.slice(0, 3),
+    });
+  }
 
   // Check data density and show warnings
   const densityCheck = selectedGraphType
@@ -881,7 +1219,7 @@ export function VisualizationCanvas({
     { name: "Print", spend: 1200, savings: 90 },
   ];
 
-  const renderChartGallery = () => {
+  const _renderChartGallery = () => {
     return (
       <div className="space-y-6">
         <div className="text-center mb-8">
@@ -895,26 +1233,6 @@ export function VisualizationCanvas({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {/* KPI Cards */}
-          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-violet-500"></span>
-              KPI Cards
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-bold text-slate-800">€24.5M</div>
-                <div className="text-xs text-slate-500">Total Spend</div>
-                <div className="text-xs text-emerald-600">↑ 12.3%</div>
-              </div>
-              <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-bold text-slate-800">8.5%</div>
-                <div className="text-xs text-slate-500">Savings</div>
-                <div className="text-xs text-emerald-600">↑ 0.8pp</div>
-              </div>
-            </div>
-          </div>
-
           {/* Bar Chart */}
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
@@ -1025,85 +1343,6 @@ export function VisualizationCanvas({
               </BarChart>
             </ResponsiveContainer>
           </div>
-
-          {/* Table */}
-          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-slate-500"></span>
-              Data Table
-            </h4>
-            <div className="text-xs">
-              <div className="grid grid-cols-3 gap-1 font-medium text-slate-600 mb-1 pb-1 border-b border-slate-200">
-                <span>Media</span>
-                <span className="text-right">Spend</span>
-                <span className="text-right">Savings</span>
-              </div>
-              {demoData.slice(0, 3).map((row, i) => (
-                <div
-                  key={i}
-                  className="grid grid-cols-3 gap-1 text-slate-800 py-0.5"
-                >
-                  <span>{row.name}</span>
-                  <span className="text-right">
-                    €{(row.spend / 1000).toFixed(1)}K
-                  </span>
-                  <span className="text-right text-emerald-600">
-                    €{row.savings}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Gauge */}
-          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-              Gauge Chart
-            </h4>
-            <div className="flex items-center justify-center h-[120px]">
-              <div className="relative">
-                <svg width="100" height="60" viewBox="0 0 100 60">
-                  <path
-                    d="M 10 55 A 40 40 0 0 1 90 55"
-                    fill="none"
-                    stroke="#E5E7EB"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M 10 55 A 40 40 0 0 1 70 20"
-                    fill="none"
-                    stroke="#10B981"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-end justify-center pb-1">
-                  <span className="text-lg font-bold text-slate-800">85%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Heatmap placeholder */}
-          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-              Heatmap
-            </h4>
-            <div className="grid grid-cols-5 gap-1 h-[120px]">
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded"
-                  style={{
-                    backgroundColor: `rgba(124, 58, 237, ${0.2 + Math.random() * 0.8})`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="text-center mt-8 p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl border border-violet-100">
@@ -1139,6 +1378,38 @@ export function VisualizationCanvas({
             data from the server
           </p>
         </div>
+      );
+    }
+
+    // Show loading state for dynamic tracker data
+    if (
+      isLoadingDynamicData &&
+      dataSource === "trackers" &&
+      client === "Arla"
+    ) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-8">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 mb-4">
+            <Loader2 className="w-12 h-12 text-violet-600 animate-spin" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-800 mb-2">
+            Loading tracker data...
+          </h3>
+          <p className="text-sm text-slate-500 max-w-md">
+            Fetching monthly and percentile data for the selected field
+          </p>
+        </div>
+      );
+    }
+
+    // Show error state if dynamic tracker data fetch failed
+    if (dynamicDataError && dataSource === "trackers" && client === "Arla") {
+      return (
+        <DashboardErrorState
+          error={new Error(dynamicDataError)}
+          title="Failed to load tracker data"
+          description="Could not fetch data for the selected field. Please try selecting a different field."
+        />
       );
     }
 
@@ -1295,7 +1566,26 @@ export function VisualizationCanvas({
       );
     }
 
-    const graphTitle = `${client || "Client"} - ${market || "All Markets"} - ${period || "YTD"}`;
+    // Show message if graph type is selected but no fields selected
+    if (selectedGraphType && getTotalSelected() === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-8">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 mb-4">
+            <Sparkles className="w-12 h-12 text-violet-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-800 mb-2">
+            Select Fields to Visualize
+          </h3>
+          <p className="text-sm text-slate-500 max-w-md">
+            Use the <strong>Query Builder</strong> on the left to select the
+            data fields you want to display in your{" "}
+            {selectedGraphType.replace("-", " ")}.
+          </p>
+        </div>
+      );
+    }
+
+    const _graphTitle = `${client || "Client"} - ${market || "All Markets"} - ${period || "YTD"}`;
 
     // Calculate KPI values from real data with proper fallbacks
     const calculateKPIs = () => {
@@ -1362,10 +1652,10 @@ export function VisualizationCanvas({
       };
     };
 
-    const kpis = calculateKPIs();
+    const _kpis = calculateKPIs();
 
     // PPT Button component to avoid duplication
-    const PPTButton = () => (
+    const _PPTButton = () => (
       <button
         onClick={handleToggleForPPT}
         disabled={!isChartReady && !isIncludedInReport}
@@ -1401,15 +1691,17 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
@@ -1444,7 +1736,9 @@ export function VisualizationCanvas({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => formatValue(value, dataKeys.spend)}
+                    formatter={(value: number) =>
+                      formatValue(value, dataKeys.spend)
+                    }
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -1463,15 +1757,17 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
             <div ref={chartOnlyRef} className="bg-white rounded-xl p-4">
@@ -1507,7 +1803,9 @@ export function VisualizationCanvas({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => formatValue(value, dataKeys.spend)}
+                    formatter={(value: number) =>
+                      formatValue(value, dataKeys.spend)
+                    }
                   />
                   <text
                     x="50%"
@@ -1531,18 +1829,23 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
@@ -1555,11 +1858,17 @@ export function VisualizationCanvas({
                   }
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <YAxis
                     type="category"
                     dataKey="name"
@@ -1567,10 +1876,15 @@ export function VisualizationCanvas({
                     width={100}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string) => formatValue(value, name as string)}
+                    formatter={(value: number, name: string) =>
+                      formatValue(value, name as string)
+                    }
                   />
                   <Legend />
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend]).map((field, index) => (
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend]
+                  ).map((field, index) => (
                     <Bar
                       key={field}
                       dataKey={field}
@@ -1599,70 +1913,109 @@ export function VisualizationCanvas({
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
             {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
-              >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
+            {!isModalOpen && (
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            )}
 
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
-                <BarChart data={sampleData} margin={{ top: 60, right: 30, left: 20, bottom: 5 }}>
+                <BarChart
+                  data={sampleData}
+                  margin={{ top: 60, right: 20, left: 20, bottom: 5 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={80}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <Tooltip
-                    formatter={(value: number, name: string) => formatValue(value, name as string)}
+                    formatter={(value: number, name: string) =>
+                      formatValue(value, name as string)
+                    }
                   />
                   <Legend />
                   {/* First half of fields as bars */}
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend]).slice(0, Math.ceil((dataKeys.apiFields.length || 1) / 2) || 1).map((field, index) => (
-                    <Bar
-                      key={field}
-                      dataKey={field}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      radius={[8, 8, 0, 0]}
-                      name={getFieldLabel(field)}
-                      label={{
-                        position: "top",
-                        fontSize: 9,
-                        fill: "#475569",
-                        angle: -90,
-                        textAnchor: "start",
-                        dy: -5,
-                        formatter: (value: any) => formatValue(value, field),
-                      }}
-                    />
-                  ))}
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend]
+                  )
+                    .slice(
+                      0,
+                      Math.ceil((dataKeys.apiFields.length || 1) / 2) || 1,
+                    )
+                    .map((field, index) => (
+                      <Bar
+                        key={field}
+                        dataKey={field}
+                        fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        radius={[8, 8, 0, 0]}
+                        name={getFieldLabel(field)}
+                        label={{
+                          position: "top",
+                          fontSize: 9,
+                          fill: "#475569",
+                          angle: -90,
+                          textAnchor: "start",
+                          dy: -5,
+                          formatter: (value: any) => formatValue(value, field),
+                        }}
+                      />
+                    ))}
                   {/* Second half of fields as lines */}
-                  {(dataKeys.apiFields.length > 1 ? dataKeys.apiFields : [dataKeys.savings]).slice(Math.ceil((dataKeys.apiFields.length || 2) / 2)).map((field, index) => (
-                    <Line
-                      key={field}
-                      type="monotone"
-                      dataKey={field}
-                      stroke={CHART_COLORS[(index + Math.ceil((dataKeys.apiFields.length || 2) / 2)) % CHART_COLORS.length]}
-                      strokeWidth={3}
-                      name={getFieldLabel(field)}
-                      label={{
-                        position: "top",
-                        fontSize: 9,
-                        fill: CHART_COLORS[(index + Math.ceil((dataKeys.apiFields.length || 2) / 2)) % CHART_COLORS.length],
-                        angle: -90,
-                        textAnchor: "start",
-                        dy: -5,
-                        formatter: (value: any) => formatValue(value, field),
-                      }}
-                    />
-                  ))}
+                  {(dataKeys.apiFields.length > 1
+                    ? dataKeys.apiFields
+                    : [dataKeys.savings]
+                  )
+                    .slice(Math.ceil((dataKeys.apiFields.length || 2) / 2))
+                    .map((field, index) => (
+                      <Line
+                        key={field}
+                        type="monotone"
+                        dataKey={field}
+                        stroke={
+                          CHART_COLORS[
+                            (index +
+                              Math.ceil((dataKeys.apiFields.length || 2) / 2)) %
+                              CHART_COLORS.length
+                          ]
+                        }
+                        strokeWidth={3}
+                        name={getFieldLabel(field)}
+                        label={{
+                          position: "top",
+                          fontSize: 9,
+                          fill: CHART_COLORS[
+                            (index +
+                              Math.ceil((dataKeys.apiFields.length || 2) / 2)) %
+                              CHART_COLORS.length
+                          ],
+                          angle: -90,
+                          textAnchor: "start",
+                          dy: -5,
+                          formatter: (value: any) => formatValue(value, field),
+                        }}
+                      />
+                    ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1678,36 +2031,78 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Chart Controls */}
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Expand"
+                onClick={() => setShowDataLabels(!showDataLabels)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? "bg-violet-100 text-violet-600" : "hover:bg-slate-100 text-slate-500"}`}
+                title={showDataLabels ? "Hide labels" : "Show labels"}
               >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
+                {showDataLabels ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <EyeOff className="w-4 h-4" />
+                )}
               </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
 
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
                 <BarChart
                   data={sampleData}
-                  margin={{ top: 60, right: 30, left: 20, bottom: 5 }}
+                  margin={{ top: 60, right: 20, left: 20, bottom: 5 }}
                   onClick={(e: any) =>
                     e &&
                     e.activePayload &&
                     handleChartClick(e.activePayload[0].payload)
                   }
                 >
+                  {/* Gradient definitions */}
+                  <defs>
+                    {CHART_COLORS.map((color, index) => (
+                      <linearGradient
+                        key={`gradient-${index}`}
+                        id={`barGradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="0%" stopColor={color} stopOpacity={1} />
+                        <stop
+                          offset="100%"
+                          stopColor={color}
+                          stopOpacity={0.6}
+                        />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={80}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <Tooltip />
                   <Legend />
                   {hasIndexData && (
@@ -1723,23 +2118,31 @@ export function VisualizationCanvas({
                       }}
                     />
                   )}
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend]).map((field, index) => (
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend]
+                  ).map((field, index) => (
                     <Bar
                       key={field}
                       dataKey={field}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      fill={`url(#barGradient-${index % CHART_COLORS.length})`}
                       radius={[8, 8, 0, 0]}
                       name={getFieldLabel(field)}
                       style={{ cursor: "pointer" }}
-                      label={{
-                        position: "top",
-                        fontSize: 9,
-                        fill: "#475569",
-                        angle: -90,
-                        textAnchor: "start",
-                        dy: -5,
-                        formatter: (value: any) => formatValue(value, field),
-                      }}
+                      label={
+                        showDataLabels
+                          ? {
+                              position: "top",
+                              fontSize: 9,
+                              fill: "#475569",
+                              angle: -90,
+                              textAnchor: "start",
+                              dy: -5,
+                              formatter: (value: any) =>
+                                formatValue(value, field),
+                            }
+                          : false
+                      }
                     />
                   ))}
                 </BarChart>
@@ -1754,46 +2157,101 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Chart Controls */}
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setShowDataLabels(!showDataLabels)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? "bg-violet-100 text-violet-600" : "hover:bg-slate-100 text-slate-500"}`}
+                title={showDataLabels ? "Hide labels" : "Show labels"}
               >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
+                {showDataLabels ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <EyeOff className="w-4 h-4" />
+                )}
               </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
-                <BarChart data={sampleData} margin={{ top: 60, right: 30, left: 20, bottom: 5 }}>
+                <BarChart
+                  data={sampleData}
+                  margin={{ top: 60, right: 20, left: 20, bottom: 5 }}
+                >
+                  {/* Gradient definitions */}
+                  <defs>
+                    {CHART_COLORS.map((color, index) => (
+                      <linearGradient
+                        key={`gradient-${index}`}
+                        id={`groupedGradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="0%" stopColor={color} stopOpacity={1} />
+                        <stop
+                          offset="100%"
+                          stopColor={color}
+                          stopOpacity={0.6}
+                        />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={80}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <Tooltip
-                    formatter={(value: number, name: string) => formatValue(value, name as string)}
+                    formatter={(value: number, name: string) =>
+                      formatValue(value, name as string)
+                    }
                   />
                   <Legend />
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index) => (
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend, dataKeys.savings]
+                  ).map((field, index) => (
                     <Bar
                       key={field}
                       dataKey={field}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      fill={`url(#groupedGradient-${index % CHART_COLORS.length})`}
                       radius={[8, 8, 0, 0]}
                       name={getFieldLabel(field)}
-                      label={{
-                        position: "top",
-                        fontSize: 9,
-                        fill: "#475569",
-                        angle: -90,
-                        textAnchor: "start",
-                        dy: -5,
-                        formatter: (value: any) => formatValue(value, field),
-                      }}
+                      label={
+                        showDataLabels
+                          ? {
+                              position: "top",
+                              fontSize: 9,
+                              fill: "#475569",
+                              angle: -90,
+                              textAnchor: "start",
+                              dy: -5,
+                              formatter: (value: any) =>
+                                formatValue(value, field),
+                            }
+                          : false
+                      }
                     />
                   ))}
                 </BarChart>
@@ -1808,47 +2266,104 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Chart Controls */}
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setShowDataLabels(!showDataLabels)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? "bg-violet-100 text-violet-600" : "hover:bg-slate-100 text-slate-500"}`}
+                title={showDataLabels ? "Hide labels" : "Show labels"}
               >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
+                {showDataLabels ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <EyeOff className="w-4 h-4" />
+                )}
               </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
-                <BarChart data={sampleData} margin={{ top: 60, right: 30, left: 20, bottom: 5 }}>
+                <BarChart
+                  data={sampleData}
+                  margin={{ top: 60, right: 20, left: 20, bottom: 5 }}
+                >
+                  {/* Gradient definitions */}
+                  <defs>
+                    {CHART_COLORS.map((color, index) => (
+                      <linearGradient
+                        key={`gradient-${index}`}
+                        id={`stackedGradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="0%" stopColor={color} stopOpacity={1} />
+                        <stop
+                          offset="100%"
+                          stopColor={color}
+                          stopOpacity={0.6}
+                        />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={80}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <Tooltip
-                    formatter={(value: number, name: string) => formatValue(value, name as string)}
+                    formatter={(value: number, name: string) =>
+                      formatValue(value, name as string)
+                    }
                   />
                   <Legend />
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index, arr) => (
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend, dataKeys.savings]
+                  ).map((field, index, arr) => (
                     <Bar
                       key={field}
                       dataKey={field}
                       stackId="a"
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      radius={index === arr.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]}
+                      fill={`url(#stackedGradient-${index % CHART_COLORS.length})`}
+                      radius={
+                        index === arr.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]
+                      }
                       name={getFieldLabel(field)}
-                      label={index === arr.length - 1 ? {
-                        position: "top",
-                        fontSize: 9,
-                        fill: "#475569",
-                        angle: -90,
-                        textAnchor: "start",
-                        dy: -5,
-                        formatter: (value: any) => formatValue(value, field),
-                      } : undefined}
+                      label={
+                        showDataLabels && index === arr.length - 1
+                          ? {
+                              position: "top",
+                              fontSize: 9,
+                              fill: "#475569",
+                              angle: -90,
+                              textAnchor: "start",
+                              dy: -5,
+                              formatter: (value: any) =>
+                                formatValue(value, field),
+                            }
+                          : false
+                      }
                     />
                   ))}
                 </BarChart>
@@ -1863,31 +2378,61 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Chart Controls */}
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setShowDataLabels(!showDataLabels)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? "bg-violet-100 text-violet-600" : "hover:bg-slate-100 text-slate-500"}`}
+                title={showDataLabels ? "Hide labels" : "Show labels"}
               >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
+                {showDataLabels ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <EyeOff className="w-4 h-4" />
+                )}
               </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
-                <LineChart data={sampleData} margin={{ top: 40, right: 30, left: 20, bottom: 5 }}>
+                <LineChart
+                  data={sampleData}
+                  margin={{ top: 40, right: 20, left: 20, bottom: 5 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={80}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <Tooltip
-                    formatter={(value: number, name: string) => formatValue(value, name as string)}
+                    formatter={(value: number, name: string) =>
+                      formatValue(value, name as string)
+                    }
                   />
                   <Legend />
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index) => (
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend, dataKeys.savings]
+                  ).map((field, index) => (
                     <Line
                       key={field}
                       type="monotone"
@@ -1915,55 +2460,112 @@ export function VisualizationCanvas({
             ref={chartContainerRef}
             className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-sm relative"
           >
-            {/* Expand Button */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Chart Controls */}
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setShowDataLabels(!showDataLabels)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${showDataLabels ? "bg-violet-100 text-violet-600" : "hover:bg-slate-100 text-slate-500"}`}
+                title={showDataLabels ? "Hide labels" : "Show labels"}
               >
-                <Maximize2 className="w-4 h-4 text-slate-500" />
+                {showDataLabels ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <EyeOff className="w-4 h-4" />
+                )}
               </button>
+              {!isModalOpen && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4 text-slate-500" />
+                </button>
+              )}
             </div>
             {/* Chart content for PPT capture */}
-            <div ref={chartOnlyRef} className="bg-white rounded-xl p-4 overflow-visible">
+            <div
+              ref={chartOnlyRef}
+              className="bg-white rounded-xl p-4 overflow-visible"
+            >
               <ResponsiveContainer width="100%" height={450}>
-                <AreaChart data={sampleData} margin={{ top: 40, right: 30, left: 20, bottom: 5 }}>
+                <AreaChart
+                  data={sampleData}
+                  margin={{ top: 40, right: 20, left: 20, bottom: 5 }}
+                >
+                  {/* Gradient definitions for area fills */}
+                  <defs>
+                    {CHART_COLORS.map((color, index) => (
+                      <linearGradient
+                        key={`areaGradient-${index}`}
+                        id={`areaGradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="0%" stopColor={color} stopOpacity={0.6} />
+                        <stop
+                          offset="100%"
+                          stopColor={color}
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 11 }} width={80} tickFormatter={(value) => {
-                    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={80}
+                    tickFormatter={(value) => {
+                      if (Math.abs(value) >= 1000000)
+                        return `${(value / 1000000).toFixed(1)}M`;
+                      if (Math.abs(value) >= 1000)
+                        return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
                   <Tooltip
-                    formatter={(value: number, name: string) => formatValue(value, name as string)}
+                    formatter={(value: number, name: string) =>
+                      formatValue(value, name as string)
+                    }
                   />
                   <Legend />
-                  {(dataKeys.apiFields.length > 0 ? dataKeys.apiFields : [dataKeys.spend, dataKeys.savings]).map((field, index) => (
+                  {(dataKeys.apiFields.length > 0
+                    ? dataKeys.apiFields
+                    : [dataKeys.spend, dataKeys.savings]
+                  ).map((field, index) => (
                     <Area
                       key={field}
                       type="monotone"
                       dataKey={field}
                       stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      fillOpacity={0.4}
+                      fill={`url(#areaGradient-${index % CHART_COLORS.length})`}
                       name={getFieldLabel(field)}
                     />
                   ))}
                   {/* Invisible line for labels on first field */}
-                  <Line
-                    type="monotone"
-                    dataKey={dataKeys.apiFields[0] || dataKeys.spend}
-                    stroke="transparent"
-                    dot={false}
-                    legendType="none"
-                    label={{
-                      position: "top",
-                      fontSize: 10,
-                      fill: CHART_COLORS[0],
-                      formatter: (value: any) => formatValue(value, dataKeys.apiFields[0] || dataKeys.spend),
-                    } as any}
-                  />
+                  {showDataLabels && (
+                    <Line
+                      type="monotone"
+                      dataKey={dataKeys.apiFields[0] || dataKeys.spend}
+                      stroke="transparent"
+                      dot={false}
+                      legendType="none"
+                      label={
+                        {
+                          position: "top",
+                          fontSize: 10,
+                          fill: CHART_COLORS[0],
+                          formatter: (value: any) =>
+                            formatValue(
+                              value,
+                              dataKeys.apiFields[0] || dataKeys.spend,
+                            ),
+                        } as any
+                      }
+                    />
+                  )}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -2115,7 +2717,10 @@ export function VisualizationCanvas({
           slideNumber={slideNumber}
           onUpdateSlideNumber={(num) => onUpdateSlideNumber?.(graphId, num)}
         >
-          <div ref={chartOnlyRef} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm">
+          <div
+            ref={chartOnlyRef}
+            className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-sm"
+          >
             {renderVisualization()}
           </div>
         </GraphModal>

@@ -486,23 +486,19 @@ function ReportAutomationContent() {
       }
     });
 
-    // Initialize upload progress for all files
-    marketsToUpload.forEach((market) => {
-      if (market.file) {
-        setUploadProgress((prev) => [
-          ...prev,
-          {
-            id: `${market.id}-${Date.now()}`,
-            marketId: market.id,
-            dbMarketId: market.marketId!,
-            marketCode: market.code || "",
-            fileName: market.file!.name,
-            progress: 0,
-            status: "uploading",
-          },
-        ]);
-      }
-    });
+    // Initialize upload progress for all files (batch update to avoid duplicates)
+    const initialProgress: UploadProgress[] = marketsToUpload
+      .filter((market) => market.file)
+      .map((market) => ({
+        id: `${market.id}-${Date.now()}-${Math.random()}`,
+        marketId: market.id,
+        dbMarketId: market.marketId!,
+        marketCode: market.code || "",
+        fileName: market.file!.name,
+        progress: 0,
+        status: "uploading" as const,
+      }));
+    setUploadProgress(initialProgress);
 
     try {
       // Step 1: Submit batch extraction

@@ -1,6 +1,12 @@
 "use client";
 
-import { Building2, Database, MapPin, ChevronDown, Loader2 } from "lucide-react";
+import {
+  Building2,
+  Database,
+  MapPin,
+  ChevronDown,
+  Loader2,
+} from "lucide-react";
 
 export type DataSource = "summary" | "trackers" | "";
 
@@ -40,7 +46,8 @@ export function TopBar({
 
   // Get display name for selected market code
   const selectedMarketName = selectedMarket
-    ? availableMarkets.find(m => m.code === selectedMarket)?.name || selectedMarket
+    ? availableMarkets.find((m) => m.code === selectedMarket)?.name ||
+      selectedMarket
     : "";
 
   // When data source changes, reset market if switching to summary
@@ -130,7 +137,9 @@ export function TopBar({
                 </div>
                 <div className="relative">
                   {isLoadingMarkets ? (
-                    <div className={`${selectBaseClass} min-w-[150px] flex items-center gap-2`}>
+                    <div
+                      className={`${selectBaseClass} min-w-[150px] flex items-center gap-2`}
+                    >
                       <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                       <span className="text-slate-400">Loading...</span>
                     </div>
@@ -139,11 +148,15 @@ export function TopBar({
                       <select
                         value={selectedMarket}
                         onChange={(e) => onMarketChange(e.target.value)}
-                        disabled={!selectedClient || availableMarkets.length === 0}
+                        disabled={
+                          !selectedClient || availableMarkets.length === 0
+                        }
                         className={`${selectBaseClass} min-w-[150px]`}
                       >
                         <option value="">
-                          {availableMarkets.length === 0 ? "No markets available" : "Select Market..."}
+                          {availableMarkets.length === 0
+                            ? "No markets available"
+                            : "Select Market..."}
                         </option>
                         {availableMarkets.map((market) => (
                           <option key={market.code} value={market.code}>
