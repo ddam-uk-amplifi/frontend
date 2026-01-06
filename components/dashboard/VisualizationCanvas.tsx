@@ -294,13 +294,6 @@ export function VisualizationCanvas({
         return;
       }
 
-      // Only fetch for Arla client
-      if (client !== "Arla") {
-        setApiData(null);
-        setTrackerData(null);
-        return;
-      }
-
       // Skip fetching via old endpoints if we're using dynamic tracker fields
       // The data is already fetched via the /tracker/{media}/data endpoint in the parent component
       if (dataSource === "trackers" && hasDynamicTrackerFields) {
@@ -685,11 +678,10 @@ export function VisualizationCanvas({
       });
   }, [trackerSummaryData]);
 
-  // Get real Arla data based on data source selection
+  // Get chart data based on data source selection
   // Only returns actual API data, no static fallbacks
-  const getArlaData = useMemo(() => {
-    if (client !== "Arla") return null;
-
+  // Works for any client, not just Arla
+  const getClientData = useMemo(() => {
     // Use API data for summary
     if (
       dataSource === "summary" &&
@@ -716,27 +708,30 @@ export function VisualizationCanvas({
     // No fallback for summary - return null if no API data
     return null;
   }, [
-    client,
     dataSource,
     getApiChartData,
     getTrackerChartData,
     getTrackerSummaryChartData,
   ]);
 
+  // Alias for backwards compatibility
+  const getArlaData = getClientData;
+
   // Get chart data - only returns real data, no sample/mock data
+  // Works for any client
   const getChartData = () => {
-    // For Arla summary data
-    if (client === "Arla" && dataSource === "summary") {
-      if (getArlaData && getArlaData.length > 0) {
-        return getArlaData;
+    // For summary data (any client)
+    if (dataSource === "summary") {
+      if (getClientData && getClientData.length > 0) {
+        return getClientData;
       }
       // Return empty array - no mock data
       return [];
     }
 
-    // For Arla tracker data with dynamic field selection (new normalized flow)
+    // For tracker data with dynamic field selection (new normalized flow)
     // The API now returns field_value directly in each record - no lookup needed!
-    if (client === "Arla" && dataSource === "trackers" && dynamicTrackerData) {
+    if (dataSource === "trackers" && dynamicTrackerData) {
       const monthlyData = dynamicTrackerData.monthly || [];
       const generalData = dynamicTrackerData.general || [];
 
@@ -928,17 +923,16 @@ export function VisualizationCanvas({
       }
     }
 
-    // For Arla tracker data (existing flow - static field selection)
-    if (client === "Arla" && dataSource === "trackers") {
-      if (getArlaData && getArlaData.length > 0) {
-        return getArlaData;
+    // For tracker data (existing flow - static field selection, any client)
+    if (dataSource === "trackers") {
+      if (getClientData && getClientData.length > 0) {
+        return getClientData;
       }
       // Return empty array - no mock data
       return [];
     }
 
-    // For non-Arla clients - return empty array (no mock/random data)
-    // Real data should be fetched from API when implemented
+    // Default: return empty array (no mock/random data)
     return [];
   };
 
@@ -948,7 +942,9 @@ export function VisualizationCanvas({
   const hasData = rawData.length > 0;
 
   // Determine which data keys to use based on data type
-  const isArlaData = client === "Arla" && getArlaData && getArlaData.length > 0;
+  const hasClientData = getClientData && getClientData.length > 0;
+  // Alias for backwards compatibility
+  const isArlaData = hasClientData;
   const isApiData = apiData && apiData.data.length > 0;
   const _isTrackerApiData =
     (trackerData &&
@@ -1358,11 +1354,10 @@ export function VisualizationCanvas({
   };
 
   const renderVisualization = () => {
-    // Show loading state when fetching API data (for both summary and trackers)
+    // Show loading state when fetching API data (for both summary and trackers, any client)
     if (
       isLoadingApiData &&
-      (dataSource === "summary" || dataSource === "trackers") &&
-      client === "Arla"
+      (dataSource === "summary" || dataSource === "trackers")
     ) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center px-8">
@@ -1382,11 +1377,7 @@ export function VisualizationCanvas({
     }
 
     // Show loading state for dynamic tracker data
-    if (
-      isLoadingDynamicData &&
-      dataSource === "trackers" &&
-      client === "Arla"
-    ) {
+    if (isLoadingDynamicData && dataSource === "trackers") {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center px-8">
           <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 mb-4">
@@ -1403,7 +1394,7 @@ export function VisualizationCanvas({
     }
 
     // Show error state if dynamic tracker data fetch failed
-    if (dynamicDataError && dataSource === "trackers" && client === "Arla") {
+    if (dynamicDataError && dataSource === "trackers") {
       return (
         <DashboardErrorState
           error={new Error(dynamicDataError)}
@@ -1413,11 +1404,10 @@ export function VisualizationCanvas({
       );
     }
 
-    // Show error state if API call failed (for both summary and trackers)
+    // Show error state if API call failed (for both summary and trackers, any client)
     if (
       apiError &&
       (dataSource === "summary" || dataSource === "trackers") &&
-      client === "Arla" &&
       getTotalSelected() > 0
     ) {
       return (
@@ -1433,9 +1423,8 @@ export function VisualizationCanvas({
       );
     }
 
-    // Show "no data" state when fields are selected but no data returned (for both summary and trackers)
+    // Show "no data" state when fields are selected but no data returned (any client)
     if (
-      client === "Arla" &&
       (dataSource === "summary" || dataSource === "trackers") &&
       getTotalSelected() > 0 &&
       !hasData &&

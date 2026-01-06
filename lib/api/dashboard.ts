@@ -201,6 +201,40 @@ export interface TrackerSummaryItem {
   value_loss_pct: number | null;
 }
 
+// ============================================
+// KERING-SPECIFIC TYPES (Re-exported from @/lib/clients/kering)
+// ============================================
+import type {
+  KeringTrackerSummaryItem,
+  KeringTrackerSummaryResponse,
+  KeringBrandSummaryItem,
+  KeringBrandSummaryResponse,
+  KeringTrackerFiltersResponse,
+  KeringConsolidatedItem,
+  KeringConsolidatedDataResponse,
+  KeringMarketSummary,
+  KeringMarketSummaryResponse,
+  KeringBrandAggSummary,
+  KeringBrandAggSummaryResponse,
+  KeringConsolidatedFiltersResponse,
+} from "@/lib/clients/kering";
+
+// Re-export for consumers of this module
+export type {
+  KeringTrackerSummaryItem,
+  KeringTrackerSummaryResponse,
+  KeringBrandSummaryItem,
+  KeringBrandSummaryResponse,
+  KeringTrackerFiltersResponse,
+  KeringConsolidatedItem,
+  KeringConsolidatedDataResponse,
+  KeringMarketSummary,
+  KeringMarketSummaryResponse,
+  KeringBrandAggSummary,
+  KeringBrandAggSummaryResponse,
+  KeringConsolidatedFiltersResponse,
+};
+
 export interface TrackerAvailableFieldsResponse {
   media_type?: string;
   fields?: string[];
@@ -1033,6 +1067,177 @@ export async function getChartRecommendations(
   const response = await apiClient.post("/api/v1/dashboard/recommendations", {
     selected_fields: selectedFields,
   });
+
+  return response.data;
+}
+
+// ============================================
+// KERING API FUNCTIONS
+// ============================================
+
+/**
+ * Fetch Kering tracker summary data (from Summary_Overall sheets)
+ * Returns aggregated spend data by period and media type
+ * @param clientId - Client ID (Kering = 3)
+ * @param period - Filter by period (JANUARY-DECEMBER, Q1-Q4, 1H, FY)
+ * @param mediaType - Filter by media type
+ * @param marketId - Filter by market ID
+ * @param markets - Comma-separated market codes
+ */
+export async function fetchKeringTrackerSummary(
+  clientId: number,
+  period?: string,
+  mediaType?: string,
+  marketId?: number,
+  markets?: string,
+): Promise<KeringTrackerSummaryResponse> {
+  const queryParams = new URLSearchParams({
+    client_id: clientId.toString(),
+  });
+
+  if (period) queryParams.append("period", period.toUpperCase());
+  if (mediaType) queryParams.append("media_type", mediaType);
+  if (markets) {
+    queryParams.append("markets", markets);
+  } else if (marketId !== undefined) {
+    queryParams.append("market_id", marketId.toString());
+  }
+
+  const response = await apiClient.get<KeringTrackerSummaryResponse>(
+    `/api/v1/client/kering/tracker/summary?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Kering brand-level summary data
+ * @param clientId - Client ID (Kering = 3)
+ * @param brandName - Filter by brand name
+ * @param period - Filter by period
+ * @param mediaType - Filter by media type
+ * @param marketId - Filter by market ID
+ * @param markets - Comma-separated market codes
+ */
+export async function fetchKeringBrandSummary(
+  clientId: number,
+  brandName?: string,
+  period?: string,
+  mediaType?: string,
+  marketId?: number,
+  markets?: string,
+): Promise<KeringBrandSummaryResponse> {
+  const queryParams = new URLSearchParams({
+    client_id: clientId.toString(),
+  });
+
+  if (brandName) queryParams.append("brand_name", brandName);
+  if (period) queryParams.append("period", period.toUpperCase());
+  if (mediaType) queryParams.append("media_type", mediaType);
+  if (markets) {
+    queryParams.append("markets", markets);
+  } else if (marketId !== undefined) {
+    queryParams.append("market_id", marketId.toString());
+  }
+
+  const response = await apiClient.get<KeringBrandSummaryResponse>(
+    `/api/v1/client/kering/tracker/brand-summary?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch available filter values for Kering tracker data
+ * @param clientId - Client ID (Kering = 3)
+ */
+export async function fetchKeringTrackerFilters(
+  clientId: number,
+): Promise<KeringTrackerFiltersResponse> {
+  const response = await apiClient.get<KeringTrackerFiltersResponse>(
+    `/api/v1/client/kering/tracker/filters?client_id=${clientId}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Kering consolidated data from "YTD By Brand" sheet
+ * @param consolidationJobId - Consolidation job UUID
+ * @param market - Filter by market name
+ * @param brand - Filter by brand name
+ * @param media - Filter by media type
+ * @param subMedia - Filter by sub-media type
+ */
+export async function fetchKeringConsolidatedData(
+  consolidationJobId: string,
+  market?: string,
+  brand?: string,
+  media?: string,
+  subMedia?: string,
+): Promise<KeringConsolidatedDataResponse> {
+  const queryParams = new URLSearchParams({
+    consolidation_job_id: consolidationJobId,
+  });
+
+  if (market) queryParams.append("market", market);
+  if (brand) queryParams.append("brand", brand);
+  if (media) queryParams.append("media", media);
+  if (subMedia) queryParams.append("sub_media", subMedia);
+
+  const response = await apiClient.get<KeringConsolidatedDataResponse>(
+    `/api/v1/client/kering/consolidated/data?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Kering consolidated summary aggregated by market
+ * @param consolidationJobId - Consolidation job UUID
+ */
+export async function fetchKeringMarketSummary(
+  consolidationJobId: string,
+): Promise<KeringMarketSummaryResponse> {
+  const response = await apiClient.get<KeringMarketSummaryResponse>(
+    `/api/v1/client/kering/consolidated/summary-by-market?consolidation_job_id=${consolidationJobId}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Kering consolidated summary aggregated by brand
+ * @param consolidationJobId - Consolidation job UUID
+ * @param market - Optional filter by market name
+ */
+export async function fetchKeringBrandAggSummary(
+  consolidationJobId: string,
+  market?: string,
+): Promise<KeringBrandAggSummaryResponse> {
+  const queryParams = new URLSearchParams({
+    consolidation_job_id: consolidationJobId,
+  });
+
+  if (market) queryParams.append("market", market);
+
+  const response = await apiClient.get<KeringBrandAggSummaryResponse>(
+    `/api/v1/client/kering/consolidated/summary-by-brand?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch available filter values for Kering consolidated data
+ * @param consolidationJobId - Consolidation job UUID
+ */
+export async function fetchKeringConsolidatedFilters(
+  consolidationJobId: string,
+): Promise<KeringConsolidatedFiltersResponse> {
+  const response = await apiClient.get<KeringConsolidatedFiltersResponse>(
+    `/api/v1/client/kering/consolidated/filters?consolidation_job_id=${consolidationJobId}`,
+  );
 
   return response.data;
 }

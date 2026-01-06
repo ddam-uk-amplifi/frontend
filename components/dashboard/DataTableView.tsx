@@ -21,6 +21,7 @@ import {
   type ConsolidatedSummaryResponse,
   type TrackerSummaryItem,
 } from "@/lib/api/dashboard";
+import { getClientIdByName } from "@/lib/clients";
 
 // ============================================================================
 // Type Definitions
@@ -64,12 +65,6 @@ interface DataTableViewProps {
 // ============================================================================
 // Constants
 // ============================================================================
-
-const CLIENT_ID_MAP: Record<string, number> = {
-  Arla: 1,
-  Carlsberg: 2,
-  Kering: 3,
-};
 
 // Available periods for tracker data
 const AVAILABLE_PERIODS = [
@@ -509,7 +504,7 @@ export function DataTableView({
     }
   };
 
-  const clientId = selectedClient ? CLIENT_ID_MAP[selectedClient] : undefined;
+  const clientId = selectedClient ? getClientIdByName(selectedClient) : undefined;
 
   // Update columns based on data source
   useEffect(() => {

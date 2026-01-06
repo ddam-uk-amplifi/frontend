@@ -23,6 +23,7 @@ import {
 import { consolidationApi } from "@/lib/api/consolidation";
 import { tokenUtils } from "@/lib/utils/token";
 import { usePPTStore } from "@/lib/stores/usePPTStore";
+import { getClientIdByName } from "@/lib/clients";
 
 interface GraphTitleDialogState {
   isOpen: boolean;
@@ -33,12 +34,6 @@ interface GraphTitleDialogState {
   dataKeys?: string[];
 }
 
-// Client ID mapping - used for tracker API calls
-const CLIENT_ID_MAP: Record<string, number> = {
-  Arla: 1,
-  Carlsberg: 2,
-  Kering: 3,
-};
 
 export default function Dashboard() {
   const [selectedClient, setSelectedClient] = useState("");
@@ -92,9 +87,9 @@ export default function Dashboard() {
   // Ref to store chart element references for image capture
   const chartElementRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-  // Get client ID from selected client name
+  // Get client ID from selected client name (using client registry)
   const selectedClientId = selectedClient
-    ? CLIENT_ID_MAP[selectedClient]
+    ? getClientIdByName(selectedClient) ?? undefined
     : undefined;
 
   // Fetch latest job when client changes (for summary data source)
