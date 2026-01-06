@@ -62,6 +62,9 @@ export default function Dashboard() {
   const [isLoadingDynamicData, setIsLoadingDynamicData] = useState(false);
   const [dynamicDataError, setDynamicDataError] = useState<string | null>(null);
 
+  // Chart data for smart recommendations (populated by VisualizationCanvas)
+  const [chartDataForRecommendations, setChartDataForRecommendations] = useState<any[]>([]);
+
   // PPT Report State - Using Zustand for persistence
   const {
     selectedGraphsForPPT,
@@ -803,6 +806,7 @@ export default function Dashboard() {
             dynamicTrackerData={dynamicTrackerData}
             isLoadingDynamicData={isLoadingDynamicData}
             dynamicDataError={dynamicDataError}
+            onChartDataChange={setChartDataForRecommendations}
           />
 
           {/* Graph Recommendations Panel */}
@@ -812,6 +816,8 @@ export default function Dashboard() {
             selectedGraphType={selectedGraphType}
             isOpen={isRecommendationsPanelOpen}
             onOpenChange={setIsRecommendationsPanelOpen}
+            chartData={chartDataForRecommendations}
+            selectedClient={selectedClient}
           />
         </div>
       )}

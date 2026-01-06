@@ -2,10 +2,25 @@
 // CLIENT REGISTRY
 // ============================================
 
-import type { ClientConfig, ClientSchema, ClientModule } from "./types";
+import type {
+  ClientConfig,
+  ClientSchema,
+  ClientModule,
+  ChartThresholds,
+  ChartPreferences,
+} from "./types";
 
 // Re-export types for convenience
 export * from "./types";
+
+/**
+ * Default chart thresholds used when client doesn't specify
+ */
+export const DEFAULT_CHART_THRESHOLDS: ChartThresholds = {
+  highCardinalityThreshold: 15,
+  maxPieCategories: 7,
+  maxBarCategories: 20,
+};
 
 // Import all client modules
 import * as arla from "./arla";
@@ -97,4 +112,30 @@ export function getClientDataSchemas(): Record<
   }
 
   return schemas;
+}
+
+/**
+ * Get chart preferences for a client (with defaults)
+ */
+export function getClientChartPreferences(slug: string): ChartPreferences & {
+  thresholds: ChartThresholds;
+} {
+  const client = getClient(slug);
+  const prefs = client?.config.chartPreferences || {};
+
+  return {
+    preferredChartTypes: prefs.preferredChartTypes,
+    disabledChartTypes: prefs.disabledChartTypes,
+    thresholds: {
+      ...DEFAULT_CHART_THRESHOLDS,
+      ...prefs.thresholds,
+    },
+  };
+}
+
+/**
+ * Get chart thresholds for a client (with defaults)
+ */
+export function getClientChartThresholds(slug: string): ChartThresholds {
+  return getClientChartPreferences(slug).thresholds;
 }

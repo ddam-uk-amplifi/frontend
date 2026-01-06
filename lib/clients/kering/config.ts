@@ -1,6 +1,6 @@
 import type { ClientConfig } from "../types";
 
-export const config: ClientConfig = {
+export const keringConfig: ClientConfig = {
   id: 3,
   name: "Kering",
   slug: "kering",
@@ -10,5 +10,14 @@ export const config: ClientConfig = {
     hasBrandSummary: true,
     hasInflation: true,
     hasDynamicTrackerFields: false,
+  },
+  // Kering has many brands (11+), so adjust thresholds accordingly
+  chartPreferences: {
+    preferredChartTypes: ["bar-chart", "table", "grouped-bar"],
+    thresholds: {
+      highCardinalityThreshold: 20, // More brands than typical client
+      maxPieCategories: 10, // Allow more categories in pie
+      maxBarCategories: 25,
+    },
   },
 };

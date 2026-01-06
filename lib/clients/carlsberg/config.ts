@@ -1,6 +1,6 @@
 import type { ClientConfig } from "../types";
 
-export const config: ClientConfig = {
+export const carlsbergConfig: ClientConfig = {
   id: 2,
   name: "Carlsberg",
   slug: "carlsberg",

@@ -3,6 +3,24 @@
 // ============================================
 
 /**
+ * Chart-specific thresholds for smart recommendations
+ */
+export interface ChartThresholds {
+  highCardinalityThreshold: number; // When to suggest table view (default: 15)
+  maxPieCategories: number; // Max categories for pie chart (default: 7)
+  maxBarCategories: number; // Max categories for bar chart (default: 20)
+}
+
+/**
+ * Client-specific chart preferences
+ */
+export interface ChartPreferences {
+  preferredChartTypes?: string[]; // e.g., ["bar", "table"] - shown first
+  disabledChartTypes?: string[]; // Charts to hide for this client
+  thresholds?: Partial<ChartThresholds>;
+}
+
+/**
  * Client configuration metadata
  */
 export interface ClientConfig {
@@ -16,6 +34,7 @@ export interface ClientConfig {
     hasInflation: boolean;
     hasDynamicTrackerFields: boolean;
   };
+  chartPreferences?: ChartPreferences;
 }
 
 /**

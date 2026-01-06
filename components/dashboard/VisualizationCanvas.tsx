@@ -148,6 +148,8 @@ interface VisualizationCanvasProps {
   dynamicTrackerData?: TrackerFieldDataResponse | null;
   isLoadingDynamicData?: boolean;
   dynamicDataError?: string | null;
+  // Callback to expose chart data for smart recommendations
+  onChartDataChange?: (data: any[]) => void;
 }
 
 export function VisualizationCanvas({
@@ -168,6 +170,7 @@ export function VisualizationCanvas({
   dynamicTrackerData,
   isLoadingDynamicData = false,
   dynamicDataError,
+  onChartDataChange,
 }: VisualizationCanvasProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -937,6 +940,13 @@ export function VisualizationCanvas({
   };
 
   const rawData = getChartData();
+
+  // Notify parent of chart data changes for smart recommendations
+  useEffect(() => {
+    if (onChartDataChange) {
+      onChartDataChange(rawData);
+    }
+  }, [rawData, onChartDataChange]);
 
   // Check if we have actual data to display
   const hasData = rawData.length > 0;

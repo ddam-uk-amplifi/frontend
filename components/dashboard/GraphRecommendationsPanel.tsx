@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   BarChart3,
   PieChart as PieIcon,
@@ -14,12 +14,19 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import {
   isChartCompatible,
   getRecommendedCharts,
   analyzeSelectedFields,
+  analyzeDataForCharts,
+  type DataAwareAnalysis,
 } from "./utils/dataProcessing";
+import {
+  getClientChartThresholds,
+  type ChartThresholds,
+} from "@/lib/clients";
 
 interface GraphRecommendationsPanelProps {
   selectedFields: Record<string, string[]>;
@@ -27,6 +34,10 @@ interface GraphRecommendationsPanelProps {
   selectedGraphType: string | null;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  // Pass actual chart data for smart recommendations
+  chartData?: any[];
+  // Pass selected client for client-specific thresholds
+  selectedClient?: string;
 }
 
 export function GraphRecommendationsPanel({
@@ -35,6 +46,8 @@ export function GraphRecommendationsPanel({
   selectedGraphType,
   isOpen = false,
   onOpenChange,
+  chartData,
+  selectedClient,
 }: GraphRecommendationsPanelProps) {
   const [hoveredGraph, setHoveredGraph] = useState<string | null>(null);
   const [internalOpen, setInternalOpen] = useState(isOpen);
@@ -47,6 +60,21 @@ export function GraphRecommendationsPanel({
   const hasSelectedFields = Object.values(selectedFields).some(
     (arr) => arr.length > 0,
   );
+
+  // Get client-specific thresholds (memoized)
+  const clientThresholds = useMemo<Partial<ChartThresholds>>(() => {
+    if (!selectedClient) return {};
+    return getClientChartThresholds(selectedClient.toLowerCase());
+  }, [selectedClient]);
+
+  // Data-aware analysis using client thresholds (memoized)
+  const dataAnalysis = useMemo<DataAwareAnalysis | null>(() => {
+    if (!chartData || chartData.length === 0) return null;
+    return analyzeDataForCharts(chartData, clientThresholds);
+  }, [chartData, clientThresholds]);
+
+  // Check if we're using smart (data-aware) mode
+  const isSmartMode = dataAnalysis !== null && dataAnalysis.rowCount > 0;
 
   useEffect(() => {
     // Auto-open when fields are first selected
@@ -155,16 +183,35 @@ export function GraphRecommendationsPanel({
     );
   };
 
-  // Use the smart recommendation function
-  const recommendedGraphIds = getRecommendedCharts(selectedFields);
+  // Use data-aware recommendations when data is available, otherwise fall back to field-based
+  const recommendedGraphIds = useMemo(() => {
+    if (isSmartMode && dataAnalysis) {
+      // Use data-aware suggestions
+      return dataAnalysis.suggestedCharts
+        .filter(s => s.score >= 60)
+        .map(s => s.chartType);
+    }
+    // Fallback to field-name based recommendations
+    return getRecommendedCharts(selectedFields);
+  }, [isSmartMode, dataAnalysis, selectedFields]);
+
   const fieldAnalysis = analyzeSelectedFields(selectedFields);
 
-  // Sort graph types by compatibility score
-  const sortedGraphTypes = [...graphTypes].sort((a, b) => {
-    const scoreA = isChartCompatible(a.id, selectedFields).score || 0;
-    const scoreB = isChartCompatible(b.id, selectedFields).score || 0;
-    return scoreB - scoreA;
-  });
+  // Sort graph types by compatibility score (data-aware when available)
+  const sortedGraphTypes = useMemo(() => {
+    return [...graphTypes].sort((a, b) => {
+      if (isSmartMode && dataAnalysis) {
+        const suggestionA = dataAnalysis.suggestedCharts.find(s => s.chartType === a.id);
+        const suggestionB = dataAnalysis.suggestedCharts.find(s => s.chartType === b.id);
+        const scoreA = suggestionA?.score || 0;
+        const scoreB = suggestionB?.score || 0;
+        return scoreB - scoreA;
+      }
+      const scoreA = isChartCompatible(a.id, selectedFields).score || 0;
+      const scoreB = isChartCompatible(b.id, selectedFields).score || 0;
+      return scoreB - scoreA;
+    });
+  }, [graphTypes, isSmartMode, dataAnalysis, selectedFields]);
 
   // If no fields selected and panel is not open, don't render
   if (!hasSelectedFields && !isPanelOpen) {
@@ -208,6 +255,12 @@ export function GraphRecommendationsPanel({
             <h3 className="text-base font-semibold text-slate-800">
               Visualizations
             </h3>
+            {isSmartMode && (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-[10px] font-medium rounded-full">
+                <Sparkles className="w-3 h-3" />
+                Smart
+              </span>
+            )}
           </div>
           <button
             onClick={() => setIsPanelOpen(false)}
@@ -219,7 +272,9 @@ export function GraphRecommendationsPanel({
         </div>
         <p className="text-xs text-slate-500">
           {getTotalSelected() > 0
-            ? `${recommendedGraphIds.length} recommended`
+            ? isSmartMode 
+              ? `${recommendedGraphIds.length} recommended (${dataAnalysis?.rowCount} rows analyzed)`
+              : `${recommendedGraphIds.length} recommended`
             : "Select fields first"}
         </p>
       </div>
@@ -243,10 +298,73 @@ export function GraphRecommendationsPanel({
         </div>
       )}
 
+      {/* Data Insights Banner (Smart Mode) */}
+      {isSmartMode && dataAnalysis && dataAnalysis.warnings.length > 0 && (
+        <div className="mx-3 mt-3 p-3 bg-violet-50 border border-violet-200 rounded-xl">
+          <div className="flex items-start gap-2">
+            <Sparkles className="w-4 h-4 text-violet-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-violet-800">
+                Data Insight
+              </p>
+              <p className="text-[11px] text-violet-700 mt-0.5 leading-relaxed">
+                {dataAnalysis.warnings[0]}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Data Summary (Smart Mode) */}
+      {isSmartMode && dataAnalysis && (
+        <div className="mx-3 mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex flex-wrap gap-2 text-[10px] text-slate-600">
+            <span className="px-2 py-0.5 bg-white rounded-full border border-slate-200">
+              {dataAnalysis.rowCount} rows
+            </span>
+            <span className="px-2 py-0.5 bg-white rounded-full border border-slate-200">
+              {dataAnalysis.cardinality} categories
+            </span>
+            {dataAnalysis.hasTimeSeries && (
+              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-200">
+                Time series
+              </span>
+            )}
+            {dataAnalysis.percentageFields.length > 0 && (
+              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                {dataAnalysis.percentageFields.length} %
+              </span>
+            )}
+            {dataAnalysis.currencyFields.length > 0 && (
+              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                {dataAnalysis.currencyFields.length} currency
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="p-3 space-y-2">
         {sortedGraphTypes.map((graph) => {
           const isRecommended = recommendedGraphIds.includes(graph.id);
-          const compatibility = isChartCompatible(graph.id, selectedFields);
+          
+          // Use data-aware compatibility when available
+          const compatibility = isSmartMode && dataAnalysis
+            ? (() => {
+                const suggestion = dataAnalysis.suggestedCharts.find(s => s.chartType === graph.id);
+                if (suggestion) {
+                  return {
+                    compatible: true,
+                    score: suggestion.score,
+                    reason: suggestion.reason,
+                    scaleWarning: dataAnalysis.warnings.length > 0 ? dataAnalysis.warnings[0] : undefined,
+                  };
+                }
+                // Not in suggestions - lower score
+                return { compatible: true, score: 20, reason: "Not optimal for this data" };
+              })()
+            : isChartCompatible(graph.id, selectedFields);
+          
           const isDisabled = !compatibility.compatible;
           const score = compatibility.score || 0;
 
@@ -296,9 +414,15 @@ export function GraphRecommendationsPanel({
                           Good
                         </span>
                       )}
+                      {isSmartMode && score >= 85 && (
+                        <Sparkles className="w-3 h-3 text-violet-500" />
+                      )}
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      {graph.description}
+                      {/* Show data-aware reason when available, otherwise default description */}
+                      {isSmartMode && compatibility.reason && score >= 60
+                        ? compatibility.reason
+                        : graph.description}
                     </p>
                     {/* Score indicator */}
                     {!isDisabled && getTotalSelected() > 0 && (
@@ -330,12 +454,17 @@ export function GraphRecommendationsPanel({
               {hoveredGraph === graph.id && (
                 <div className="absolute right-full mr-2 top-0 z-20 w-56 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-xl border border-slate-700">
                   <p className="leading-relaxed">{graph.tooltip}</p>
-                  {isDisabled && compatibility.reason && (
+                  {isSmartMode && compatibility.reason && (
+                    <div className="mt-2 pt-2 border-t border-slate-700 text-violet-300 text-[11px]">
+                      ✨ {compatibility.reason}
+                    </div>
+                  )}
+                  {isDisabled && compatibility.reason && !isSmartMode && (
                     <div className="mt-2 pt-2 border-t border-slate-700 text-rose-300 text-[11px]">
                       ⚠️ {compatibility.reason}
                     </div>
                   )}
-                  {!isDisabled && compatibility.reason && (
+                  {!isDisabled && compatibility.reason && !isSmartMode && (
                     <div className="mt-2 pt-2 border-t border-slate-700 text-amber-300 text-[11px]">
                       💡 {compatibility.reason}
                     </div>
