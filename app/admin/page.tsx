@@ -1,7 +1,14 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Building2, Globe } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Building2,
+  Globe,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import {
   clientsApi,
@@ -63,6 +70,23 @@ export default function AdminPage() {
     id: number;
     name: string;
   } | null>(null);
+
+  // Expanded clients state for dropdown
+  const [expandedClients, setExpandedClients] = useState<Set<number>>(
+    new Set(),
+  );
+
+  const toggleClientExpanded = (clientId: number) => {
+    setExpandedClients((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientId)) {
+        next.delete(clientId);
+      } else {
+        next.add(clientId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     // Wait for auth store to hydrate
@@ -366,7 +390,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Markets List */}
+              {/* Markets List - Grouped by Client */}
               <div className="border rounded-lg">
                 {marketsLoading ? (
                   <div className="p-4 text-center text-sm text-gray-500">
@@ -378,43 +402,67 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="divide-y">
-                    {(markets || []).map((market) => {
-                      const client = clients.find(
-                        (c) => c.id === market.client_id,
+                    {clients.map((client) => {
+                      const clientMarkets = markets.filter(
+                        (m) => m.client_id === client.id,
                       );
+                      if (clientMarkets.length === 0) return null;
+                      const isExpanded = expandedClients.has(client.id);
                       return (
-                        <div
-                          key={market.id}
-                          className="flex items-center justify-between p-3 hover:bg-gray-50"
-                        >
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold mr-2">
-                                {market.code}
-                              </span>
-                              {market.name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              <span className="font-medium">
-                                {client?.name || "Unknown"}
-                              </span>
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setDeleteDialog({
-                                open: true,
-                                type: "market",
-                                id: market.id,
-                                name: `${market.code} - ${market.name}`,
-                              })
-                            }
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        <div key={client.id}>
+                          <button
+                            type="button"
+                            onClick={() => toggleClientExpanded(client.id)}
+                            className="w-full bg-gray-50 hover:bg-gray-100 px-3 py-2.5 flex items-center justify-between transition-colors"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-gray-500" />
+                              )}
+                              <Building2 className="h-4 w-4 text-gray-600" />
+                              <span className="text-sm font-semibold text-gray-700">
+                                {client.name}
+                              </span>
+                            </div>
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                              {clientMarkets.length} market
+                              {clientMarkets.length !== 1 ? "s" : ""}
+                            </span>
+                          </button>
+                          {isExpanded && (
+                            <div className="divide-y border-t bg-white">
+                              {clientMarkets.map((market) => (
+                                <div
+                                  key={market.id}
+                                  className="flex items-center justify-between p-3 pl-10 hover:bg-gray-50"
+                                >
+                                  <p className="font-medium text-gray-900">
+                                    <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold mr-2">
+                                      {market.code}
+                                    </span>
+                                    {market.name}
+                                  </p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setDeleteDialog({
+                                        open: true,
+                                        type: "market",
+                                        id: market.id,
+                                        name: `${market.code} - ${market.name}`,
+                                      })
+                                    }
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

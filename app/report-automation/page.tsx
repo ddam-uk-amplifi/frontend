@@ -2,16 +2,7 @@
 
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Upload,
-  Trash2,
-  Plus,
-  X,
-  Download,
-  ChevronDown,
-  FileUp,
-  CheckCircle,
-} from "lucide-react";
+import { X, Download, ChevronDown, FileUp, CheckCircle } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -19,7 +10,6 @@ import { apiClient } from "@/lib/api/client";
 import {
   consolidationApi,
   type ConsolidationJob,
-  type ConsolidationHistoryResponse,
 } from "@/lib/api/consolidation";
 import {
   extractionApi,
