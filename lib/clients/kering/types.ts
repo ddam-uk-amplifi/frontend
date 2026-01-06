@@ -3,11 +3,17 @@
 // ============================================
 
 /**
+ * Kering Type filter values
+ */
+export type KeringType = "ALL" | "DIRECT BUY" | "CENTRAL HUB" | "CLIENT BUY";
+
+/**
  * Kering Tracker Summary (from Summary_Overall sheets)
  */
 export interface KeringTrackerSummaryItem {
   id: number;
   market_id: number;
+  type: string;
   period: string;
   media_type: string;
   total_net_net_media_spend: number | null;
@@ -40,6 +46,7 @@ export interface KeringBrandSummaryItem {
   id: number;
   market_id: number;
   brand_name: string;
+  type: string;
   period: string;
   media_type: string;
   total_net_net_media_spend: number | null;
@@ -74,6 +81,7 @@ export interface KeringTrackerFiltersResponse {
   periods: string[];
   media_types: string[];
   brands: string[];
+  types: string[];
 }
 
 /**
