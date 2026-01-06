@@ -1,0 +1,14 @@
+import type { ClientConfig } from "../types";
+
+export const config: ClientConfig = {
+  id: 2,
+  name: "Carlsberg",
+  slug: "carlsberg",
+  markets: ["DK", "SE", "NO", "FI", "PL", "UK", "FR", "CH"],
+  features: {
+    hasTrackers: true,
+    hasBrandSummary: false,
+    hasInflation: true,
+    hasDynamicTrackerFields: false,
+  },
+};
