@@ -34,7 +34,6 @@ interface GraphTitleDialogState {
   dataKeys?: string[];
 }
 
-
 export default function Dashboard() {
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedDataSource, setSelectedDataSource] = useState<
@@ -89,7 +88,7 @@ export default function Dashboard() {
 
   // Get client ID from selected client name (using client registry)
   const selectedClientId = selectedClient
-    ? getClientIdByName(selectedClient) ?? undefined
+    ? (getClientIdByName(selectedClient) ?? undefined)
     : undefined;
 
   // Fetch latest job when client changes (for summary data source)

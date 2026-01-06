@@ -9,14 +9,20 @@ import type { Field } from "../types";
  */
 export const commonSummaryFields: Field[] = [
   { id: "total-net-net-spend", label: "Total net net spend" },
-  { id: "total-addressable-net-net-spend", label: "Total addressable net net spend" },
+  {
+    id: "total-addressable-net-net-spend",
+    label: "Total addressable net net spend",
+  },
   { id: "total-net-net-measured", label: "Total net net measured" },
   { id: "measured-spend-pct", label: "Measured Spend %" },
   { id: "savings-value", label: "Savings Value" },
   { id: "savings-pct", label: "Savings %" },
   { id: "inflation-pct", label: "Inflation %" },
   { id: "inflation-mitigation", label: "Inflation Mitigation" },
-  { id: "inflation-after-mitigation-pct", label: "Inflation after Mitigation %" },
+  {
+    id: "inflation-after-mitigation-pct",
+    label: "Inflation after Mitigation %",
+  },
 ];
 
 /**
@@ -28,7 +34,10 @@ export const trackerSummaryFields: Field[] = [
   { id: "total-addressable-spend", label: "Total Addressable Spend" },
   { id: "measured-spend", label: "Measured Spend" },
   { id: "measured-spend-pct", label: "Measured Spend %" },
-  { id: "benchmark-equivalent-net-net-spend", label: "Benchmark Equivalent Spend" },
+  {
+    id: "benchmark-equivalent-net-net-spend",
+    label: "Benchmark Equivalent Spend",
+  },
   { id: "value-loss", label: "Value Loss" },
   { id: "value-loss-pct", label: "Value Loss %" },
 ];
@@ -67,6 +76,13 @@ export function prefixFields(fields: Field[], prefix: string): Field[] {
 /**
  * Helper to prefix fields with a client identifier
  */
-export function prefixFieldsWithClient(fields: Field[], clientPrefix: string, typePrefix: string): Field[] {
-  return fields.map((f) => ({ ...f, id: `${clientPrefix}-${typePrefix}-${f.id}` }));
+export function prefixFieldsWithClient(
+  fields: Field[],
+  clientPrefix: string,
+  typePrefix: string,
+): Field[] {
+  return fields.map((f) => ({
+    ...f,
+    id: `${clientPrefix}-${typePrefix}-${f.id}`,
+  }));
 }

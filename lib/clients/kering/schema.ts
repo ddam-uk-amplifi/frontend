@@ -7,10 +7,22 @@ import type { FieldGroup, Field } from "../types";
 const keringInflationFields: Field[] = [
   { id: "h1-measured-spend", label: "H1 Measured Spend" },
   { id: "market-weighted-inflation", label: "Market Weighted Inflation" },
-  { id: "inflation-mitigated-dentsu-c", label: "Inflation Mitigated by DENTSU C" },
-  { id: "inflation-mitigated-dentsu-pct", label: "Inflation mitigated by DENTSU %" },
-  { id: "inflation-not-mitigated-dentsu-c", label: "Inflation not mitigated by DENTSU C" },
-  { id: "inflation-not-mitigated-dentsu-pct", label: "Inflation not mitigated by DENTSU %" },
+  {
+    id: "inflation-mitigated-dentsu-c",
+    label: "Inflation Mitigated by DENTSU C",
+  },
+  {
+    id: "inflation-mitigated-dentsu-pct",
+    label: "Inflation mitigated by DENTSU %",
+  },
+  {
+    id: "inflation-not-mitigated-dentsu-c",
+    label: "Inflation not mitigated by DENTSU C",
+  },
+  {
+    id: "inflation-not-mitigated-dentsu-pct",
+    label: "Inflation not mitigated by DENTSU %",
+  },
 ];
 
 const keringBrandSummaryFields: Field[] = [
@@ -77,7 +89,11 @@ const keringTrackerCommonFields = keringBrandSummaryFields;
 /**
  * Create a tracker subgroup with common fields
  */
-function createTrackerSubgroup(id: string, title: string, prefix: string): FieldGroup {
+function createTrackerSubgroup(
+  id: string,
+  title: string,
+  prefix: string,
+): FieldGroup {
   return {
     id,
     title,
@@ -102,9 +118,21 @@ const keringTrackerGroups: FieldGroup[] = [
     title: "Print",
     fields: [],
     subgroups: [
-      createTrackerSubgroup("kering-tracker-print-newspaper", "Newspaper", "kering-print-newspaper"),
-      createTrackerSubgroup("kering-tracker-print-magazines", "Magazines", "kering-print-magazines"),
-      createTrackerSubgroup("kering-tracker-print-anniversary", "Anniversary", "kering-print-anniversary"),
+      createTrackerSubgroup(
+        "kering-tracker-print-newspaper",
+        "Newspaper",
+        "kering-print-newspaper",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-print-magazines",
+        "Magazines",
+        "kering-print-magazines",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-print-anniversary",
+        "Anniversary",
+        "kering-print-anniversary",
+      ),
     ],
   },
   {
@@ -112,8 +140,16 @@ const keringTrackerGroups: FieldGroup[] = [
     title: "Outdoor",
     fields: [],
     subgroups: [
-      createTrackerSubgroup("kering-tracker-outdoor-standard", "Outdoor-standard", "kering-outdoor-standard"),
-      createTrackerSubgroup("kering-tracker-outdoor-digital", "Outdoor-digital", "kering-outdoor-digital"),
+      createTrackerSubgroup(
+        "kering-tracker-outdoor-standard",
+        "Outdoor-standard",
+        "kering-outdoor-standard",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-outdoor-digital",
+        "Outdoor-digital",
+        "kering-outdoor-digital",
+      ),
     ],
   },
   {
@@ -121,9 +157,21 @@ const keringTrackerGroups: FieldGroup[] = [
     title: "Digital",
     fields: [],
     subgroups: [
-      createTrackerSubgroup("kering-tracker-digital-display", "Display", "kering-digital-display"),
-      createTrackerSubgroup("kering-tracker-digital-video", "Video", "kering-digital-video"),
-      createTrackerSubgroup("kering-tracker-digital-search", "Search", "kering-digital-search"),
+      createTrackerSubgroup(
+        "kering-tracker-digital-display",
+        "Display",
+        "kering-digital-display",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-digital-video",
+        "Video",
+        "kering-digital-video",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-digital-search",
+        "Search",
+        "kering-digital-search",
+      ),
     ],
   },
   {
@@ -131,8 +179,16 @@ const keringTrackerGroups: FieldGroup[] = [
     title: "Social Total",
     fields: [],
     subgroups: [
-      createTrackerSubgroup("kering-tracker-social-branding", "Social Branding", "kering-social-branding"),
-      createTrackerSubgroup("kering-tracker-social-non-branding", "Social NON Branding", "kering-social-non-branding"),
+      createTrackerSubgroup(
+        "kering-tracker-social-branding",
+        "Social Branding",
+        "kering-social-branding",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-social-non-branding",
+        "Social NON Branding",
+        "kering-social-non-branding",
+      ),
     ],
   },
   {
@@ -140,9 +196,21 @@ const keringTrackerGroups: FieldGroup[] = [
     title: "Programmatic Total",
     fields: [],
     subgroups: [
-      createTrackerSubgroup("kering-tracker-programmatic-display", "Display", "kering-programmatic-display"),
-      createTrackerSubgroup("kering-tracker-programmatic-video", "Video", "kering-programmatic-video"),
-      createTrackerSubgroup("kering-tracker-programmatic-search", "Search", "kering-programmatic-search"),
+      createTrackerSubgroup(
+        "kering-tracker-programmatic-display",
+        "Display",
+        "kering-programmatic-display",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-programmatic-video",
+        "Video",
+        "kering-programmatic-video",
+      ),
+      createTrackerSubgroup(
+        "kering-tracker-programmatic-search",
+        "Search",
+        "kering-programmatic-search",
+      ),
     ],
   },
 ];

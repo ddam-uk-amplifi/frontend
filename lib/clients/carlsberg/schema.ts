@@ -28,15 +28,36 @@ const carlsbergCostResultFields: Field[] = [
 ];
 
 const carlsbergMEUFields: Field[] = [
-  { id: "total-spend-tracker-fy24-MEU", label: "Total spend Tracker FY24 & MEU" },
+  {
+    id: "total-spend-tracker-fy24-MEU",
+    label: "Total spend Tracker FY24 & MEU",
+  },
   { id: "fy-hold-vs-actual-spend-pct", label: "FY Hold vs Actual Spend %" },
   { id: "fy-projected-spend-MEU", label: "FY Projected Spend & MEU" },
-  { id: "fy-hold-vs-projected-spend-pct", label: "FY Hold vs Projected Spend %" },
-  { id: "fy-projected-savings-vs-hold", label: "FY Projected Savings (vs Hold)" },
-  { id: "fy-MEU-impact-vs-actual-hold", label: "FY MEU Impact vs Actual Hold Spend" },
-  { id: "fy-MEU-impact-vs-projected", label: "FY MEU Impact vs Projected Spend" },
-  { id: "fy-projected-savings-MEU-only", label: "FY Projected Savings (MEU only vs Hold)" },
-  { id: "fy-projected-MEU-achievement", label: "FY Projected MEU Achievement (Actual vs Projected)" },
+  {
+    id: "fy-hold-vs-projected-spend-pct",
+    label: "FY Hold vs Projected Spend %",
+  },
+  {
+    id: "fy-projected-savings-vs-hold",
+    label: "FY Projected Savings (vs Hold)",
+  },
+  {
+    id: "fy-MEU-impact-vs-actual-hold",
+    label: "FY MEU Impact vs Actual Hold Spend",
+  },
+  {
+    id: "fy-MEU-impact-vs-projected",
+    label: "FY MEU Impact vs Projected Spend",
+  },
+  {
+    id: "fy-projected-savings-MEU-only",
+    label: "FY Projected Savings (MEU only vs Hold)",
+  },
+  {
+    id: "fy-projected-MEU-achievement",
+    label: "FY Projected MEU Achievement (Actual vs Projected)",
+  },
 ];
 
 // ============================================
@@ -96,7 +117,10 @@ const carlsbergSummaryGroups: FieldGroup[] = [
 /**
  * Create a tracker group for a media type
  */
-function createTrackerGroup(mediaType: string, mediaTypeId: string): FieldGroup {
+function createTrackerGroup(
+  mediaType: string,
+  mediaTypeId: string,
+): FieldGroup {
   return {
     id: `carlsberg-tracker-${mediaTypeId}`,
     title: mediaType,

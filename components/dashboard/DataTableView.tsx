@@ -504,7 +504,9 @@ export function DataTableView({
     }
   };
 
-  const clientId = selectedClient ? getClientIdByName(selectedClient) : undefined;
+  const clientId = selectedClient
+    ? getClientIdByName(selectedClient)
+    : undefined;
 
   // Update columns based on data source
   useEffect(() => {

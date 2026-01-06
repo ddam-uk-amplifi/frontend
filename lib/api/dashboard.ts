@@ -1081,6 +1081,7 @@ export async function getChartRecommendations(
  * @param clientId - Client ID (Kering = 3)
  * @param period - Filter by period (JANUARY-DECEMBER, Q1-Q4, 1H, FY)
  * @param mediaType - Filter by media type
+ * @param type - Filter by type (ALL, DIRECT BUY, CENTRAL HUB, CLIENT BUY)
  * @param marketId - Filter by market ID
  * @param markets - Comma-separated market codes
  */
@@ -1088,6 +1089,7 @@ export async function fetchKeringTrackerSummary(
   clientId: number,
   period?: string,
   mediaType?: string,
+  type?: string,
   marketId?: number,
   markets?: string,
 ): Promise<KeringTrackerSummaryResponse> {
@@ -1097,6 +1099,7 @@ export async function fetchKeringTrackerSummary(
 
   if (period) queryParams.append("period", period.toUpperCase());
   if (mediaType) queryParams.append("media_type", mediaType);
+  if (type) queryParams.append("type", type.toUpperCase());
   if (markets) {
     queryParams.append("markets", markets);
   } else if (marketId !== undefined) {
@@ -1116,6 +1119,7 @@ export async function fetchKeringTrackerSummary(
  * @param brandName - Filter by brand name
  * @param period - Filter by period
  * @param mediaType - Filter by media type
+ * @param type - Filter by type (ALL, DIRECT BUY, CENTRAL HUB, CLIENT BUY)
  * @param marketId - Filter by market ID
  * @param markets - Comma-separated market codes
  */
@@ -1124,6 +1128,7 @@ export async function fetchKeringBrandSummary(
   brandName?: string,
   period?: string,
   mediaType?: string,
+  type?: string,
   marketId?: number,
   markets?: string,
 ): Promise<KeringBrandSummaryResponse> {
@@ -1134,6 +1139,7 @@ export async function fetchKeringBrandSummary(
   if (brandName) queryParams.append("brand_name", brandName);
   if (period) queryParams.append("period", period.toUpperCase());
   if (mediaType) queryParams.append("media_type", mediaType);
+  if (type) queryParams.append("type", type.toUpperCase());
   if (markets) {
     queryParams.append("markets", markets);
   } else if (marketId !== undefined) {

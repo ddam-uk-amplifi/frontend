@@ -1,3 +1,8 @@
 // Carlsberg client module
 export { config } from "./config";
-export { schema, carlsbergCostResultFields, carlsbergMEUFields, carlsbergMediaTypes } from "./schema";
+export {
+  schema,
+  carlsbergCostResultFields,
+  carlsbergMEUFields,
+  carlsbergMediaTypes,
+} from "./schema";

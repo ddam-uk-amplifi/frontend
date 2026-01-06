@@ -33,7 +33,7 @@ const arlaSummaryGroups: FieldGroup[] = [
  */
 function createMediaTypeGroup(
   mediaType: string,
-  mediaTypeId: string
+  mediaTypeId: string,
 ): FieldGroup {
   return {
     id: `arla-tracker-${mediaTypeId}`,
