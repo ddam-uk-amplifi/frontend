@@ -66,7 +66,7 @@ interface DataTableViewProps {
     graphId: string,
     graphTitle: string,
     element?: HTMLElement,
-    chartData?: Array<{ name: string; [key: string]: any }>,
+    chartData?: Array<{ name: string;[key: string]: any }>,
     dataKeys?: string[],
   ) => void;
 }
@@ -455,8 +455,8 @@ const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
     order: 1,
   },
   {
-    id: "total_affectable_spend",
-    label: "Affectable Spend",
+    id: "total_non_affectable_spend",
+    label: "Non Affectable Spend",
     type: "currency",
     align: "right",
     visible: true,
@@ -471,12 +471,28 @@ const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
     order: 3,
   },
   {
+    id: "non_measured_spend",
+    label: "Non Measured Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 4,
+  },
+  {
+    id: "total_affectable_spend",
+    label: "Affectable Spend",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 5,
+  },
+  {
     id: "measured_spend_pct",
     label: "Measured %",
     type: "percentage",
     align: "right",
     visible: true,
-    order: 4,
+    order: 6,
   },
   {
     id: "total_savings",
@@ -484,7 +500,7 @@ const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
     type: "currency",
     align: "right",
     visible: true,
-    order: 5,
+    order: 7,
   },
   {
     id: "total_savings_pct",
@@ -492,7 +508,7 @@ const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
     type: "percentage",
     align: "right",
     visible: true,
-    order: 6,
+    order: 8,
   },
   {
     id: "measured_savings",
@@ -500,7 +516,23 @@ const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
     type: "currency",
     align: "right",
     visible: true,
-    order: 7,
+    order: 9,
+  },
+  {
+    id: "measured_savings_pct",
+    label: "Measured Savings %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 10,
+  },
+  {
+    id: "inflation_mitigation",
+    label: "Inflation Mitigation",
+    type: "currency",
+    align: "right",
+    visible: true,
+    order: 11,
   },
   {
     id: "added_value_penalty_avoidance",
@@ -508,7 +540,15 @@ const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
     type: "currency",
     align: "right",
     visible: true,
-    order: 8,
+    order: 12,
+  },
+  {
+    id: "added_value_penalty_avoidance_pct",
+    label: "Added Value %",
+    type: "percentage",
+    align: "right",
+    visible: true,
+    order: 13,
   },
 ];
 
@@ -622,8 +662,8 @@ function transformTrackerData(
   // Filter by selected period (frontend filtering since backend doesn't support it)
   const filteredData = selectedPeriod
     ? data.filter(
-        (item) => item.period?.toLowerCase() === selectedPeriod.toLowerCase(),
-      )
+      (item) => item.period?.toLowerCase() === selectedPeriod.toLowerCase(),
+    )
     : data;
 
   if (filteredData.length === 0) return [];
@@ -660,45 +700,45 @@ function transformTrackerData(
   // Use GRAND TOTAL from API if available, otherwise calculate totals
   const totals = grandTotalRow
     ? {
-        total_net_net_spend: grandTotalRow.total_net_net_spend,
-        total_non_addressable_spend: grandTotalRow.total_non_addressable_spend,
-        total_addressable_spend: grandTotalRow.total_addressable_spend,
-        measured_spend: grandTotalRow.measured_spend,
-        measured_spend_pct: grandTotalRow.measured_spend_pct,
-        benchmark_equivalent_net_net_spend:
-          grandTotalRow.benchmark_equivalent_net_net_spend,
-        value_loss: grandTotalRow.value_loss,
-        value_loss_pct: grandTotalRow.value_loss_pct,
-      }
+      total_net_net_spend: grandTotalRow.total_net_net_spend,
+      total_non_addressable_spend: grandTotalRow.total_non_addressable_spend,
+      total_addressable_spend: grandTotalRow.total_addressable_spend,
+      measured_spend: grandTotalRow.measured_spend,
+      measured_spend_pct: grandTotalRow.measured_spend_pct,
+      benchmark_equivalent_net_net_spend:
+        grandTotalRow.benchmark_equivalent_net_net_spend,
+      value_loss: grandTotalRow.value_loss,
+      value_loss_pct: grandTotalRow.value_loss_pct,
+    }
     : {
-        total_net_net_spend: tableRows.reduce(
-          (sum, row) => sum + (row.data.total_net_net_spend || 0),
-          0,
-        ),
-        total_non_addressable_spend: tableRows.reduce(
-          (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
-          0,
-        ),
-        total_addressable_spend: tableRows.reduce(
-          (sum, row) => sum + (row.data.total_addressable_spend || 0),
-          0,
-        ),
-        measured_spend: tableRows.reduce(
-          (sum, row) => sum + (row.data.measured_spend || 0),
-          0,
-        ),
-        measured_spend_pct: null,
-        benchmark_equivalent_net_net_spend: tableRows.reduce(
-          (sum, row) =>
-            sum + (row.data.benchmark_equivalent_net_net_spend || 0),
-          0,
-        ),
-        value_loss: tableRows.reduce(
-          (sum, row) => sum + (row.data.value_loss || 0),
-          0,
-        ),
-        value_loss_pct: null,
-      };
+      total_net_net_spend: tableRows.reduce(
+        (sum, row) => sum + (row.data.total_net_net_spend || 0),
+        0,
+      ),
+      total_non_addressable_spend: tableRows.reduce(
+        (sum, row) => sum + (row.data.total_non_addressable_spend || 0),
+        0,
+      ),
+      total_addressable_spend: tableRows.reduce(
+        (sum, row) => sum + (row.data.total_addressable_spend || 0),
+        0,
+      ),
+      measured_spend: tableRows.reduce(
+        (sum, row) => sum + (row.data.measured_spend || 0),
+        0,
+      ),
+      measured_spend_pct: null,
+      benchmark_equivalent_net_net_spend: tableRows.reduce(
+        (sum, row) =>
+          sum + (row.data.benchmark_equivalent_net_net_spend || 0),
+        0,
+      ),
+      value_loss: tableRows.reduce(
+        (sum, row) => sum + (row.data.value_loss || 0),
+        0,
+      ),
+      value_loss_pct: null,
+    };
 
   tableRows.push({
     id: "total",
@@ -934,6 +974,7 @@ function transformKeringTrackerBrandData(
     string,
     {
       total_net_net_media_spend: number;
+      total_non_affectable_spend: number;
       total_affectable_spend: number;
       measured_spend: number;
       total_savings: number;
@@ -944,12 +985,19 @@ function transformKeringTrackerBrandData(
 
   filteredData.forEach((item) => {
     const mediaType = normalizeMediaType(item.media_type || "Unknown");
-    // Skip GRAND TOTAL rows
-    if (mediaType === "Grand Total") return;
+    // Skip GRAND TOTAL rows and TV-related rows
+    if (
+      mediaType === "Grand Total" ||
+      mediaType === "Tv" ||
+      mediaType === "Tv - Linear" ||
+      mediaType === "Tv - Vod"
+    )
+      return;
 
     if (!mediaGroups[mediaType]) {
       mediaGroups[mediaType] = {
         total_net_net_media_spend: 0,
+        total_non_affectable_spend: 0,
         total_affectable_spend: 0,
         measured_spend: 0,
         total_savings: 0,
@@ -959,6 +1007,8 @@ function transformKeringTrackerBrandData(
     }
     mediaGroups[mediaType].total_net_net_media_spend +=
       item.total_net_net_media_spend || 0;
+    mediaGroups[mediaType].total_non_affectable_spend +=
+      item.total_non_affectable_spend || 0;
     mediaGroups[mediaType].total_affectable_spend +=
       item.total_affectable_spend || 0;
     mediaGroups[mediaType].measured_spend += item.measured_spend || 0;
@@ -977,6 +1027,7 @@ function transformKeringTrackerBrandData(
       level: 0,
       data: {
         total_net_net_media_spend: values.total_net_net_media_spend,
+        total_non_affectable_spend: values.total_non_affectable_spend,
         total_affectable_spend: values.total_affectable_spend,
         measured_spend: values.measured_spend,
         measured_spend_pct:
@@ -998,6 +1049,10 @@ function transformKeringTrackerBrandData(
   const totals = {
     total_net_net_media_spend: tableRows.reduce(
       (sum, row) => sum + (row.data.total_net_net_media_spend || 0),
+      0,
+    ),
+    total_non_affectable_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.total_non_affectable_spend || 0),
       0,
     ),
     total_affectable_spend: tableRows.reduce(
@@ -1066,36 +1121,53 @@ function transformKeringTrackerSummaryData(
     string,
     {
       total_net_net_media_spend: number;
+      total_non_affectable_spend: number;
       total_affectable_spend: number;
       measured_spend: number;
+      non_measured_spend: number;
       total_savings: number;
       measured_savings: number;
+      inflation_mitigation: number;
       added_value_penalty_avoidance: number;
     }
   > = {};
 
   filteredData.forEach((item) => {
     const mediaType = normalizeMediaType(item.media_type || "Unknown");
-    // Skip GRAND TOTAL rows
-    if (mediaType === "Grand Total") return;
+    // Skip GRAND TOTAL rows and TV-related rows
+    if (
+      mediaType === "Grand Total" ||
+      mediaType === "Tv" ||
+      mediaType === "Tv - Linear" ||
+      mediaType === "Tv - Vod"
+    )
+      return;
 
     if (!mediaGroups[mediaType]) {
       mediaGroups[mediaType] = {
         total_net_net_media_spend: 0,
+        total_non_affectable_spend: 0,
         total_affectable_spend: 0,
         measured_spend: 0,
+        non_measured_spend: 0,
         total_savings: 0,
         measured_savings: 0,
+        inflation_mitigation: 0,
         added_value_penalty_avoidance: 0,
       };
     }
     mediaGroups[mediaType].total_net_net_media_spend +=
       item.total_net_net_media_spend || 0;
+    mediaGroups[mediaType].total_non_affectable_spend +=
+      item.total_non_affectable_spend || 0;
     mediaGroups[mediaType].total_affectable_spend +=
       item.total_affectable_spend || 0;
     mediaGroups[mediaType].measured_spend += item.measured_spend || 0;
+    mediaGroups[mediaType].non_measured_spend += item.non_measured_spend || 0;
     mediaGroups[mediaType].total_savings += item.total_savings || 0;
     mediaGroups[mediaType].measured_savings += item.measured_savings || 0;
+    mediaGroups[mediaType].inflation_mitigation +=
+      item.inflation_mitigation || 0;
     mediaGroups[mediaType].added_value_penalty_avoidance +=
       item.added_value_penalty_avoidance || 0;
   });
@@ -1109,8 +1181,10 @@ function transformKeringTrackerSummaryData(
       level: 0,
       data: {
         total_net_net_media_spend: values.total_net_net_media_spend,
-        total_affectable_spend: values.total_affectable_spend,
+        total_non_affectable_spend: values.total_non_affectable_spend,
         measured_spend: values.measured_spend,
+        non_measured_spend: values.non_measured_spend,
+        total_affectable_spend: values.total_affectable_spend,
         measured_spend_pct:
           values.total_affectable_spend > 0
             ? (values.measured_spend / values.total_affectable_spend) * 100
@@ -1121,7 +1195,17 @@ function transformKeringTrackerSummaryData(
             ? (values.total_savings / values.measured_spend) * 100
             : 0,
         measured_savings: values.measured_savings,
+        measured_savings_pct:
+          values.measured_spend > 0
+            ? (values.measured_savings / values.measured_spend) * 100
+            : 0,
+        inflation_mitigation: values.inflation_mitigation,
         added_value_penalty_avoidance: values.added_value_penalty_avoidance,
+        added_value_penalty_avoidance_pct:
+          values.measured_spend > 0
+            ? (values.added_value_penalty_avoidance / values.measured_spend) *
+            100
+            : 0,
       },
     }),
   );
@@ -1132,12 +1216,20 @@ function transformKeringTrackerSummaryData(
       (sum, row) => sum + (row.data.total_net_net_media_spend || 0),
       0,
     ),
+    total_non_affectable_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.total_non_affectable_spend || 0),
+      0,
+    ),
     total_affectable_spend: tableRows.reduce(
       (sum, row) => sum + (row.data.total_affectable_spend || 0),
       0,
     ),
     measured_spend: tableRows.reduce(
       (sum, row) => sum + (row.data.measured_spend || 0),
+      0,
+    ),
+    non_measured_spend: tableRows.reduce(
+      (sum, row) => sum + (row.data.non_measured_spend || 0),
       0,
     ),
     measured_spend_pct: 0,
@@ -1150,10 +1242,16 @@ function transformKeringTrackerSummaryData(
       (sum, row) => sum + (row.data.measured_savings || 0),
       0,
     ),
+    measured_savings_pct: 0,
+    inflation_mitigation: tableRows.reduce(
+      (sum, row) => sum + (row.data.inflation_mitigation || 0),
+      0,
+    ),
     added_value_penalty_avoidance: tableRows.reduce(
       (sum, row) => sum + (row.data.added_value_penalty_avoidance || 0),
       0,
     ),
+    added_value_penalty_avoidance_pct: 0,
   };
 
   // Calculate total percentages
@@ -1164,6 +1262,10 @@ function transformKeringTrackerSummaryData(
   if (totals.measured_spend > 0) {
     totals.total_savings_pct =
       (totals.total_savings / totals.measured_spend) * 100;
+    totals.measured_savings_pct =
+      (totals.measured_savings / totals.measured_spend) * 100;
+    totals.added_value_penalty_avoidance_pct =
+      (totals.added_value_penalty_avoidance / totals.measured_spend) * 100;
   }
 
   tableRows.push({
@@ -1360,10 +1462,10 @@ export function DataTableView({
       ),
     enabled: Boolean(
       isKering &&
-        selectedDataSource === "summary" &&
-        clientId &&
-        isKeringBrandSelected &&
-        selectedBrand,
+      selectedDataSource === "summary" &&
+      clientId &&
+      isKeringBrandSelected &&
+      selectedBrand,
     ),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -1387,9 +1489,9 @@ export function DataTableView({
       ),
     enabled: Boolean(
       isKering &&
-        selectedDataSource === "summary" &&
-        clientId &&
-        !isKeringBrandSelected,
+      selectedDataSource === "summary" &&
+      clientId &&
+      !isKeringBrandSelected,
     ),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -1417,10 +1519,10 @@ export function DataTableView({
       ),
     enabled: Boolean(
       selectedClient &&
-        selectedDataSource === "trackers" &&
-        selectedMarket &&
-        clientId &&
-        !isKering, // Disable for Kering - use keringTrackerData instead
+      selectedDataSource === "trackers" &&
+      selectedMarket &&
+      clientId &&
+      !isKering, // Disable for Kering - use keringTrackerData instead
     ),
     staleTime: 5 * 60 * 1000, // Cache longer since we filter on frontend
     gcTime: 10 * 60 * 1000,
@@ -1454,11 +1556,11 @@ export function DataTableView({
       ),
     enabled: Boolean(
       isKering &&
-        selectedDataSource === "trackers" &&
-        clientId &&
-        selectedMarket &&
-        isKeringTrackerBrandSelected &&
-        selectedTrackerBrand,
+      selectedDataSource === "trackers" &&
+      clientId &&
+      selectedMarket &&
+      isKeringTrackerBrandSelected &&
+      selectedTrackerBrand,
     ),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -1485,10 +1587,10 @@ export function DataTableView({
       ),
     enabled: Boolean(
       isKering &&
-        selectedDataSource === "trackers" &&
-        clientId &&
-        selectedMarket &&
-        !isKeringTrackerBrandSelected,
+      selectedDataSource === "trackers" &&
+      clientId &&
+      selectedMarket &&
+      !isKeringTrackerBrandSelected,
     ),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -1749,11 +1851,10 @@ export function DataTableView({
                           setSheetType("ytd");
                           setIsSheetTypeOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                          sheetType === "ytd"
-                            ? "bg-violet-100 text-violet-700"
-                            : "hover:bg-slate-100"
-                        }`}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === "ytd"
+                          ? "bg-violet-100 text-violet-700"
+                          : "hover:bg-slate-100"
+                          }`}
                       >
                         All Brand Summary
                       </button>
@@ -1769,11 +1870,10 @@ export function DataTableView({
                             setSheetType(brand as any);
                             setIsSheetTypeOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                            sheetType === brand
-                              ? "bg-violet-100 text-violet-700"
-                              : "hover:bg-slate-100"
-                          }`}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === brand
+                            ? "bg-violet-100 text-violet-700"
+                            : "hover:bg-slate-100"
+                            }`}
                         >
                           {brand}
                         </button>
@@ -1787,11 +1887,10 @@ export function DataTableView({
                           setSheetType("ytd");
                           setIsSheetTypeOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                          sheetType === "ytd"
-                            ? "bg-violet-100 text-violet-700"
-                            : "hover:bg-slate-100"
-                        }`}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === "ytd"
+                          ? "bg-violet-100 text-violet-700"
+                          : "hover:bg-slate-100"
+                          }`}
                       >
                         YTD Summary
                       </button>
@@ -1800,11 +1899,10 @@ export function DataTableView({
                           setSheetType("fyfc");
                           setIsSheetTypeOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                          sheetType === "fyfc"
-                            ? "bg-violet-100 text-violet-700"
-                            : "hover:bg-slate-100"
-                        }`}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === "fyfc"
+                          ? "bg-violet-100 text-violet-700"
+                          : "hover:bg-slate-100"
+                          }`}
                       >
                         FYFC Summary
                       </button>
@@ -1826,7 +1924,7 @@ export function DataTableView({
                       : selectedPeriod
                     : selectedPeriod
                       ? AVAILABLE_PERIODS.find((p) => p.code === selectedPeriod)
-                          ?.name || selectedPeriod
+                        ?.name || selectedPeriod
                       : "Select Period"}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
@@ -1841,11 +1939,10 @@ export function DataTableView({
                           setSelectedPeriod("detailed");
                           setIsPeriodOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                          selectedPeriod === "detailed" || !selectedPeriod
-                            ? "bg-violet-100 text-violet-700"
-                            : "hover:bg-slate-100"
-                        }`}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === "detailed" || !selectedPeriod
+                          ? "bg-violet-100 text-violet-700"
+                          : "hover:bg-slate-100"
+                          }`}
                       >
                         Detailed Summary
                       </button>
@@ -1861,11 +1958,10 @@ export function DataTableView({
                             setSelectedPeriod(brand);
                             setIsPeriodOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                            selectedPeriod === brand
-                              ? "bg-violet-100 text-violet-700"
-                              : "hover:bg-slate-100"
-                          }`}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === brand
+                            ? "bg-violet-100 text-violet-700"
+                            : "hover:bg-slate-100"
+                            }`}
                         >
                           {brand}
                         </button>
@@ -1881,11 +1977,10 @@ export function DataTableView({
                             setSelectedPeriod(period.code);
                             setIsPeriodOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                            selectedPeriod === period.code
-                              ? "bg-violet-100 text-violet-700"
-                              : "hover:bg-slate-100"
-                          }`}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === period.code
+                            ? "bg-violet-100 text-violet-700"
+                            : "hover:bg-slate-100"
+                            }`}
                         >
                           {period.name}
                         </button>
@@ -1966,9 +2061,8 @@ export function DataTableView({
                       />
                       <label
                         htmlFor={column.id}
-                        className={`flex-1 text-sm cursor-pointer select-none ${
-                          column.frozen ? "text-slate-400" : ""
-                        }`}
+                        className={`flex-1 text-sm cursor-pointer select-none ${column.frozen ? "text-slate-400" : ""
+                          }`}
                       >
                         {column.label}
                         {column.frozen && (
@@ -2085,9 +2179,8 @@ export function DataTableView({
                   {scrollableColumns.map((column) => (
                     <th
                       key={column.id}
-                      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 bg-slate-100 border-b border-slate-200 whitespace-nowrap ${
-                        column.align === "right" ? "text-right" : "text-left"
-                      }`}
+                      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 bg-slate-100 border-b border-slate-200 whitespace-nowrap ${column.align === "right" ? "text-right" : "text-left"
+                        }`}
                       style={{ minWidth: "130px" }}
                     >
                       {column.label}
@@ -2110,9 +2203,8 @@ export function DataTableView({
                         return (
                           <td
                             key={`${row.id}-${column.id}`}
-                            className={`px-4 py-3 text-sm sticky z-10 left-0 ${rowStyles} ${
-                              isTotal ? "font-semibold" : ""
-                            }`}
+                            className={`px-4 py-3 text-sm sticky z-10 left-0 ${rowStyles} ${isTotal ? "font-semibold" : ""
+                              }`}
                             style={{
                               minWidth: "150px",
                               boxShadow:
@@ -2136,15 +2228,13 @@ export function DataTableView({
                         return (
                           <td
                             key={`${row.id}-${column.id}`}
-                            className={`px-4 py-3 text-sm whitespace-nowrap ${
-                              column.align === "right"
-                                ? "text-right"
-                                : "text-left"
-                            } ${
-                              isTotal
+                            className={`px-4 py-3 text-sm whitespace-nowrap ${column.align === "right"
+                              ? "text-right"
+                              : "text-left"
+                              } ${isTotal
                                 ? "font-semibold text-slate-900"
                                 : "text-slate-600"
-                            }`}
+                              }`}
                           >
                             {formatCellValue(value, column.type)}
                           </td>

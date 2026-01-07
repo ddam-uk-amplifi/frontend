@@ -38,7 +38,6 @@ export function TopBar({
   onClientChange,
   onDataSourceChange,
   onMarketChange,
-  onYtdMonthChange,
   availableMarkets = [],
   isLoadingMarkets = false,
 }: TopBarProps) {

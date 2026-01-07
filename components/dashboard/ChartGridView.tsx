@@ -26,6 +26,7 @@ import {
   PolarGrid,
   PolarAngleAxis,
 } from "recharts";
+import { applyOthersLogic, getFieldType } from "./utils/dataProcessing";
 
 type ChartType =
   | "bar"
@@ -64,7 +65,7 @@ interface ChartGridViewProps {
     graphId: string,
     graphTitle: string,
     element?: HTMLElement,
-    chartData?: Array<{ name: string; [key: string]: any }>,
+    chartData?: Array<{ name: string;[key: string]: any }>,
     dataKeys?: string[],
   ) => void;
   onUpdateSlideNumber?: (
@@ -114,6 +115,10 @@ const COLUMN_LABELS: Record<string, string> = {
   measured_savings_pct: "Measured Savings %",
   added_value: "Added Value",
   added_value_pct: "Added Value %",
+  total_net_net_media_spend: "Net Net Media Spend",
+  total_non_affectable_spend: "Non-Affectable Spend",
+  non_measured_spend: "Non-Measured Spend",
+  inflation_mitigation: "Inflation Mitigation",
 };
 
 const getColumnLabel = (col: string) => COLUMN_LABELS[col] || col;
@@ -127,7 +132,12 @@ function generateChartConfigs(
   categoryLabel: string = "Media Type",
 ): ChartConfig[] {
   // Filter out non-numeric columns
-  const numericCols = columns.filter((col) => col !== "mediaType");
+  const numericCols = columns.filter((col) => {
+    if (col === "mediaType" || col === "market" || col === "brand")
+      return false;
+    const type = getFieldType(col);
+    return type === "metric" || type === "percentage" || type === "index";
+  });
   if (numericCols.length === 0) return [];
 
   const charts: ChartConfig[] = [];
@@ -341,7 +351,7 @@ export function ChartGridView({
   );
 
   // Prepare chart data from rows
-  const chartData = useMemo((): Array<{ name: string; [key: string]: any }> => {
+  const chartData = useMemo((): Array<{ name: string;[key: string]: any }> => {
     if (!rows || rows.length === 0) return [];
     return rows
       .filter((row) => row.mediaType !== "Total")
@@ -404,12 +414,55 @@ export function ChartGridView({
     const fontSize = showLabels ? 12 : 9;
     const tickFontSize = showLabels ? 11 : 9;
 
+    // Define limits for different chart types
+    const maxItemsMap: Record<string, number> = {
+      pie: 10,
+      donut: 10,
+      radar: 8,
+      "stacked-bar": 12,
+      bar: 15,
+      "horizontal-bar": 15,
+      line: 25,
+      area: 25,
+      combo: 15,
+      "grouped-bar": 12,
+    };
+
+    const maxItems = maxItemsMap[chart.type] || 15;
+    const isHighCardinality = chartData.length > maxItems;
+
+    // Prepare displayed data with Top-N + "Others" grouping for high cardinality
+    let displayedData = chartData;
+
+    if (chart.type === "pie" || chart.type === "donut") {
+      // Filter out zero/null values first
+      const filtered = chartData.filter((d) => {
+        const val = d[chart.dataKeys[0]];
+        return val !== null && val !== undefined && val !== 0;
+      });
+      if (filtered.length > maxItems) {
+        displayedData = applyOthersLogic(
+          filtered,
+          maxItems - 1,
+          chart.dataKeys[0],
+        );
+      } else {
+        displayedData = filtered;
+      }
+    } else if (isHighCardinality) {
+      displayedData = applyOthersLogic(
+        chartData,
+        maxItems - 1,
+        chart.dataKeys[0],
+      );
+    }
+
     switch (chart.type) {
       case "bar":
         return (
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
-              data={chartData}
+              data={displayedData}
               margin={{
                 top: 20,
                 right: 10,
@@ -441,11 +494,11 @@ export function ChartGridView({
                 label={
                   showLabels
                     ? {
-                        position: "top",
-                        fontSize: 10,
-                        fill: "#475569",
-                        formatter: (v: any) => formatValue(v, isPercentage),
-                      }
+                      position: "top",
+                      fontSize: 10,
+                      fill: "#475569",
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    }
                     : false
                 }
               />
@@ -457,7 +510,7 @@ export function ChartGridView({
         return (
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
-              data={chartData}
+              data={displayedData}
               layout="vertical"
               margin={{
                 top: 10,
@@ -489,11 +542,11 @@ export function ChartGridView({
                 label={
                   showLabels
                     ? {
-                        position: "right",
-                        fontSize: 10,
-                        fill: "#475569",
-                        formatter: (v: any) => formatValue(v, isPercentage),
-                      }
+                      position: "right",
+                      fontSize: 10,
+                      fill: "#475569",
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    }
                     : false
                 }
               />
@@ -502,11 +555,6 @@ export function ChartGridView({
         );
 
       case "pie":
-        // Filter out zero/null values for pie chart
-        const pieData = chartData.filter((d) => {
-          const val = d[chart.dataKeys[0]];
-          return val !== null && val !== undefined && val !== 0;
-        });
         // Custom label renderer with lines pointing to slices
         const renderPieLabel = (props: any) => {
           const { name, value } = props;
@@ -517,7 +565,7 @@ export function ChartGridView({
           <ResponsiveContainer width="100%" height={height}>
             <RechartsPieChart>
               <Pie
-                data={pieData}
+                data={displayedData}
                 cx="50%"
                 cy="50%"
                 outerRadius={
@@ -529,7 +577,7 @@ export function ChartGridView({
                 label={showLabels ? renderPieLabel : false}
                 labelLine={showLabels}
               >
-                {pieData.map((_, index) => (
+                {displayedData.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={chart.colors[index % chart.colors.length]}
@@ -548,11 +596,6 @@ export function ChartGridView({
         );
 
       case "donut":
-        // Filter out zero/null values for donut chart
-        const donutData = chartData.filter((d) => {
-          const val = d[chart.dataKeys[0]];
-          return val !== null && val !== undefined && val !== 0;
-        });
         // Custom label renderer with lines pointing to slices
         const renderDonutLabel = (props: any) => {
           const { name, value } = props;
@@ -563,7 +606,7 @@ export function ChartGridView({
           <ResponsiveContainer width="100%" height={height}>
             <RechartsPieChart>
               <Pie
-                data={donutData}
+                data={displayedData}
                 cx="50%"
                 cy="50%"
                 innerRadius={
@@ -580,7 +623,7 @@ export function ChartGridView({
                 label={showLabels ? renderDonutLabel : false}
                 labelLine={showLabels}
               >
-                {donutData.map((_, index) => (
+                {displayedData.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={chart.colors[index % chart.colors.length]}
@@ -602,7 +645,7 @@ export function ChartGridView({
         return (
           <ResponsiveContainer width="100%" height={height}>
             <RechartsLineChart
-              data={chartData}
+              data={displayedData}
               margin={{
                 top: 20,
                 right: 10,
@@ -635,11 +678,11 @@ export function ChartGridView({
                 label={
                   showLabels
                     ? {
-                        position: "top",
-                        fontSize: 11,
-                        fill: "#475569",
-                        formatter: (v: any) => formatValue(v, isPercentage),
-                      }
+                      position: "top",
+                      fontSize: 11,
+                      fill: "#475569",
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    }
                     : false
                 }
               />
@@ -651,7 +694,7 @@ export function ChartGridView({
         return (
           <ResponsiveContainer width="100%" height={height}>
             <AreaChart
-              data={chartData}
+              data={displayedData}
               margin={{
                 top: 20,
                 right: 10,
@@ -684,11 +727,11 @@ export function ChartGridView({
                 label={
                   showLabels
                     ? {
-                        position: "top",
-                        fontSize: 11,
-                        fill: "#475569",
-                        formatter: (v: any) => formatValue(v, isPercentage),
-                      }
+                      position: "top",
+                      fontSize: 11,
+                      fill: "#475569",
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    }
                     : false
                 }
               />
@@ -700,7 +743,7 @@ export function ChartGridView({
         return (
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
-              data={chartData}
+              data={displayedData}
               margin={{
                 top: 20,
                 right: 10,
@@ -735,20 +778,20 @@ export function ChartGridView({
                   label={
                     showLabels && i === chart.dataKeys.length - 1
                       ? ({
-                          position: "top",
-                          fontSize: 11,
-                          fill: "#475569",
-                          formatter: (v: any, entry: any, index: number) => {
-                            // Show total of stacked values for the top segment only
-                            // entry.payload contains the original data object
-                            const dataPoint = entry?.payload || entry || {};
-                            const total = chart.dataKeys.reduce((sum, k) => {
-                              const val = dataPoint[k];
-                              return sum + (typeof val === "number" ? val : 0);
-                            }, 0);
-                            return formatValue(total, isPercentage);
-                          },
-                        } as any)
+                        position: "top",
+                        fontSize: 11,
+                        fill: "#475569",
+                        formatter: (v: any, entry: any, index: number) => {
+                          // Show total of stacked values for the top segment only
+                          // entry.payload contains the original data object
+                          const dataPoint = entry?.payload || entry || {};
+                          const total = chart.dataKeys.reduce((sum, k) => {
+                            const val = dataPoint[k];
+                            return sum + (typeof val === "number" ? val : 0);
+                          }, 0);
+                          return formatValue(total, isPercentage);
+                        },
+                      } as any)
                       : false
                   }
                 />
@@ -761,7 +804,7 @@ export function ChartGridView({
         return (
           <ResponsiveContainer width="100%" height={height}>
             <ComposedChart
-              data={chartData}
+              data={displayedData}
               margin={{
                 top: 20,
                 right: 10,
@@ -793,11 +836,11 @@ export function ChartGridView({
                 label={
                   showLabels
                     ? {
-                        position: "top",
-                        fontSize: 11,
-                        fill: "#475569",
-                        formatter: (v: any) => formatValue(v, isPercentage),
-                      }
+                      position: "top",
+                      fontSize: 11,
+                      fill: "#475569",
+                      formatter: (v: any) => formatValue(v, isPercentage),
+                    }
                     : false
                 }
               />
@@ -811,11 +854,11 @@ export function ChartGridView({
                   label={
                     showLabels
                       ? {
-                          position: "top",
-                          fontSize: 11,
-                          fill: chart.colors[1],
-                          formatter: (v: any) => formatValue(v, isPercentage),
-                        }
+                        position: "top",
+                        fontSize: 11,
+                        fill: chart.colors[1],
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
                       : false
                   }
                 />
@@ -825,7 +868,7 @@ export function ChartGridView({
         );
 
       case "radar":
-        const radarData = chartData.map((d) => ({
+        const radarData = displayedData.map((d) => ({
           name: d.name,
           value: d[chart.dataKeys[0]] || 0,
         }));
@@ -887,7 +930,7 @@ export function ChartGridView({
         return (
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
-              data={chartData}
+              data={displayedData}
               margin={{
                 top: 20,
                 right: 10,
@@ -921,11 +964,11 @@ export function ChartGridView({
                   label={
                     showLabels
                       ? {
-                          position: "top",
-                          fontSize: 10,
-                          fill: "#475569",
-                          formatter: (v: any) => formatValue(v, isPercentage),
-                        }
+                        position: "top",
+                        fontSize: 10,
+                        fill: "#475569",
+                        formatter: (v: any) => formatValue(v, isPercentage),
+                      }
                       : false
                   }
                 />
@@ -1049,11 +1092,10 @@ export function ChartGridView({
                         );
                       }
                     }}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${
-                      isChartInPPT(`table-${fullScreenChart.id}`)
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                        : "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
-                    }`}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all text-sm font-medium shadow-sm ${isChartInPPT(`table-${fullScreenChart.id}`)
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                      : "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                      }`}
                   >
                     {isChartInPPT(`table-${fullScreenChart.id}`) ? (
                       <>
