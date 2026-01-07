@@ -217,6 +217,10 @@ import type {
   KeringBrandAggSummary,
   KeringBrandAggSummaryResponse,
   KeringConsolidatedFiltersResponse,
+  KeringAllBrandSummaryItem,
+  KeringAllBrandSummaryResponse,
+  KeringConsolidatedBrandSummaryItem,
+  KeringConsolidatedBrandSummaryResponse,
 } from "@/lib/clients/kering";
 
 // Re-export for consumers of this module
@@ -233,6 +237,10 @@ export type {
   KeringBrandAggSummary,
   KeringBrandAggSummaryResponse,
   KeringConsolidatedFiltersResponse,
+  KeringAllBrandSummaryItem,
+  KeringAllBrandSummaryResponse,
+  KeringConsolidatedBrandSummaryItem,
+  KeringConsolidatedBrandSummaryResponse,
 };
 
 export interface TrackerAvailableFieldsResponse {
@@ -445,6 +453,52 @@ export const TRACKER_BACKEND_TO_DISPLAY_MAP: Record<string, string> = {
   admissions: "Admissions",
   cpa: "CPA",
 };
+
+// Kering frontend field ID to backend field name mapping
+export const KERING_FRONTEND_TO_BACKEND_FIELD_MAP: Record<string, string> = {
+  "total-spend": "total_net_net_media_spend",
+  addressable: "total_affectable_spend",
+  "measured-spend": "measured_spend",
+  "measured-spend-pct": "measured_spend_pct",
+  "measured-savings": "measured_savings",
+  "measured-savings-pct": "measured_savings_pct",
+  // Additional fields available in the API
+  "total-savings": "total_savings",
+  "total-savings-pct": "total_savings_pct",
+  "non-affectable-spend": "total_non_affectable_spend",
+  "non-measured-spend": "non_measured_spend",
+  "inflation-mitigation": "inflation_mitigation",
+  "added-value-penalty-avoidance": "added_value_penalty_avoidance",
+  "added-value-penalty-avoidance-pct": "added_value_penalty_avoidance_pct",
+};
+
+/**
+ * Extract backend field names from Kering selected fields
+ * Field IDs are like: kering-tracker-summary-total-spend, kering-print-newspaper-measured-spend
+ */
+export function mapKeringFieldsToBackend(
+  selectedFields: Record<string, string[]>,
+): string[] {
+  const allFieldIds = Object.values(selectedFields).flat();
+  const backendFields = new Set<string>();
+
+  for (const fieldId of allFieldIds) {
+    // Extract the field suffix (e.g., "total-spend" from "kering-tracker-summary-total-spend")
+    // Pattern: kering-{category}-{subcategory}-{field} or kering-{media}-{submedia}-{field}
+    const parts = fieldId.split("-");
+    // The field name is typically the last 1-3 parts depending on the field
+    // Try matching from the end
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const potentialField = parts.slice(i).join("-");
+      if (KERING_FRONTEND_TO_BACKEND_FIELD_MAP[potentialField]) {
+        backendFields.add(KERING_FRONTEND_TO_BACKEND_FIELD_MAP[potentialField]);
+        break;
+      }
+    }
+  }
+
+  return Array.from(backendFields);
+}
 
 /**
  * Convert frontend tracker field IDs to backend field names
@@ -1122,6 +1176,7 @@ export async function fetchKeringTrackerSummary(
  * @param type - Filter by type (ALL, DIRECT BUY, CENTRAL HUB, CLIENT BUY)
  * @param marketId - Filter by market ID
  * @param markets - Comma-separated market codes
+ * @param fields - Comma-separated list of fields to return (reduces response size)
  */
 export async function fetchKeringBrandSummary(
   clientId: number,
@@ -1131,6 +1186,7 @@ export async function fetchKeringBrandSummary(
   type?: string,
   marketId?: number,
   markets?: string,
+  fields?: string[],
 ): Promise<KeringBrandSummaryResponse> {
   const queryParams = new URLSearchParams({
     client_id: clientId.toString(),
@@ -1144,6 +1200,9 @@ export async function fetchKeringBrandSummary(
     queryParams.append("markets", markets);
   } else if (marketId !== undefined) {
     queryParams.append("market_id", marketId.toString());
+  }
+  if (fields && fields.length > 0) {
+    queryParams.append("fields", fields.join(","));
   }
 
   const response = await apiClient.get<KeringBrandSummaryResponse>(
@@ -1193,6 +1252,60 @@ export async function fetchKeringConsolidatedData(
 
   const response = await apiClient.get<KeringConsolidatedDataResponse>(
     `/api/v1/client/kering/consolidated/data?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Kering All Brand Summary data from "All Brand summary" sheet
+ * Aggregated metrics across all brands, per market
+ * @param clientId - Client ID (Kering = 3) - finds latest consolidation job
+ * @param consolidationJobId - Direct consolidation job UUID (optional)
+ * @param market - Filter by market name
+ */
+export async function fetchKeringAllBrandSummary(
+  clientId?: number,
+  consolidationJobId?: string,
+  market?: string,
+): Promise<KeringAllBrandSummaryResponse> {
+  const queryParams = new URLSearchParams();
+
+  if (clientId) queryParams.append("client_id", clientId.toString());
+  if (consolidationJobId)
+    queryParams.append("consolidation_job_id", consolidationJobId);
+  if (market) queryParams.append("market", market);
+
+  const response = await apiClient.get<KeringAllBrandSummaryResponse>(
+    `/api/v1/client/kering/consolidated/all-brand-summary?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Kering Consolidated Brand Summary (per-brand metrics from individual brand sheets)
+ * @param brand - Filter by brand name (e.g., "Gucci", "Balenciaga")
+ * @param market - Filter by market name
+ * @param clientId - Client ID (Kering = 3) - finds latest consolidation job
+ * @param consolidationJobId - Direct consolidation job UUID (optional)
+ */
+export async function fetchKeringConsolidatedBrandSummary(
+  brand: string,
+  market?: string,
+  clientId?: number,
+  consolidationJobId?: string,
+): Promise<KeringConsolidatedBrandSummaryResponse> {
+  const queryParams = new URLSearchParams();
+
+  queryParams.append("brand", brand);
+  if (market) queryParams.append("market", market);
+  if (clientId) queryParams.append("client_id", clientId.toString());
+  if (consolidationJobId)
+    queryParams.append("consolidation_job_id", consolidationJobId);
+
+  const response = await apiClient.get<KeringConsolidatedBrandSummaryResponse>(
+    `/api/v1/client/kering/consolidated/brand-summary?${queryParams.toString()}`,
   );
 
   return response.data;

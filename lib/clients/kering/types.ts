@@ -166,3 +166,55 @@ export interface KeringConsolidatedFiltersResponse {
   media_types: string[];
   sub_media_types: string[];
 }
+
+/**
+ * Kering All Brand Summary (from "All Brand summary" sheet)
+ * Aggregated metrics across all brands, per market
+ */
+export interface KeringAllBrandSummaryItem {
+  id: number;
+  market: string;
+  total_spend: number | null;
+  addressable_spend: number | null;
+  measured_spend: number | null;
+  measured_spend_pct: number | null;
+  measured_savings: number | null;
+  measured_savings_pct: number | null;
+  added_value: number | null;
+  added_value_pct: number | null;
+}
+
+export interface KeringAllBrandSummaryResponse {
+  consolidation_job_id: string;
+  market_filter: string | null;
+  total_records: number;
+  data: KeringAllBrandSummaryItem[];
+}
+
+/**
+ * Kering Consolidated Brand Summary (from individual brand sheets)
+ * Per-brand metrics for a specific brand
+ */
+export interface KeringConsolidatedBrandSummaryItem {
+  id: number;
+  brand: string;
+  market: string;
+  media: string;
+  sub_media: string;
+  total_spend: number | null;
+  addressable_spend: number | null;
+  measured_spend: number | null;
+  measured_spend_pct: number | null;
+  measured_savings: number | null;
+  measured_savings_pct: number | null;
+  added_value: number | null;
+  added_value_pct: number | null;
+}
+
+export interface KeringConsolidatedBrandSummaryResponse {
+  consolidation_job_id: string;
+  brand_filter: string | null;
+  market_filter: string | null;
+  total_records: number;
+  data: KeringConsolidatedBrandSummaryItem[];
+}

@@ -1,5 +1,5 @@
 // Carlsberg client module
-export { config } from "./config";
+export { carlsbergConfig as config } from "./config";
 export {
   schema,
   carlsbergCostResultFields,

@@ -111,6 +111,13 @@ export function TableDashboardView({
         <ChartGridView
           columns={selectedColumns}
           rows={selectedRows}
+          categoryLabel={
+            // Use "Market" for Kering summary, "Media Type" for trackers
+            selectedClient?.toLowerCase() === "kering" &&
+            selectedDataSource === "summary"
+              ? "Market"
+              : "Media Type"
+          }
           selectedGraphsForPPT={selectedGraphsForPPT}
           onToggleGraphForPPT={onToggleGraphForPPT}
           onUpdateSlideNumber={onUpdateSlideNumber}

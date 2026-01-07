@@ -1,5 +1,5 @@
 // Kering client module
-export { config } from "./config";
+export { keringConfig as config } from "./config";
 export {
   schema,
   keringBrandSummaryFields,

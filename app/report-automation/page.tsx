@@ -78,14 +78,16 @@ function ReportAutomationContent() {
     setTimeout(() => setTabLoading(false), 300);
   };
 
-  // Use the key type for safer state management
-  const [clientId, setClientId] = useState<ClientIdString>("arla");
-  const clientNumberId = clientMap[clientId]; // <-- FIX
+  // Use the key type for safer state management - no default, require explicit selection
+  const [clientId, setClientId] = useState<ClientIdString | "">("");
+  const clientNumberId = clientId
+    ? clientMap[clientId as ClientIdString]
+    : null;
 
   // Client companies - lowercase names for API
   const clients = [
     { id: "arla", name: "Arla" },
-    { id: "carlsberg", name: "Carlsberg" },
+    // { id: "carlsberg", name: "Carlsberg" },
     { id: "kering", name: "Kering" },
   ];
 
@@ -362,7 +364,7 @@ function ReportAutomationContent() {
       const jobId = response.data.id;
 
       // Poll for consolidation completion
-      const maxWaitSeconds = 300; // 5 minutes
+      const maxWaitSeconds = 900; // 15 minutes
       const pollIntervalMs = 2000; // 2 seconds
       const startTime = Date.now();
 
@@ -442,6 +444,11 @@ function ReportAutomationContent() {
   };
 
   const handleRunAutomation = async () => {
+    if (!clientId) {
+      toast.error("Please select a client company first");
+      return;
+    }
+
     const marketsToUpload = markets.filter(
       (m) => m.file !== null && m.marketId !== null,
     );
@@ -710,6 +717,11 @@ function ReportAutomationContent() {
 
   // Legacy single-file extraction (fallback)
   const handleRunAutomationLegacy = async () => {
+    if (!clientId || !clientNumberId) {
+      toast.error("Please select a client company first");
+      return;
+    }
+
     const marketsToUpload = markets.filter(
       (m) => m.file !== null && m.marketId !== null,
     );
@@ -1133,39 +1145,69 @@ function ReportAutomationContent() {
 
                   {/* Dropzone Area - Compact */}
                   <div
-                    {...getRootProps()}
-                    className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
-                      isDragActive
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50"
+                    {...(clientId ? getRootProps() : {})}
+                    className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                      !clientId
+                        ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
+                        : isDragActive
+                          ? "border-blue-500 bg-blue-50 cursor-pointer"
+                          : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer"
                     }`}
                   >
-                    <input {...getInputProps()} />
+                    {clientId && <input {...getInputProps()} />}
                     <div className="flex flex-col items-center gap-2">
-                      <div className="rounded-full bg-blue-100 p-2">
-                        <FileUp className="h-6 w-6 text-blue-600" />
+                      <div
+                        className={`rounded-full p-2 ${clientId ? "bg-blue-100" : "bg-gray-200"}`}
+                      >
+                        <FileUp
+                          className={`h-6 w-6 ${clientId ? "text-blue-600" : "text-gray-400"}`}
+                        />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {isDragActive
-                            ? "Drop files here..."
-                            : "Drag & drop or click to browse"}
-                        </p>
-                        <p className="mt-0.5 text-xs text-gray-600">
-                          Excel, CSV files or ZIP archive
-                        </p>
+                        {!clientId ? (
+                          <>
+                            <p className="text-sm font-semibold text-gray-500">
+                              Select a client first
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              Choose a client company above to enable upload
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {isDragActive
+                                ? "Drop files here..."
+                                : "Drag & drop or click to browse"}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-600">
+                              Uploading for{" "}
+                              <span className="font-semibold text-blue-600">
+                                {clients.find((c) => c.id === clientId)?.name}
+                              </span>
+                            </p>
+                          </>
+                        )}
                       </div>
                       <div className="mt-1 flex flex-wrap justify-center gap-1.5 text-xs text-gray-500">
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                        <span
+                          className={`rounded px-1.5 py-0.5 ${clientId ? "bg-gray-200" : "bg-gray-200/50"}`}
+                        >
                           .xlsx
                         </span>
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                        <span
+                          className={`rounded px-1.5 py-0.5 ${clientId ? "bg-gray-200" : "bg-gray-200/50"}`}
+                        >
                           .xls
                         </span>
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                        <span
+                          className={`rounded px-1.5 py-0.5 ${clientId ? "bg-gray-200" : "bg-gray-200/50"}`}
+                        >
                           .csv
                         </span>
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5">
+                        <span
+                          className={`rounded px-1.5 py-0.5 ${clientId ? "bg-gray-200" : "bg-gray-200/50"}`}
+                        >
                           .zip
                         </span>
                       </div>
@@ -1253,6 +1295,9 @@ function ReportAutomationContent() {
               <FileReviewModal
                 files={filesToReview}
                 availableMarkets={availableMarkets as MarketUtil[]}
+                selectedClient={clientId}
+                clients={clients}
+                onClientChange={(value) => setClientId(value as ClientIdString)}
                 onConfirm={handleConfirmFiles}
                 onCancel={handleCancelReview}
                 onUpdateMarket={handleUpdateMarketInReview}
@@ -1487,6 +1532,7 @@ function ReportAutomationContent() {
                     <button
                       onClick={handleRunAutomation}
                       disabled={
+                        !clientId ||
                         isConsolidating ||
                         uploadProgress.some((p) => p.status === "uploading")
                       }
