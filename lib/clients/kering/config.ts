@@ -1,7 +1,7 @@
 import type { ClientConfig } from "../types";
 
 export const keringConfig: ClientConfig = {
-  id: 3,
+  id: 2,
   name: "Kering",
   slug: "kering",
   markets: ["FR", "IT", "US", "UK", "JP", "CN", "KR", "HK"],

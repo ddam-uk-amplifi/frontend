@@ -21,9 +21,9 @@ import {
   type TrackerFieldDataResponse,
 } from "@/lib/api/dashboard";
 import { consolidationApi } from "@/lib/api/consolidation";
+import { clientsApi, type Client } from "@/lib/api/admin";
 import { tokenUtils } from "@/lib/utils/token";
 import { usePPTStore } from "@/lib/stores/usePPTStore";
-import { getClientIdByName } from "@/lib/clients";
 
 interface GraphTitleDialogState {
   isOpen: boolean;
@@ -45,6 +45,9 @@ export default function Dashboard() {
   // Dynamic markets from consolidation job (for trackers data source)
   const [availableMarkets, setAvailableMarkets] = useState<MarketOption[]>([]);
   const [isLoadingMarkets, setIsLoadingMarkets] = useState(false);
+  // Dynamic clients from API
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [isQueryPanelOpen, setIsQueryPanelOpen] = useState(true);
   const [selectedFields, setSelectedFields] = useState<
     Record<string, string[]>
@@ -63,7 +66,8 @@ export default function Dashboard() {
   const [dynamicDataError, setDynamicDataError] = useState<string | null>(null);
 
   // Chart data for smart recommendations (populated by VisualizationCanvas)
-  const [chartDataForRecommendations, setChartDataForRecommendations] = useState<any[]>([]);
+  const [chartDataForRecommendations, setChartDataForRecommendations] =
+    useState<any[]>([]);
 
   // PPT Report State - Using Zustand for persistence
   const {
@@ -89,10 +93,27 @@ export default function Dashboard() {
   // Ref to store chart element references for image capture
   const chartElementRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-  // Get client ID from selected client name (using client registry)
+  // Get client ID from selected client name (dynamically from API)
   const selectedClientId = selectedClient
-    ? (getClientIdByName(selectedClient) ?? undefined)
+    ? clients.find((c) => c.name.toLowerCase() === selectedClient.toLowerCase())
+        ?.id
     : undefined;
+
+  // Fetch clients from API on mount
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const response = await clientsApi.getClients();
+        setClients(response.clients);
+      } catch (error) {
+        console.error("Failed to fetch clients:", error);
+        // Fallback to empty - TopBar will still show hardcoded client names
+      } finally {
+        setIsLoadingClients(false);
+      }
+    };
+    fetchClients();
+  }, []);
 
   // Fetch latest job when client changes (for summary data source)
   // Also fetch markets from job when trackers is selected
@@ -131,10 +152,19 @@ export default function Dashboard() {
             a.name.localeCompare(b.name),
           );
           setAvailableMarkets(markets);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Failed to fetch job/markets:", error);
           setSelectedJobId("");
           setAvailableMarkets([]);
+          // Show toast if it's a 404 (no job found)
+          if (
+            error?.response?.status === 404 ||
+            error?.message?.includes("404")
+          ) {
+            toast.warning(
+              `No consolidation job found for ${selectedClient}. Please run a consolidation first.`,
+            );
+          }
         } finally {
           setIsLoadingMarkets(false);
         }
@@ -147,9 +177,18 @@ export default function Dashboard() {
         try {
           const response = await fetchLatestJob(selectedClient);
           setSelectedJobId(response.consolidation_job_id);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Failed to fetch latest job:", error);
           setSelectedJobId("");
+          // Show toast if it's a 404 (no job found)
+          if (
+            error?.response?.status === 404 ||
+            error?.message?.includes("404")
+          ) {
+            toast.warning(
+              `No consolidation job found for ${selectedClient}. Please run a consolidation first.`,
+            );
+          }
         }
         return;
       }

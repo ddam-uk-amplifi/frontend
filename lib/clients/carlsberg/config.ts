@@ -1,7 +1,7 @@
 import type { ClientConfig } from "../types";
 
 export const carlsbergConfig: ClientConfig = {
-  id: 2,
+  id: 3,
   name: "Carlsberg",
   slug: "carlsberg",
   markets: ["DK", "SE", "NO", "FI", "PL", "UK", "FR", "CH"],

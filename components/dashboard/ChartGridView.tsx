@@ -58,6 +58,7 @@ interface TableRow {
 interface ChartGridViewProps {
   columns: string[];
   rows: TableRow[];
+  categoryLabel?: string; // Label for the category axis (e.g., "Media Type", "Market")
   selectedGraphsForPPT?: Set<string> | string[];
   onToggleGraphForPPT?: (
     graphId: string,
@@ -106,6 +107,13 @@ const COLUMN_LABELS: Record<string, string> = {
   benchmark_equivalent_net_net_spend: "Benchmark Spend",
   value_loss: "Value Loss",
   value_loss_pct: "Value Loss %",
+  // Kering consolidated summary fields
+  total_spend: "Total Spend",
+  addressable_spend: "Addressable Spend",
+  measured_savings: "Measured Savings",
+  measured_savings_pct: "Measured Savings %",
+  added_value: "Added Value",
+  added_value_pct: "Added Value %",
 };
 
 const getColumnLabel = (col: string) => COLUMN_LABELS[col] || col;
@@ -114,7 +122,10 @@ const getColumnLabel = (col: string) => COLUMN_LABELS[col] || col;
 // Chart Generation Logic
 // ============================================================================
 
-function generateChartConfigs(columns: string[]): ChartConfig[] {
+function generateChartConfigs(
+  columns: string[],
+  categoryLabel: string = "Media Type",
+): ChartConfig[] {
   // Filter out non-numeric columns
   const numericCols = columns.filter((col) => col !== "mediaType");
   if (numericCols.length === 0) return [];
@@ -126,7 +137,7 @@ function generateChartConfigs(columns: string[]): ChartConfig[] {
   if (numericCols[0]) {
     charts.push({
       id: `chart-${chartIndex++}`,
-      title: `${getColumnLabel(numericCols[0])} by Media Type`,
+      title: `${getColumnLabel(numericCols[0])} by ${categoryLabel}`,
       type: "bar",
       dataKeys: [numericCols[0]],
       colors: [CHART_COLORS[0]],
@@ -277,8 +288,22 @@ function generateChartConfigs(columns: string[]): ChartConfig[] {
 // Value Formatting
 // ============================================================================
 
-function formatValue(value: number, isPercentage: boolean = false): string {
+function formatValue(
+  value: string | number,
+  isPercentage: boolean = false,
+): string {
   if (value === null || value === undefined) return "—";
+
+  // Handle string values that might be passed
+  if (typeof value === "string") {
+    // Try to parse if it looks like a number
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) return value; // Return original string if not a number
+    value = parsed;
+  }
+
+  if (typeof value !== "number") return String(value);
+
   if (isPercentage) return `${value.toFixed(1)}%`;
   if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
   if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}K`;
@@ -292,6 +317,7 @@ function formatValue(value: number, isPercentage: boolean = false): string {
 export function ChartGridView({
   columns,
   rows,
+  categoryLabel = "Media Type",
   selectedGraphsForPPT = new Set(),
   onToggleGraphForPPT,
   onUpdateSlideNumber,
@@ -309,7 +335,10 @@ export function ChartGridView({
   }, []);
 
   // Generate charts based on visible columns
-  const charts = useMemo(() => generateChartConfigs(columns), [columns]);
+  const charts = useMemo(
+    () => generateChartConfigs(columns, categoryLabel),
+    [columns, categoryLabel],
+  );
 
   // Prepare chart data from rows
   const chartData = useMemo((): Array<{ name: string; [key: string]: any }> => {

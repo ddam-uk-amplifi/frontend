@@ -20,9 +20,17 @@ export interface FileWithMarket {
   selectedMarketId: number | null;
 }
 
+interface Client {
+  id: string;
+  name: string;
+}
+
 interface FileReviewModalProps {
   files: FileWithMarket[];
   availableMarkets: Market[];
+  selectedClient: string;
+  clients: Client[];
+  onClientChange: (clientId: string) => void;
   onConfirm: (files: FileWithMarket[]) => void;
   onCancel: () => void;
   onUpdateMarket: (index: number, marketId: number) => void;
@@ -31,10 +39,14 @@ interface FileReviewModalProps {
 export const FileReviewModal: React.FC<FileReviewModalProps> = ({
   files,
   availableMarkets,
+  selectedClient,
+  clients,
+  onClientChange,
   onConfirm,
   onCancel,
   onUpdateMarket,
 }) => {
+  const currentClient = clients.find((c) => c.id === selectedClient);
   const allMarketsSelected = files.every((f) => f.selectedMarketId !== null);
   const hasLowConfidence = files.some((f) => f.confidence === "low");
   const hasNoDetection = files.some((f) => f.confidence === "none");
@@ -58,6 +70,32 @@ export const FileReviewModal: React.FC<FileReviewModalProps> = ({
           >
             <X size={24} />
           </button>
+        </div>
+
+        {/* Client Selection Banner */}
+        <div className="px-6 pt-4">
+          <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-blue-800">
+                Uploading for client:
+              </span>
+              <span className="font-semibold text-blue-900">
+                {currentClient?.name}
+              </span>
+            </div>
+            <Select value={selectedClient} onValueChange={onClientChange}>
+              <SelectTrigger className="w-40 h-8 text-sm bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Alert Messages */}

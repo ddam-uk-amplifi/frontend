@@ -1,8 +1,5 @@
 // Utility functions for data processing and chart recommendations
-import {
-  DEFAULT_CHART_THRESHOLDS,
-  type ChartThresholds,
-} from "@/lib/clients";
+import { DEFAULT_CHART_THRESHOLDS, type ChartThresholds } from "@/lib/clients";
 
 export interface ProcessedDataItem {
   name: string;
@@ -22,18 +19,18 @@ export interface DataAwareAnalysis {
   rowCount: number;
   hasTimeSeries: boolean;
   timeField?: string;
-  
+
   // Field classifications (detected from actual values)
   numericFields: string[];
   percentageFields: string[]; // Values between 0-100
-  currencyFields: string[];   // Large absolute values
-  categoryFields: string[];   // String/categorical data
-  
+  currencyFields: string[]; // Large absolute values
+  categoryFields: string[]; // String/categorical data
+
   // Data characteristics
-  cardinality: number;        // Unique category count
+  cardinality: number; // Unique category count
   hasNegativeValues: boolean;
   valueRange: { min: number; max: number };
-  
+
   // Smart recommendations
   suggestedCharts: ChartSuggestion[];
   primaryRecommendation?: string;
@@ -42,7 +39,7 @@ export interface DataAwareAnalysis {
 
 export interface ChartSuggestion {
   chartType: string;
-  score: number;        // 0-100
+  score: number; // 0-100
   reason: string;
   isPrimary?: boolean;
 }
@@ -55,7 +52,7 @@ export interface ChartSuggestion {
  */
 export function analyzeDataForCharts(
   data: any[],
-  thresholds: Partial<ChartThresholds> = {}
+  thresholds: Partial<ChartThresholds> = {},
 ): DataAwareAnalysis {
   // Merge with defaults
   const mergedThresholds: ChartThresholds = {
@@ -83,30 +80,56 @@ export function analyzeDataForCharts(
 
   // Get all field keys from data (excluding metadata)
   const excludedKeys = new Set([
-    "name", "id", "market_id", "client_id", "row_index", 
-    "extracted_file_id", "isOther", "_period",
-    "tv_data_general_id", "print_data_general_id", "ooh_data_general_id",
-    "radio_data_general_id", "online_data_general_id", "cinema_data_general_id"
+    "name",
+    "id",
+    "market_id",
+    "client_id",
+    "row_index",
+    "extracted_file_id",
+    "isOther",
+    "_period",
+    "tv_data_general_id",
+    "print_data_general_id",
+    "ooh_data_general_id",
+    "radio_data_general_id",
+    "online_data_general_id",
+    "cinema_data_general_id",
   ]);
-  
+
   const sampleRow = data[0];
-  const allKeys = Object.keys(sampleRow).filter(k => !excludedKeys.has(k));
+  const allKeys = Object.keys(sampleRow).filter((k) => !excludedKeys.has(k));
 
   // Detect time series
   const timePatterns = ["month", "period", "quarter", "year", "date", "week"];
   for (const key of allKeys) {
-    if (timePatterns.some(p => key.toLowerCase().includes(p))) {
+    if (timePatterns.some((p) => key.toLowerCase().includes(p))) {
       analysis.hasTimeSeries = true;
       analysis.timeField = key;
       break;
     }
   }
-  
+
   // Also check data values for month patterns
-  if (!analysis.hasTimeSeries && data.some(d => {
-    const name = String(d.name || "").toUpperCase();
-    return ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"].includes(name);
-  })) {
+  if (
+    !analysis.hasTimeSeries &&
+    data.some((d) => {
+      const name = String(d.name || "").toUpperCase();
+      return [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+      ].includes(name);
+    })
+  ) {
     analysis.hasTimeSeries = true;
     analysis.timeField = "name";
   }
@@ -116,27 +139,31 @@ export function analyzeDataForCharts(
   let globalMax = -Infinity;
 
   for (const key of allKeys) {
-    const values = data.map(d => d[key]).filter(v => v != null);
-    
+    const values = data.map((d) => d[key]).filter((v) => v != null);
+
     if (values.length === 0) continue;
 
     // Check if numeric
-    const numericValues = values.filter(v => typeof v === "number");
-    
+    const numericValues = values.filter((v) => typeof v === "number");
+
     if (numericValues.length > values.length * 0.5) {
       // Mostly numeric field
       const min = Math.min(...numericValues);
       const max = Math.max(...numericValues);
-      
+
       globalMin = Math.min(globalMin, min);
       globalMax = Math.max(globalMax, max);
-      
+
       if (min < 0) {
         analysis.hasNegativeValues = true;
       }
 
       // Classify by value range
-      if (min >= 0 && max <= 100 && numericValues.every(v => v >= 0 && v <= 100)) {
+      if (
+        min >= 0 &&
+        max <= 100 &&
+        numericValues.every((v) => v >= 0 && v <= 100)
+      ) {
         // Likely percentage (0-100 range)
         analysis.percentageFields.push(key);
       } else if (max > 1000) {
@@ -152,18 +179,21 @@ export function analyzeDataForCharts(
     }
   }
 
-  analysis.valueRange = { 
-    min: globalMin === Infinity ? 0 : globalMin, 
-    max: globalMax === -Infinity ? 0 : globalMax 
+  analysis.valueRange = {
+    min: globalMin === Infinity ? 0 : globalMin,
+    max: globalMax === -Infinity ? 0 : globalMax,
   };
 
   // Calculate cardinality (unique categories)
-  const uniqueNames = new Set(data.map(d => d.name));
+  const uniqueNames = new Set(data.map((d) => d.name));
   analysis.cardinality = uniqueNames.size;
 
   // Generate smart chart suggestions using client thresholds
-  analysis.suggestedCharts = generateSmartSuggestions(analysis, mergedThresholds);
-  
+  analysis.suggestedCharts = generateSmartSuggestions(
+    analysis,
+    mergedThresholds,
+  );
+
   // Set primary recommendation
   if (analysis.suggestedCharts.length > 0) {
     analysis.suggestedCharts[0].isPrimary = true;
@@ -171,9 +201,12 @@ export function analyzeDataForCharts(
   }
 
   // Add warnings for mixed scales
-  if (analysis.percentageFields.length > 0 && analysis.currencyFields.length > 0) {
+  if (
+    analysis.percentageFields.length > 0 &&
+    analysis.currencyFields.length > 0
+  ) {
     analysis.warnings.push(
-      "Mixed scales detected: percentages (0-100%) and currency values. Consider separate charts."
+      "Mixed scales detected: percentages (0-100%) and currency values. Consider separate charts.",
     );
   }
 
@@ -187,17 +220,24 @@ export function analyzeDataForCharts(
  */
 function generateSmartSuggestions(
   analysis: DataAwareAnalysis,
-  thresholds: ChartThresholds
+  thresholds: ChartThresholds,
 ): ChartSuggestion[] {
   const suggestions: ChartSuggestion[] = [];
   const {
-    rowCount, hasTimeSeries, cardinality, hasNegativeValues,
-    percentageFields, currencyFields, numericFields
+    rowCount,
+    hasTimeSeries,
+    cardinality,
+    hasNegativeValues,
+    percentageFields,
+    currencyFields,
+    numericFields,
   } = analysis;
 
-  const { highCardinalityThreshold, maxPieCategories, maxBarCategories } = thresholds;
+  const { highCardinalityThreshold, maxPieCategories, maxBarCategories } =
+    thresholds;
 
-  const totalNumeric = percentageFields.length + currencyFields.length + numericFields.length;
+  const totalNumeric =
+    percentageFields.length + currencyFields.length + numericFields.length;
   const hasPercentages = percentageFields.length > 0;
   const hasCurrency = currencyFields.length > 0;
 
@@ -206,49 +246,60 @@ function generateSmartSuggestions(
     suggestions.push({
       chartType: "line-chart",
       score: 95,
-      reason: "Time series detected - ideal for showing trends over time"
+      reason: "Time series detected - ideal for showing trends over time",
     });
 
     if (totalNumeric > 1) {
       suggestions.push({
         chartType: "area-chart",
         score: 85,
-        reason: "Multiple metrics over time - area chart shows cumulative trends"
+        reason:
+          "Multiple metrics over time - area chart shows cumulative trends",
       });
     }
   }
 
   // Low cardinality → Pie/Donut for composition (using client threshold)
-  if (cardinality <= maxPieCategories && cardinality >= 2 && !hasTimeSeries && !hasNegativeValues) {
+  if (
+    cardinality <= maxPieCategories &&
+    cardinality >= 2 &&
+    !hasTimeSeries &&
+    !hasNegativeValues
+  ) {
     if (hasPercentages && !hasCurrency) {
       suggestions.push({
         chartType: "pie-chart",
         score: 90,
-        reason: `${cardinality} categories with percentage data - perfect for composition view`
+        reason: `${cardinality} categories with percentage data - perfect for composition view`,
       });
       suggestions.push({
         chartType: "donut-chart",
         score: 88,
-        reason: "Donut chart shows composition with center for totals"
+        reason: "Donut chart shows composition with center for totals",
       });
     } else if (totalNumeric === 1) {
       suggestions.push({
         chartType: "pie-chart",
         score: 75,
-        reason: `${cardinality} categories - good for part-to-whole comparison`
+        reason: `${cardinality} categories - good for part-to-whole comparison`,
       });
     }
   }
 
   // Bar charts - versatile for most data (using client threshold)
   if (totalNumeric >= 1) {
-    const barScore = hasTimeSeries ? 70 : (cardinality <= highCardinalityThreshold ? 85 : 65);
+    const barScore = hasTimeSeries
+      ? 70
+      : cardinality <= highCardinalityThreshold
+        ? 85
+        : 65;
     suggestions.push({
       chartType: "bar-chart",
       score: barScore,
-      reason: cardinality <= 10
-        ? "Clear comparison across categories"
-        : "Bar chart handles multiple categories well"
+      reason:
+        cardinality <= 10
+          ? "Clear comparison across categories"
+          : "Bar chart handles multiple categories well",
     });
 
     // Horizontal bar for many categories or long labels
@@ -256,7 +307,7 @@ function generateSmartSuggestions(
       suggestions.push({
         chartType: "horizontal-bar",
         score: 80,
-        reason: `${cardinality} categories - horizontal layout improves readability`
+        reason: `${cardinality} categories - horizontal layout improves readability`,
       });
     }
   }
@@ -269,7 +320,7 @@ function generateSmartSuggestions(
       score: mixedScales ? 60 : 90,
       reason: mixedScales
         ? "Multiple metrics (mixed scales - use with caution)"
-        : `${totalNumeric} metrics - grouped bars enable side-by-side comparison`
+        : `${totalNumeric} metrics - grouped bars enable side-by-side comparison`,
     });
   }
 
@@ -278,7 +329,8 @@ function generateSmartSuggestions(
     suggestions.push({
       chartType: "combo-chart",
       score: 88,
-      reason: "Mixed scales (% and values) - combo chart with dual axes works well"
+      reason:
+        "Mixed scales (% and values) - combo chart with dual axes works well",
     });
   }
 
@@ -287,7 +339,7 @@ function generateSmartSuggestions(
     suggestions.push({
       chartType: "scatter",
       score: 75,
-      reason: "Multiple numeric fields - scatter plot reveals correlations"
+      reason: "Multiple numeric fields - scatter plot reveals correlations",
     });
   }
 
@@ -299,18 +351,23 @@ function generateSmartSuggestions(
       score: veryHighCardinality ? 95 : 80,
       reason: veryHighCardinality
         ? `${cardinality} categories - table view recommended for detailed analysis`
-        : "Many fields - table provides complete data view"
+        : "Many fields - table provides complete data view",
     });
   }
 
   // Stacked bar for composition over categories
-  if (totalNumeric >= 2 && cardinality <= 12 && !hasTimeSeries && !hasNegativeValues) {
+  if (
+    totalNumeric >= 2 &&
+    cardinality <= 12 &&
+    !hasTimeSeries &&
+    !hasNegativeValues
+  ) {
     const mixedScales = hasPercentages && hasCurrency;
     if (!mixedScales) {
       suggestions.push({
         chartType: "stacked-bar",
         score: 78,
-        reason: "Shows composition breakdown across categories"
+        reason: "Shows composition breakdown across categories",
       });
     }
   }
@@ -333,7 +390,7 @@ export function getSmartChartCompatibility(
   chartType: string,
   selectedFields: Record<string, string[]>,
   data?: any[],
-  thresholds?: Partial<ChartThresholds>
+  thresholds?: Partial<ChartThresholds>,
 ): {
   compatible: boolean;
   reason?: string;
@@ -344,15 +401,20 @@ export function getSmartChartCompatibility(
   // If we have actual data, use data-aware analysis with client thresholds
   if (data && data.length > 0) {
     const dataAnalysis = analyzeDataForCharts(data, thresholds);
-    const suggestion = dataAnalysis.suggestedCharts.find(s => s.chartType === chartType);
+    const suggestion = dataAnalysis.suggestedCharts.find(
+      (s) => s.chartType === chartType,
+    );
 
     if (suggestion) {
       return {
         compatible: true,
         score: suggestion.score,
         reason: suggestion.reason,
-        scaleWarning: dataAnalysis.warnings.length > 0 ? dataAnalysis.warnings[0] : undefined,
-        dataInsight: `Based on ${dataAnalysis.rowCount} rows, ${dataAnalysis.cardinality} categories`
+        scaleWarning:
+          dataAnalysis.warnings.length > 0
+            ? dataAnalysis.warnings[0]
+            : undefined,
+        dataInsight: `Based on ${dataAnalysis.rowCount} rows, ${dataAnalysis.cardinality} categories`,
       };
     }
 
@@ -361,7 +423,7 @@ export function getSmartChartCompatibility(
     return {
       ...baseCompatibility,
       score: baseCompatibility.score || 30,
-      dataInsight: "Not optimal for this data shape"
+      dataInsight: "Not optimal for this data shape",
     };
   }
 
@@ -380,7 +442,7 @@ export function getSmartChartCompatibility(
  */
 export function getBestChartForData(
   data: any[],
-  thresholds?: Partial<ChartThresholds>
+  thresholds?: Partial<ChartThresholds>,
 ): string | null {
   if (!data || data.length === 0) return null;
 

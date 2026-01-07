@@ -23,10 +23,7 @@ import {
   analyzeDataForCharts,
   type DataAwareAnalysis,
 } from "./utils/dataProcessing";
-import {
-  getClientChartThresholds,
-  type ChartThresholds,
-} from "@/lib/clients";
+import { getClientChartThresholds, type ChartThresholds } from "@/lib/clients";
 
 interface GraphRecommendationsPanelProps {
   selectedFields: Record<string, string[]>;
@@ -188,8 +185,8 @@ export function GraphRecommendationsPanel({
     if (isSmartMode && dataAnalysis) {
       // Use data-aware suggestions
       return dataAnalysis.suggestedCharts
-        .filter(s => s.score >= 60)
-        .map(s => s.chartType);
+        .filter((s) => s.score >= 60)
+        .map((s) => s.chartType);
     }
     // Fallback to field-name based recommendations
     return getRecommendedCharts(selectedFields);
@@ -201,8 +198,12 @@ export function GraphRecommendationsPanel({
   const sortedGraphTypes = useMemo(() => {
     return [...graphTypes].sort((a, b) => {
       if (isSmartMode && dataAnalysis) {
-        const suggestionA = dataAnalysis.suggestedCharts.find(s => s.chartType === a.id);
-        const suggestionB = dataAnalysis.suggestedCharts.find(s => s.chartType === b.id);
+        const suggestionA = dataAnalysis.suggestedCharts.find(
+          (s) => s.chartType === a.id,
+        );
+        const suggestionB = dataAnalysis.suggestedCharts.find(
+          (s) => s.chartType === b.id,
+        );
         const scoreA = suggestionA?.score || 0;
         const scoreB = suggestionB?.score || 0;
         return scoreB - scoreA;
@@ -272,7 +273,7 @@ export function GraphRecommendationsPanel({
         </div>
         <p className="text-xs text-slate-500">
           {getTotalSelected() > 0
-            ? isSmartMode 
+            ? isSmartMode
               ? `${recommendedGraphIds.length} recommended (${dataAnalysis?.rowCount} rows analyzed)`
               : `${recommendedGraphIds.length} recommended`
             : "Select fields first"}
@@ -347,24 +348,34 @@ export function GraphRecommendationsPanel({
       <div className="p-3 space-y-2">
         {sortedGraphTypes.map((graph) => {
           const isRecommended = recommendedGraphIds.includes(graph.id);
-          
+
           // Use data-aware compatibility when available
-          const compatibility = isSmartMode && dataAnalysis
-            ? (() => {
-                const suggestion = dataAnalysis.suggestedCharts.find(s => s.chartType === graph.id);
-                if (suggestion) {
+          const compatibility =
+            isSmartMode && dataAnalysis
+              ? (() => {
+                  const suggestion = dataAnalysis.suggestedCharts.find(
+                    (s) => s.chartType === graph.id,
+                  );
+                  if (suggestion) {
+                    return {
+                      compatible: true,
+                      score: suggestion.score,
+                      reason: suggestion.reason,
+                      scaleWarning:
+                        dataAnalysis.warnings.length > 0
+                          ? dataAnalysis.warnings[0]
+                          : undefined,
+                    };
+                  }
+                  // Not in suggestions - lower score
                   return {
                     compatible: true,
-                    score: suggestion.score,
-                    reason: suggestion.reason,
-                    scaleWarning: dataAnalysis.warnings.length > 0 ? dataAnalysis.warnings[0] : undefined,
+                    score: 20,
+                    reason: "Not optimal for this data",
                   };
-                }
-                // Not in suggestions - lower score
-                return { compatible: true, score: 20, reason: "Not optimal for this data" };
-              })()
-            : isChartCompatible(graph.id, selectedFields);
-          
+                })()
+              : isChartCompatible(graph.id, selectedFields);
+
           const isDisabled = !compatibility.compatible;
           const score = compatibility.score || 0;
 

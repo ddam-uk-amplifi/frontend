@@ -43,6 +43,12 @@ import {
   TrackerMediaType,
   TrackerFieldDataResponse,
   getTrackerMediaTypeFromFields,
+  fetchKeringBrandSummary,
+  mapKeringFieldsToBackend,
+  fetchKeringAllBrandSummary,
+  fetchKeringConsolidatedBrandSummary, // Keeping for future use if brand filtering is enabled
+  type KeringBrandSummaryResponse,
+  type KeringAllBrandSummaryItem,
 } from "@/lib/api/dashboard";
 
 // Field name to readable label mapping
@@ -68,6 +74,13 @@ const FIELD_LABELS: Record<string, string> = {
   // Tracker summary specific fields (from Summary_YTD sheets)
   total_addressable_net_net_spend: "Total Addressable Spend",
   total_net_net_measured: "Measured Spend",
+  // Kering consolidated summary fields
+  total_spend: "Total Spend",
+  addressable_spend: "Addressable Spend",
+  measured_savings: "Measured Savings",
+  measured_savings_pct: "Measured Savings %",
+  added_value: "Added Value",
+  added_value_pct: "Added Value %",
 };
 
 // Get readable label for a field name
@@ -191,8 +204,13 @@ export function VisualizationCanvas({
   const [trackerSummaryData, setTrackerSummaryData] = useState<
     TrackerSummaryItem[] | null
   >(null);
+  const [keringBrandData, setKeringBrandData] =
+    useState<KeringBrandSummaryResponse | null>(null);
   const [isLoadingApiData, setIsLoadingApiData] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Check if this is Kering client
+  const isKering = client?.toLowerCase() === "kering";
 
   // Generate a unique graph ID based on current state (include jobId or clientId)
   const graphId = `${selectedGraphType}-${client}-${market}-${period}-${jobId || clientId}`;
@@ -228,6 +246,7 @@ export function VisualizationCanvas({
     apiData,
     trackerData,
     trackerSummaryData,
+    keringBrandData,
     isLoadingApiData,
   ]); // Re-check when these change
 
@@ -313,72 +332,288 @@ export function VisualizationCanvas({
       setApiError(null);
 
       try {
-        if (dataSource === "summary" && jobId) {
-          // Fetch consolidated summary data
-          // market is now a code string like "UK", "DK" instead of an ID
-          const response = await fetchSummaryDataFromSelection(
-            client,
-            jobId,
-            selectedFields,
-            undefined, // deprecated marketId
-            undefined, // mediaType
-            market || undefined, // markets parameter (code string)
-          );
-          setApiData(response);
-          setTrackerData(null);
-          setTrackerSummaryData(null);
-        } else if (dataSource === "trackers" && clientId) {
-          // Auto-detect media type from selected fields if not explicitly provided
-          const detectedMediaType =
-            trackerMediaType || getTrackerMediaTypeFromFields(selectedFields);
+        if (dataSource === "summary" && (jobId || (isKering && clientId))) {
+          if (isKering && clientId) {
+            // Kering Summary Excel data source
+            // Determine if a specific brand is selected
+            // Typically brand selection comes from the "dataset" dropdown in Kering context
+            // field ID format: kering-consolidated-brand-summary-{brand}-...
+            // OR if generic summary, check if specific brand is in context
 
-          if (!detectedMediaType) {
-            console.warn(
-              "Could not determine tracker media type from selected fields",
+            // For now, based on user request:
+            // "Summary Excel" -> "All Brand Summary" (aggregates) OR "Consolidated Brand Summary" (per brand)
+            // If "All Brands" selected (or no brand filter), use fetchKeringAllBrandSummary
+            // If specific brand selected, use fetchKeringConsolidatedBrandSummary
+
+            // We need to know if a specific brand is selected.
+            // In DataTableView, this was done via `selectedBrand`
+            // Here, we might need to rely on `selectedFields` or a prop.
+            // Assuming for now "Summary" means Detailed/AllBrand unless we can detect a brand.
+
+            // Actually, based on DataTableView logic:
+            // If specific brand selected -> fetchKeringConsolidatedBrandSummary
+            // If "All" selected -> fetchKeringAllBrandSummary (Detailed Summary)
+
+            // IMPORTANT: VisualizationCanvas doesn't have explicit `selectedBrand` prop seen in previous view.
+            // But let's assume if the user selects fields from "Consolidated Brand Summary", we treat it as such.
+
+            // Map fields first
+            // Extract backend field names from selected fields
+            let keringFields = mapKeringFieldsToBackend(selectedFields);
+
+            // Kering Consolidated Summary endpoint does not support inflation fields
+            // Filter them out to prevent rendering issues
+            keringFields = keringFields.filter((f) => !f.includes("inflation"));
+
+            // If no metric fields were selected (e.g., user only selected a brand),
+            // default to all available metrics for the brand-summary endpoint
+            if (keringFields.length === 0) {
+              keringFields = [
+                "total_spend",
+                "addressable_spend",
+                "measured_spend",
+                "measured_spend_pct",
+                "measured_savings",
+                "measured_savings_pct",
+              ];
+            }
+
+            // For Query Builder "Summary Excel" view, determine endpoint based on field selection:
+            // - If "Brands" field group selected (specific brand) -> use /consolidated/brand-summary?brand=X
+            // - If "All Brand Summary" field group selected -> use /consolidated/all-brand-summary
+
+            // Kering brand name mapping (field ID slug -> actual brand name)
+            const KERING_BRAND_SLUG_MAP: Record<string, string> = {
+              "alexander-mcqueen": "Alexander McQueen",
+              balenciaga: "Balenciaga",
+              "bottega-veneta": "Bottega Veneta",
+              boucheron: "Boucheron",
+              brioni: "Brioni",
+              dodo: "Dodo",
+              gucci: "Gucci",
+              "kering-eyewear": "Kering Eyewear",
+              pomellato: "Pomellato",
+              "saint-laurent": "Saint Laurent",
+              "kering-corporate": "Kering Corporate",
+            };
+
+            // Check if a specific brand is selected from "Brands" field group
+            // Field IDs look like: "kering-brand-gucci", "kering-brand-balenciaga"
+            const allSelectedFields = Object.values(selectedFields).flat();
+            const selectedBrandField = allSelectedFields.find(
+              (field) =>
+                field.startsWith("kering-brand-") &&
+                !field.includes("all-brand"),
             );
-            setApiError(
-              "Please select fields from a specific media type (Summary, TV, Radio, Print, etc.)",
-            );
+
+            let summaryResponse: any;
+            let responseSheetType = "All Brand summary";
+
+            if (selectedBrandField) {
+              // Extract brand slug from field ID (e.g., "kering-brand-gucci" -> "gucci")
+              const brandSlug = selectedBrandField.replace("kering-brand-", "");
+              const brandName = KERING_BRAND_SLUG_MAP[brandSlug];
+
+              if (brandName) {
+                // Call brand-specific endpoint
+                responseSheetType = brandName;
+                summaryResponse = await fetchKeringConsolidatedBrandSummary(
+                  brandName,
+                  market || undefined,
+                  clientId,
+                  undefined,
+                );
+              } else {
+                // Fallback to all-brand-summary if brand mapping not found
+                summaryResponse = await fetchKeringAllBrandSummary(
+                  clientId,
+                  undefined,
+                  market || undefined,
+                );
+              }
+            } else {
+              // No specific brand selected, use all-brand-summary
+              summaryResponse = await fetchKeringAllBrandSummary(
+                clientId,
+                undefined,
+                market || undefined,
+              );
+            }
+
+            // Transform to generic format for `apiData`
+            // Map: Tracker Field Name -> Consolidated Response Field Name
+            const KERING_CONSOLIDATED_TO_TRACKER_MAP: Record<string, string> = {
+              total_net_net_media_spend: "total_spend",
+              total_affectable_spend: "addressable_spend",
+              measured_spend: "measured_spend",
+              measured_spend_pct: "measured_spend_pct",
+              measured_savings: "measured_savings",
+              measured_savings_pct: "measured_savings_pct",
+              total_savings: "added_value",
+              total_savings_pct: "added_value_pct",
+            };
+
+            // Response field names that can be used directly
+            const RESPONSE_FIELDS = [
+              "total_spend",
+              "addressable_spend",
+              "measured_spend",
+              "measured_spend_pct",
+              "measured_savings",
+              "measured_savings_pct",
+              "added_value",
+              "added_value_pct",
+            ];
+
+            const mappedData = summaryResponse.data.map((item: any) => {
+              const mappedItem: any = { ...item };
+
+              // Apply mapping: Ensure the keys expected by the chart (keringFields) exist in the item
+              keringFields.forEach((field) => {
+                // Check if field is already a response field name (direct access)
+                if (RESPONSE_FIELDS.includes(field)) {
+                  // Field already matches response, no mapping needed
+                  if (item[field] !== undefined) {
+                    mappedItem[field] = item[field];
+                  }
+                } else {
+                  // Field is a tracker field name, need to map
+                  const sourceKey = KERING_CONSOLIDATED_TO_TRACKER_MAP[field];
+                  if (sourceKey && item[sourceKey] !== undefined) {
+                    mappedItem[field] = item[sourceKey];
+                  }
+                }
+              });
+
+              return mappedItem;
+            });
+
+            setApiData({
+              data: mappedData,
+              requested_fields: keringFields,
+              total_records: summaryResponse.total_records,
+              consolidation_job_id: summaryResponse.consolidation_job_id,
+              sheet_type: "All Brand summary",
+            });
             setTrackerData(null);
             setTrackerSummaryData(null);
-            setApiData(null);
-            setIsLoadingApiData(false);
-            return;
-          }
-
-          // market is now a code string like "UK", "DK"
-          const marketsParam = market || undefined;
-
-          // Handle Summary vs specific media types
-          if (detectedMediaType === "summary") {
-            // Fetch tracker summary data (aggregated by media type)
-            const response = await fetchTrackerSummaryData(
+            setKeringBrandData(null);
+          } else {
+            // Generic Consolidated Summary logic
+            const response = await fetchSummaryDataFromSelection(
               client,
-              clientId,
-              undefined, // deprecated marketId
-              undefined, // mediaType
-              marketsParam, // markets parameter (code string)
+              jobId || "", // handle potentially undefined jobId if strict check needed
+              selectedFields,
+              undefined,
+              undefined,
+              market || undefined,
             );
-            setTrackerSummaryData(response);
+            setApiData(response);
             setTrackerData(null);
+            setTrackerSummaryData(null);
+            setKeringBrandData(null);
+          }
+        } else if (dataSource === "trackers" && clientId) {
+          // Kering uses brand-summary endpoint for trackers
+          if (isKering) {
+            // Extract backend field names from selected fields
+            const keringFields = mapKeringFieldsToBackend(selectedFields);
+
+            // Detect media type for Kering to ensure correct data filtering
+            let keringMediaType: string | undefined;
+            const allSelectedIds = Object.values(selectedFields).flat();
+
+            // Simple heuristic to find media type from field ID
+            // Kering field IDs are like: kering-social-total-branding-total-spend
+            const findMediaType = (ids: string[]) => {
+              for (const id of ids) {
+                if (id.includes("social-total")) return "SOCIAL TOTAL";
+                if (id.includes("social-branding")) return "SOCIAL BRANDING";
+                if (id.includes("social-performance"))
+                  return "SOCIAL PERFORMANCE";
+                if (id.includes("print")) return "PRINT";
+                if (id.includes("outdoor")) return "OUTDOOR";
+                if (id.includes("digital")) return "DIGITAL";
+                if (id.includes("tv")) return "TV";
+                if (id.includes("cinema")) return "CINEMA";
+                if (id.includes("radio")) return "RADIO";
+              }
+              return undefined;
+            };
+
+            keringMediaType = findMediaType(allSelectedIds);
+
+            const response = await fetchKeringBrandSummary(
+              clientId,
+              undefined, // brandName - all brands
+              undefined, // period
+              keringMediaType, // Pass detected media type
+              undefined, // type
+              undefined, // marketId
+              market || undefined, // markets
+              keringFields.length > 0 ? keringFields : undefined, // fields - only pass if selected
+            );
+            setKeringBrandData(response);
+            setTrackerData(null);
+            setTrackerSummaryData(null);
             setApiData(null);
           } else {
-            // Fetch complete tracker data using /tracker/{media}/complete endpoint
-            const response = await fetchTrackerComplete(
-              client,
-              clientId,
-              detectedMediaType as TrackerMediaType,
-              undefined, // deprecated marketId
-              marketsParam, // markets parameter (code string)
-            );
-            setTrackerData(response);
-            setTrackerSummaryData(null);
-            setApiData(null);
+            // Auto-detect media type from selected fields if not explicitly provided
+            const detectedMediaType =
+              trackerMediaType || getTrackerMediaTypeFromFields(selectedFields);
+
+            if (!detectedMediaType) {
+              console.warn(
+                "Could not determine tracker media type from selected fields",
+              );
+              setApiError(
+                "Please select fields from a specific media type (Summary, TV, Radio, Print, etc.)",
+              );
+              setTrackerData(null);
+              setTrackerSummaryData(null);
+              setKeringBrandData(null);
+              setApiData(null);
+              setIsLoadingApiData(false);
+              return;
+            }
+
+            // market is now a code string like "UK", "DK"
+            const marketsParam = market || undefined;
+
+            // Handle Summary vs specific media types
+            if (detectedMediaType === "summary") {
+              // Fetch tracker summary data (aggregated by media type)
+              const response = await fetchTrackerSummaryData(
+                client,
+                clientId,
+                undefined, // deprecated marketId
+                undefined, // mediaType
+                marketsParam, // markets parameter (code string)
+              );
+              setTrackerSummaryData(response);
+              setTrackerData(null);
+              setKeringBrandData(null);
+              setApiData(null);
+            } else {
+              // Fetch complete tracker data using /tracker/{media}/complete endpoint
+              const response = await fetchTrackerComplete(
+                client,
+                clientId,
+                detectedMediaType as TrackerMediaType,
+                undefined, // deprecated marketId
+                marketsParam, // markets parameter (code string)
+              );
+              setTrackerData(response);
+              setTrackerSummaryData(null);
+              setKeringBrandData(null);
+              setApiData(null);
+            }
           }
         } else {
           setApiData(null);
           setTrackerData(null);
           setTrackerSummaryData(null);
+          setKeringBrandData(null);
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -388,6 +623,7 @@ export function VisualizationCanvas({
         setApiData(null);
         setTrackerData(null);
         setTrackerSummaryData(null);
+        setKeringBrandData(null);
       } finally {
         setIsLoadingApiData(false);
       }
@@ -403,6 +639,7 @@ export function VisualizationCanvas({
     selectedFields,
     market,
     hasDynamicTrackerFields,
+    isKering,
   ]);
 
   const getTotalSelected = () => {
@@ -681,6 +918,98 @@ export function VisualizationCanvas({
       });
   }, [trackerSummaryData]);
 
+  // Transform Kering brand summary data into chart-compatible format
+  const getKeringBrandChartData = useMemo(() => {
+    if (
+      !keringBrandData ||
+      !keringBrandData.data ||
+      keringBrandData.data.length === 0
+    )
+      return null;
+
+    // Group by brand_name and aggregate numeric values
+    const brandAggregates: Record<string, Record<string, unknown>> = {};
+
+    // Numeric fields to aggregate
+    const numericFields = [
+      "total_net_net_media_spend",
+      "measured_spend",
+      "total_savings",
+      "total_savings_pct",
+      "measured_savings",
+      "measured_savings_pct",
+      "total_affectable_spend",
+      "total_non_affectable_spend",
+    ];
+
+    // Find the best period to use (prefer FY, then 1H, then any available)
+    const availablePeriods = new Set(
+      keringBrandData.data.map((row) => row.period),
+    );
+    const preferredPeriod = availablePeriods.has("FY")
+      ? "FY"
+      : availablePeriods.has("1H")
+        ? "1H"
+        : availablePeriods.has("YTD")
+          ? "YTD"
+          : Array.from(availablePeriods)[0] || null;
+
+    console.log(
+      "[getKeringBrandChartData] Available periods:",
+      Array.from(availablePeriods),
+    );
+    console.log("[getKeringBrandChartData] Using period:", preferredPeriod);
+
+    keringBrandData.data.forEach((row) => {
+      const brandName = row.brand_name || "Unknown";
+
+      // Use the preferred period for aggregation
+      if (preferredPeriod && row.period !== preferredPeriod) return;
+
+      // Only use ALL type (skip DIRECT BUY, CENTRAL HUB, CLIENT BUY breakdowns)
+      if (row.type !== "ALL") return;
+
+      // Skip GRAND TOTAL media type - we want individual media types
+      if (row.media_type === "GRAND TOTAL") return;
+
+      if (!brandAggregates[brandName]) {
+        brandAggregates[brandName] = {
+          name: brandName,
+        };
+        numericFields.forEach((field) => {
+          brandAggregates[brandName][field] = 0;
+        });
+      }
+
+      // Sum up values across media types (treat null as 0)
+      numericFields.forEach((field) => {
+        const value = row[field as keyof typeof row];
+        if (typeof value === "number") {
+          (brandAggregates[brandName][field] as number) += value;
+        }
+        // If value is null but we've seen this field before, keep the accumulated value
+        // This ensures we don't reset to 0 when encountering nulls
+      });
+    });
+
+    console.log(
+      "[getKeringBrandChartData] Aggregated brands:",
+      Object.keys(brandAggregates),
+    );
+    console.log(
+      "[getKeringBrandChartData] Sample aggregate:",
+      Object.values(brandAggregates)[0],
+    );
+
+    // Convert to array - don't filter out brands with zero/null values
+    // The data might legitimately have zeros or nulls
+    const result = Object.values(brandAggregates);
+
+    console.log("[getKeringBrandChartData] Returning", result.length, "brands");
+
+    return result;
+  }, [keringBrandData]);
+
   // Get chart data based on data source selection
   // Only returns actual API data, no static fallbacks
   // Works for any client, not just Arla
@@ -696,6 +1025,14 @@ export function VisualizationCanvas({
 
     // Use tracker data for trackers
     if (dataSource === "trackers") {
+      // Kering uses brand summary data
+      if (
+        isKering &&
+        getKeringBrandChartData &&
+        getKeringBrandChartData.length > 0
+      ) {
+        return getKeringBrandChartData;
+      }
       // Check for tracker summary data first (when Summary category is selected)
       if (getTrackerSummaryChartData && getTrackerSummaryChartData.length > 0) {
         return getTrackerSummaryChartData;
@@ -715,6 +1052,8 @@ export function VisualizationCanvas({
     getApiChartData,
     getTrackerChartData,
     getTrackerSummaryChartData,
+    getKeringBrandChartData,
+    isKering,
   ]);
 
   // Alias for backwards compatibility
@@ -939,12 +1278,25 @@ export function VisualizationCanvas({
     return [];
   };
 
-  const rawData = getChartData();
+  // Memoize rawData to prevent infinite loops
+  const rawData = useMemo(
+    () => getChartData(),
+    [dataSource, getClientData, dynamicTrackerData, keringBrandData, isKering],
+  );
+
+  // Track previous rawData to avoid unnecessary parent updates
+  const prevRawDataRef = useRef<typeof rawData>(rawData);
 
   // Notify parent of chart data changes for smart recommendations
   useEffect(() => {
     if (onChartDataChange) {
-      onChartDataChange(rawData);
+      // Only notify if data actually changed (deep comparison by JSON)
+      const prevJson = JSON.stringify(prevRawDataRef.current);
+      const currentJson = JSON.stringify(rawData);
+      if (prevJson !== currentJson) {
+        prevRawDataRef.current = rawData;
+        onChartDataChange(rawData);
+      }
     }
   }, [rawData, onChartDataChange]);
 
@@ -1088,6 +1440,26 @@ export function VisualizationCanvas({
     return [];
   }, [dynamicTrackerData, selectedDynamicChannels]);
 
+  /* 
+    Moved primaryApiField definition AFTER allApiFields because it depends on correct field resolution.
+    See below.
+  */
+
+  // Get all requested fields from either API source
+  // For summary: use apiData.requested_fields
+  // For Kering trackers: use mapped backend fields
+  // For dynamic trackers: use actual numeric fields from the response
+  // For static trackers: use the selected fields from Query Builder
+  const allApiFields = isApiData
+    ? apiData.requested_fields
+    : isKering && keringBrandData
+      ? mapKeringFieldsToBackend(selectedFields)
+      : dynamicTrackerData && dynamicTrackerNumericFields.length > 0
+        ? dynamicTrackerNumericFields
+        : dataSource === "trackers" && selectedFieldNames.length > 0
+          ? selectedFieldNames
+          : [];
+
   const primaryApiField =
     isApiData && apiData.requested_fields.length > 0
       ? apiData.requested_fields[0]
@@ -1096,21 +1468,9 @@ export function VisualizationCanvas({
             (f) =>
               f.includes("net_net_spend") || f.includes("ytd_net_net_spend"),
           ) || dynamicTrackerNumericFields[0]
-        : dataSource === "trackers" && selectedFieldNames.length > 0
-          ? selectedFieldNames[0]
+        : allApiFields.length > 0
+          ? allApiFields[0]
           : null;
-
-  // Get all requested fields from either API source
-  // For summary: use apiData.requested_fields
-  // For dynamic trackers: use actual numeric fields from the response
-  // For static trackers: use the selected fields from Query Builder
-  const allApiFields = isApiData
-    ? apiData.requested_fields
-    : dynamicTrackerData && dynamicTrackerNumericFields.length > 0
-      ? dynamicTrackerNumericFields
-      : dataSource === "trackers" && selectedFieldNames.length > 0
-        ? selectedFieldNames
-        : [];
 
   // Helper to find field in allApiFields
   const findField = (patterns: string[]) => {

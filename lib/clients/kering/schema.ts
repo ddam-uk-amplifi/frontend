@@ -53,14 +53,7 @@ const keringBrands = [
 // ============================================
 
 const keringSummaryGroups: FieldGroup[] = [
-  {
-    id: "kering-inflation",
-    title: "Inflation",
-    fields: keringInflationFields.map((f) => ({
-      ...f,
-      id: `kering-inflation-${f.id}`,
-    })),
-  },
+  // Inflation fields removed per client request
   {
     id: "kering-all-brand-summary",
     title: "All Brand Summary",
