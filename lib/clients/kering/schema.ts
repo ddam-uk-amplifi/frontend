@@ -42,10 +42,12 @@ const keringBrands = [
   "Brioni",
   "Dodo",
   "Gucci",
-  "Kering Eyewear",
-  "Pomellato",
-  "Saint Laurent",
   "Kering Corporate",
+  "Kering Eyewear",
+  "Maui Jim",
+  "Pomellato",
+  "Qeelin",
+  "Saint Laurent",
 ];
 
 // ============================================
