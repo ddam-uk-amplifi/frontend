@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,11 @@ import { handleApiError } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/auth";
 import { type LoginFormData, loginSchema } from "@/lib/validations/schemas";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
   const { login, isLoading } = useAuthStore();
 
   const form = useForm<LoginFormData>({
@@ -41,30 +43,31 @@ export default function LoginPage() {
     },
   });
 
+  // Handle redirect reason messages
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason) {
+      const messages: Record<string, string> = {
+        authentication_required: "Please sign in to access this page.",
+        session_expired: "Your session has expired. Please sign in again.",
+        invalid_tokens: "Invalid authentication. Please sign in again.",
+      };
+      setRedirectMessage(messages[reason] || "Please sign in to continue.");
+    }
+  }, [searchParams]);
+
   const onSubmit = async (data: LoginFormData) => {
     try {
       setError(null);
       await login(data.username, data.password);
-      router.push("/dashboard");
+
+      // Redirect to the original page or dashboard
+      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      router.push(redirectTo);
     } catch (err) {
       setError(handleApiError(err));
     }
   };
-
-  const demoUser = {
-    username: "admin",
-    password: "admin123",
-  }
-
-  const adminButton = async () => {
-    try {
-      setError(null);
-      await login(demoUser.username, demoUser.password);
-      router.push("/dashboard");
-    } catch (err) {
-      setError(handleApiError(err));
-    }
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -81,6 +84,12 @@ export default function LoginPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <CardContent className="space-y-4">
+              {redirectMessage && (
+                <Alert>
+                  <AlertDescription>{redirectMessage}</AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -152,7 +161,7 @@ export default function LoginPage() {
           </form>
         </Form>
 
-        <div className="mt-4 text-center pb-6">
+        {/* <div className="mt-4 text-center pb-6">
           <button
             type="button"
             onClick={adminButton}
@@ -161,8 +170,22 @@ export default function LoginPage() {
           >
             Auto Login (Demo)
           </button>
-        </div>
+        </div> */}
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

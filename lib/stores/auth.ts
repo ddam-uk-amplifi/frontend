@@ -124,11 +124,7 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      register: async (
-        username: string,
-        email: string,
-        password: string,
-      ) => {
+      register: async (username: string, email: string, password: string) => {
         try {
           set({ isLoading: true, error: null });
 

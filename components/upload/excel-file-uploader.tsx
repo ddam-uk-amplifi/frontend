@@ -58,7 +58,10 @@ export function ExcelFileUploader({
       fieldName,
       headers: () => {
         const token = tokenUtils.getAccessToken();
-        console.log("Getting token for upload:", token ? "Token exists" : "No token");
+        console.log(
+          "Getting token for upload:",
+          token ? "Token exists" : "No token",
+        );
         return {
           authorization: token ? `Bearer ${token}` : "",
           ...additionalHeaders,
@@ -114,7 +117,10 @@ export function ExcelFileUploader({
   }, [uppy, onUploadSuccess, onUploadError, onComplete]);
 
   return (
-    <div className="excel-file-uploader not-prose" style={{ minHeight: '450px' }}>
+    <div
+      className="excel-file-uploader not-prose"
+      style={{ minHeight: "450px" }}
+    >
       <Dashboard
         uppy={uppy}
         proudlyDisplayPoweredByUppy={false}
