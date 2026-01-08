@@ -91,6 +91,28 @@ const AVAILABLE_PERIODS = [
   { code: "Dec", name: "December" },
 ];
 
+// Available periods for Kering tracker data
+const KERING_TRACKER_PERIODS = [
+  { code: "DECEMBER", name: "December (YTD)" },
+  { code: "FY", name: "Full Year" },
+  { code: "1H", name: "First Half" },
+  { code: "1Q", name: "Q1" },
+  { code: "2Q", name: "Q2" },
+  { code: "3Q", name: "Q3" },
+  { code: "4Q", name: "Q4" },
+  { code: "JANUARY", name: "January" },
+  { code: "FEBRUARY", name: "February" },
+  { code: "MARCH", name: "March" },
+  { code: "APRIL", name: "April" },
+  { code: "MAY", name: "May" },
+  { code: "JUNE", name: "June" },
+  { code: "JULY", name: "July" },
+  { code: "AUGUST", name: "August" },
+  { code: "SEPTEMBER", name: "September" },
+  { code: "OCTOBER", name: "October" },
+  { code: "NOVEMBER", name: "November" },
+];
+
 // Kering brand names for dropdown
 const KERING_BRANDS = [
   "Alexander McQueen",
@@ -959,14 +981,13 @@ import type { KeringBrandSummaryItem } from "@/lib/api/dashboard";
 
 function transformKeringTrackerBrandData(
   data: KeringBrandSummaryItem[],
+  period: string = "DECEMBER",
 ): TableRow[] {
   if (!data || !Array.isArray(data) || data.length === 0) return [];
 
-  // Filter for FY period and ALL type only
+  // Filter for selected period and ALL type only
   const filteredData = data.filter(
-    (item) =>
-      item.type === "ALL" &&
-      (item.period === "FY" || item.period === "1H" || item.period === "YTD"),
+    (item) => item.type === "ALL" && item.period === period,
   );
 
   // Aggregate by media type
@@ -1106,14 +1127,13 @@ function transformKeringTrackerBrandData(
  */
 function transformKeringTrackerSummaryData(
   data: KeringTrackerSummaryItem[],
+  period: string = "DECEMBER",
 ): TableRow[] {
   if (!data || !Array.isArray(data) || data.length === 0) return [];
 
-  // Filter for FY period and ALL type only
+  // Filter for selected period and ALL type only
   const filteredData = data.filter(
-    (item) =>
-      item.type === "ALL" &&
-      (item.period === "FY" || item.period === "1H" || item.period === "YTD"),
+    (item) => item.type === "ALL" && item.period === period,
   );
 
   // Aggregate by media type
@@ -1300,8 +1320,10 @@ export function DataTableView({
   // For others: sheetType is "ytd" or "fyfc"
   const [sheetType, setSheetType] = useState<string>("ytd");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
+  const [keringTrackerPeriod, setKeringTrackerPeriod] = useState<string>("DECEMBER"); // Kering tracker period filter
   const [isSheetTypeOpen, setIsSheetTypeOpen] = useState(false);
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+  const [isKeringPeriodOpen, setIsKeringPeriodOpen] = useState(false);
 
   // Check if current sheetType is a Kering brand (for Summary)
   const isKeringBrandSelected = KERING_BRANDS.includes(sheetType);
@@ -1402,7 +1424,6 @@ export function DataTableView({
   // Query: Fetch latest job ID (for summary)
   const {
     data: latestJob,
-    error: latestJobError,
     isError: isLatestJobError,
   } = useQuery({
     queryKey: tableDataKeys.latestJob(selectedClient || ""),
@@ -1629,7 +1650,7 @@ export function DataTableView({
       isKeringTrackerBrandSelected &&
       keringTrackerBrandData?.data
     ) {
-      return transformKeringTrackerBrandData(keringTrackerBrandData.data);
+      return transformKeringTrackerBrandData(keringTrackerBrandData.data, keringTrackerPeriod);
     }
     // Kering trackers - detailed summary (from tracker/summary endpoint)
     if (
@@ -1638,7 +1659,7 @@ export function DataTableView({
       !isKeringTrackerBrandSelected &&
       keringTrackerAllBrandData?.data
     ) {
-      return transformKeringTrackerSummaryData(keringTrackerAllBrandData.data);
+      return transformKeringTrackerSummaryData(keringTrackerAllBrandData.data, keringTrackerPeriod);
     }
     // Other clients trackers
     if (selectedDataSource === "trackers" && trackerData && selectedPeriod) {
@@ -1658,6 +1679,7 @@ export function DataTableView({
     isKeringTrackerBrandSelected,
     keringTrackerBrandData,
     keringTrackerAllBrandData,
+    keringTrackerPeriod,
   ]);
 
   const isLoading =
@@ -1987,6 +2009,62 @@ export function DataTableView({
                       ))}
                     </>
                   )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {/* Kering Tracker Period Selector */}
+          {selectedDataSource === "trackers" && isKering && (
+            <Popover open={isKeringPeriodOpen} onOpenChange={setIsKeringPeriodOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="min-w-[140px]">
+                  {KERING_TRACKER_PERIODS.find((p) => p.code === keringTrackerPeriod)?.name || keringTrackerPeriod}
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56" align="end">
+                <div className="space-y-1 max-h-80 overflow-y-auto">
+                  <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
+                    Summary Periods
+                  </p>
+                  {KERING_TRACKER_PERIODS.slice(0, 7).map((period) => (
+                    <button
+                      key={period.code}
+                      onClick={() => {
+                        setKeringTrackerPeriod(period.code);
+                        setIsKeringPeriodOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        keringTrackerPeriod === period.code
+                          ? "bg-violet-100 text-violet-700"
+                          : "hover:bg-slate-100"
+                      }`}
+                    >
+                      {period.name}
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-100 my-1 pt-1">
+                    <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
+                      Monthly
+                    </p>
+                  </div>
+                  {KERING_TRACKER_PERIODS.slice(7).map((period) => (
+                    <button
+                      key={period.code}
+                      onClick={() => {
+                        setKeringTrackerPeriod(period.code);
+                        setIsKeringPeriodOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        keringTrackerPeriod === period.code
+                          ? "bg-violet-100 text-violet-700"
+                          : "hover:bg-slate-100"
+                      }`}
+                    >
+                      {period.name}
+                    </button>
+                  ))}
                 </div>
               </PopoverContent>
             </Popover>
