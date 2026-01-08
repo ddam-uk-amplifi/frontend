@@ -35,7 +35,7 @@ export const keringTrackerPeriods = [
  * Column definitions for Kering All Brand Summary (Summary data source)
  */
 const keringSummaryAllBrandColumns: TableColumnConfig[] = [
-  { id: "market", label: "Market", type: "text", align: "left", visible: true, order: 0, frozen: true },
+  { id: "mediaType", label: "Market", type: "text", align: "left", visible: true, order: 0, frozen: true },
   { id: "total_spend", label: "Total Spend", type: "currency", align: "right", visible: true, order: 1 },
   { id: "addressable_spend", label: "Addressable Spend", type: "currency", align: "right", visible: true, order: 2 },
   { id: "measured_spend", label: "Measured Spend", type: "currency", align: "right", visible: true, order: 3 },
