@@ -8,9 +8,9 @@ This document describes how to add new clients to the dashboard system. The syst
 
 ```
 lib/clients/
-├── index.ts                 # Client registry & helper functions
+├── index.ts                 # Client registry, helper functions & transform registration
 ├── types.ts                 # TypeScript interfaces for all configs
-├── transforms.ts            # Transform registry & generic transform function
+├── transforms.ts            # Generic transform function & registry (no client-specific code)
 ├── api.ts                   # Generic API layer & client API registry
 ├── hooks/
 │   └── useTableViewData.ts  # Generic data fetching hook
@@ -20,8 +20,17 @@ lib/clients/
     ├── schema.ts            # Field schema for QueryBuilder
     ├── tableView.ts         # TableViewConfig (columns, periods, brands)
     ├── api.ts               # ClientApiConfig (endpoint definitions)
+    ├── transforms.ts        # Client-specific transform configs (NEW!)
     └── types.ts             # Client-specific types (optional)
 ```
+
+### Key Principle: Client-Specific Code Lives in Client Folders
+
+All client-specific configurations (transforms, API endpoints, columns, periods) live in the client's folder.
+The core files (`transforms.ts`, `api.ts`, `index.ts`) only contain:
+- Generic utility functions
+- Type definitions
+- Registration mechanisms
 
 ---
 
@@ -292,36 +301,14 @@ export const {clientName}ApiConfig: ClientApiConfig = {
 };
 ```
 
-### Step 6: Create index.ts
+### Step 6: Create transforms.ts
 
-This exports everything from the client module.
-
-```typescript
-// lib/clients/{client-name}/index.ts
-
-// Client module exports
-export { {clientName}Config as config } from "./config";
-export { schema, {clientName}Brands } from "./schema";
-export {
-  {clientName}TableView as tableView,
-  {clientName}TrackerPeriods,
-  {clientName}SummaryColumns,
-  {clientName}SummaryBrandColumns,
-  {clientName}TrackerColumns,
-} from "./tableView";
-export { {clientName}ApiConfig } from "./api";
-```
-
-### Step 7: Register Transforms
-
-Add transform configs to `lib/clients/transforms.ts`:
+This defines the client-specific data transform configurations.
 
 ```typescript
-// Add to lib/clients/transforms.ts
+// lib/clients/{client-name}/transforms.ts
 
-// ============================================
-// {CLIENT-NAME} TRANSFORM CONFIGS
-// ============================================
+import type { TransformConfig } from "../transforms";
 
 /**
  * {Client Name} All Brand Summary transform
@@ -360,26 +347,6 @@ export const {clientName}AllBrandSummaryTransform: TransformConfig = {
 };
 
 /**
- * {Client Name} Consolidated Brand Summary transform
- * Data source: /consolidated/brand-summary
- */
-export const {clientName}ConsolidatedBrandTransform: TransformConfig = {
-  groupByField: "market",
-  sumFields: [
-    "total_spend",
-    "addressable_spend",
-    "measured_spend",
-    "measured_savings",
-    "added_value",
-  ],
-  aggregate: true,  // Aggregate multiple rows per market
-  includeTotals: true,
-  calculatedPercentages: {
-    // ... same as above
-  },
-};
-
-/**
  * {Client Name} Tracker Summary transform
  * Data source: /tracker/summary
  */
@@ -388,7 +355,7 @@ export const {clientName}TrackerSummaryTransform: TransformConfig = {
   filterField: "type",              // Filter field
   filterValue: "ALL",               // Filter value (e.g., only show "ALL" type)
   periodField: "period",            // Field containing period for filtering
-  skipValues: ["Grand Total"],      // Values to exclude from results
+  skipValues: ["Grand Total"],      // Values to exclude (we use useGrandTotalFromApi instead)
   sumFields: [
     "total_net_net_media_spend",
     "total_non_affectable_spend",
@@ -399,6 +366,11 @@ export const {clientName}TrackerSummaryTransform: TransformConfig = {
   ],
   aggregate: true,
   includeTotals: true,
+  // Use GRAND TOTAL from API instead of calculating (more accurate)
+  useGrandTotalFromApi: true,
+  grandTotalValue: "Grand Total",
+  // Handle duplicate media types (e.g., DIGITAL appears twice in some APIs)
+  renameSecondOccurrence: { "Digital": "Digital Total" },
   calculatedPercentages: {
     measured_spend_pct: {
       numerator: "measured_spend",
@@ -411,28 +383,68 @@ export const {clientName}TrackerSummaryTransform: TransformConfig = {
   },
 };
 
+// Add more transforms as needed...
+
 /**
- * {Client Name} Tracker Brand Summary transform
- * Data source: /tracker/brand-summary
+ * Client transform registry - export all transforms
+ * These will be registered globally in lib/clients/index.ts
  */
-export const {clientName}TrackerBrandTransform: TransformConfig = {
-  // ... similar to tracker summary
-};
-
-// ============================================
-// Add to TRANSFORM REGISTRY
-// ============================================
-
-export const transformRegistry: Record<string, TransformConfig> = {
-  // ... existing transforms
+export const {clientName}Transforms: Record<string, TransformConfig> = {
   "{client-name}:allBrandSummary": {clientName}AllBrandSummaryTransform,
-  "{client-name}:consolidatedBrand": {clientName}ConsolidatedBrandTransform,
   "{client-name}:trackerSummary": {clientName}TrackerSummaryTransform,
-  "{client-name}:trackerBrand": {clientName}TrackerBrandTransform,
+  // Add more transforms here
 };
 ```
 
-### Step 8: Register API Config
+### Step 7: Create index.ts
+
+This exports everything from the client module.
+
+```typescript
+// lib/clients/{client-name}/index.ts
+
+// Client module exports
+export { {clientName}Config as config } from "./config";
+export { schema, {clientName}Brands } from "./schema";
+export {
+  {clientName}TableView as tableView,
+  {clientName}TrackerPeriods,
+  {clientName}SummaryColumns,
+  {clientName}SummaryBrandColumns,
+  {clientName}TrackerColumns,
+} from "./tableView";
+export { {clientName}ApiConfig } from "./api";
+export {
+  {clientName}Transforms,
+  {clientName}AllBrandSummaryTransform,
+  {clientName}TrackerSummaryTransform,
+  // ... export individual transforms
+} from "./transforms";
+```
+
+### Step 8: Register Transforms
+
+Transforms are registered automatically in `lib/clients/index.ts`. Add this after the client imports:
+
+```typescript
+// In lib/clients/index.ts
+
+// Import client modules
+import * as {clientName} from "./{client-name}";
+
+// ... after clientRegistry definition ...
+
+// ============================================
+// REGISTER CLIENT TRANSFORMS
+// ============================================
+
+// Register {Client Name} transforms
+if ({clientName}.{clientName}Transforms) {
+  registerTransforms({clientName}.{clientName}Transforms);
+}
+```
+
+### Step 9: Register API Config
 
 Add to `lib/clients/api.ts`:
 
@@ -447,7 +459,7 @@ export const clientApiRegistry: Record<string, ClientApiConfig> = {
 };
 ```
 
-### Step 9: Register Client Module
+### Step 10: Register Client Module
 
 Add to `lib/clients/index.ts`:
 
@@ -537,6 +549,11 @@ const clientRegistry: Record<string, ClientModule> = {
 | `aggregate` | boolean | No | Whether to aggregate by groupByField |
 | `includeTotals` | boolean | No | Add "Total" row at bottom |
 | `calculatedPercentages` | object | No | Percentage calculations for totals |
+| `useGrandTotalFromApi` | boolean | No | Use GRAND TOTAL from API instead of calculating |
+| `grandTotalValue` | string | No | Field value that represents grand total (e.g., "Grand Total") |
+| `skipDuplicates` | string[] | No | Skip duplicate occurrences (keep first only) |
+| `renameSecondOccurrence` | object | No | Rename second occurrence: `{ "Digital": "Digital Total" }` |
+| `renameValues` | object | No | Rename values: `{ "OLD": "NEW" }` |
 
 ---
 
@@ -600,15 +617,16 @@ The `transformDataWithConfig()` function in `lib/clients/transforms.ts`:
 - [ ] `lib/clients/{client-name}/schema.ts` - Field schema for QueryBuilder
 - [ ] `lib/clients/{client-name}/tableView.ts` - TableViewConfig
 - [ ] `lib/clients/{client-name}/api.ts` - ClientApiConfig
+- [ ] `lib/clients/{client-name}/transforms.ts` - TransformConfigs (client-specific)
 - [ ] `lib/clients/{client-name}/index.ts` - Module exports
 
 ### Registry Updates
 
-- [ ] Add transforms to `lib/clients/transforms.ts` → `transformRegistry`
 - [ ] Import API config in `lib/clients/api.ts`
 - [ ] Add to `lib/clients/api.ts` → `clientApiRegistry`
 - [ ] Import client module in `lib/clients/index.ts`
 - [ ] Add to `lib/clients/index.ts` → `clientRegistry`
+- [ ] Register transforms in `lib/clients/index.ts` → `registerTransforms()`
 
 ### Verification
 
@@ -642,6 +660,7 @@ lib/clients/kering/
 ├── schema.ts     # Field groups + keringBrands array
 ├── tableView.ts  # Columns, periods, TableViewConfig
 ├── api.ts        # keringApiConfig with 4 endpoints
+├── transforms.ts # Kering-specific transform configs
 └── types.ts      # Kering-specific TypeScript types
 ```
 
@@ -652,7 +671,7 @@ lib/clients/kering/
 | `kering/config.ts` | ClientConfig structure |
 | `kering/tableView.ts` | Column definitions, period arrays, TableViewConfig |
 | `kering/api.ts` | Endpoint configurations |
-| `transforms.ts` | Kering transform configs (search for "kering") |
+| `kering/transforms.ts` | Transform configs with useGrandTotalFromApi, renameSecondOccurrence |
 
 ---
 

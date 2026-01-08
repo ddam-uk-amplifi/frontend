@@ -11,9 +11,9 @@ Scalable, config-driven architecture for multi-client dashboard support.
 
 ```
 lib/clients/
-├── index.ts          # Client registry & helper functions
+├── index.ts          # Client registry, helpers & transform registration
 ├── types.ts          # TypeScript interfaces
-├── transforms.ts     # Transform registry & generic transform function
+├── transforms.ts     # Generic transform function (no client-specific code)
 ├── api.ts            # Generic API layer & client API registry
 ├── hooks/
 │   └── useTableViewData.ts  # Generic data fetching hook
@@ -22,16 +22,21 @@ lib/clients/
     ├── config.ts     # ClientConfig
     ├── schema.ts     # QueryBuilder field schema
     ├── tableView.ts  # TableViewConfig (columns, periods, brands)
-    └── api.ts        # ClientApiConfig (endpoints)
+    ├── api.ts        # ClientApiConfig (endpoints)
+    └── transforms.ts # Client-specific transform configs (NEW!)
 ```
+
+### Key Principle
+
+**Client-specific code lives in client folders.** Core files only contain generic utilities and registration mechanisms.
 
 ## Adding a New Client (Summary)
 
 1. Create `lib/clients/{client-name}/` directory
-2. Create config files: `config.ts`, `schema.ts`, `tableView.ts`, `api.ts`, `index.ts`
-3. Add transforms to `transforms.ts` → `transformRegistry`
-4. Register API config in `api.ts` → `clientApiRegistry`
-5. Register client in `index.ts` → `clientRegistry`
+2. Create config files: `config.ts`, `schema.ts`, `tableView.ts`, `api.ts`, `transforms.ts`, `index.ts`
+3. Register API config in `api.ts` → `clientApiRegistry`
+4. Register client in `index.ts` → `clientRegistry`
+5. Register transforms in `index.ts` → `registerTransforms()`
 6. Test all views
 
 See **[ADDING_CLIENTS.md](../../ADDING_CLIENTS.md)** for detailed instructions and configuration reference.
@@ -56,11 +61,17 @@ const result = await fetchClientData(apiConfig, "summary", "default", { clientId
 
 ### Transform System (`transforms.ts`)
 
-Config-driven data transformation:
+Config-driven data transformation with advanced features:
 
 ```typescript
 const rows = transformDataWithConfig(apiData, transformConfig, periodFilter);
 ```
+
+**Transform Features:**
+- `useGrandTotalFromApi` - Use API's GRAND TOTAL instead of calculating
+- `renameSecondOccurrence` - Handle duplicate values (e.g., "Digital" → "Digital Total")
+- `skipDuplicates` - Remove duplicate occurrences
+- `skipValues` - Exclude specific values from results
 
 ### Data Hook (`hooks/useTableViewData.ts`)
 
@@ -68,6 +79,6 @@ Unified data fetching that automatically uses the right API and transform based 
 
 ## Files to Modify When Adding a Client
 
-1. `transforms.ts` - Add transform configs to registry
+1. Create all files in `lib/clients/{client-name}/`
 2. `api.ts` - Import and register client API config
-3. `index.ts` - Import and register client module
+3. `index.ts` - Import client module, register in `clientRegistry`, and call `registerTransforms()`

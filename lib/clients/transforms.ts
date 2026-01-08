@@ -43,6 +43,16 @@ export interface TransformConfig {
   aggregate?: boolean;
   /** Include a totals row */
   includeTotals?: boolean;
+  /** Use GRAND TOTAL from API instead of calculating totals */
+  useGrandTotalFromApi?: boolean;
+  /** Field value that represents the grand total row in API data */
+  grandTotalValue?: string;
+  /** Rename mappings: { "Original Value": "New Display Name" } */
+  renameValues?: Record<string, string>;
+  /** Skip duplicate occurrences of these values (only keep first occurrence) */
+  skipDuplicates?: string[];
+  /** Rename second occurrence of these values: { "Original": "New Name For Second" } */
+  renameSecondOccurrence?: Record<string, string>;
 }
 
 /**
@@ -93,6 +103,16 @@ export function transformDataWithConfig<T extends Record<string, any>>(
 
   if (filteredData.length === 0) return [];
 
+  // Extract GRAND TOTAL row before filtering if we need to use it
+  let grandTotalRow: T | undefined;
+  if (config.useGrandTotalFromApi && config.grandTotalValue) {
+    const grandTotalValueUpper = config.grandTotalValue.toUpperCase();
+    grandTotalRow = filteredData.find((item) => {
+      const groupValue = item[config.groupByField];
+      return normalizeToTitleCase(groupValue || "").toUpperCase() === grandTotalValueUpper;
+    });
+  }
+
   // Skip certain values (e.g., "GRAND TOTAL")
   if (config.skipValues && config.skipValues.length > 0) {
     const skipValuesUpper = config.skipValues.map((v) => v.toUpperCase());
@@ -101,6 +121,68 @@ export function transformDataWithConfig<T extends Record<string, any>>(
       return !skipValuesUpper.includes(
         normalizeToTitleCase(groupValue || "").toUpperCase()
       );
+    });
+  }
+
+  // Skip duplicate occurrences of specified values (keep only first occurrence)
+  if (config.skipDuplicates && config.skipDuplicates.length > 0) {
+    const skipDuplicatesUpper = config.skipDuplicates.map((v) => v.toUpperCase());
+    const seenValues = new Set<string>();
+    filteredData = filteredData.filter((item) => {
+      const groupValue = item[config.groupByField];
+      const normalizedValue = normalizeToTitleCase(groupValue || "").toUpperCase();
+
+      // Check if this is a value we should deduplicate
+      if (skipDuplicatesUpper.includes(normalizedValue)) {
+        if (seenValues.has(normalizedValue)) {
+          // Skip this duplicate
+          return false;
+        }
+        seenValues.add(normalizedValue);
+      }
+      return true;
+    });
+  }
+
+  // Rename second occurrence of specified values (e.g., "Digital" -> "Digital Total")
+  if (config.renameSecondOccurrence) {
+    const renameMap = config.renameSecondOccurrence;
+    const renameKeysUpper = Object.keys(renameMap).map((k) => k.toUpperCase());
+    const seenValues = new Set<string>();
+    filteredData = filteredData.map((item) => {
+      const groupValue = item[config.groupByField];
+      const normalizedValue = normalizeToTitleCase(groupValue || "").toUpperCase();
+
+      // Check if this is a value we should rename on second occurrence
+      if (renameKeysUpper.includes(normalizedValue)) {
+        if (seenValues.has(normalizedValue)) {
+          // This is the second occurrence - rename it
+          const originalKey = Object.keys(renameMap).find(
+            (k) => k.toUpperCase() === normalizedValue
+          );
+          if (originalKey) {
+            return { ...item, [config.groupByField]: renameMap[originalKey] };
+          }
+        }
+        seenValues.add(normalizedValue);
+      }
+      return item;
+    });
+  }
+
+  // Apply rename mappings to the data before processing
+  if (config.renameValues) {
+    const renameMap = config.renameValues;
+    filteredData = filteredData.map((item) => {
+      const groupValue = item[config.groupByField];
+      const normalizedValue = normalizeToTitleCase(groupValue || "");
+      // Check if this value should be renamed
+      for (const [original, newName] of Object.entries(renameMap)) {
+        if (normalizedValue.toUpperCase() === original.toUpperCase()) {
+          return { ...item, [config.groupByField]: newName };
+        }
+      }
+      return item;
     });
   }
 
@@ -191,206 +273,117 @@ export function transformDataWithConfig<T extends Record<string, any>>(
     });
   }
 
-  // Add totals row if requested
+  // Add totals row
   if (config.includeTotals && tableRows.length > 0) {
-    const totals: Record<string, number> = {};
+    // Use GRAND TOTAL from API if configured and available
+    if (config.useGrandTotalFromApi && grandTotalRow) {
+      const totals: Record<string, any> = {};
 
-    // Sum all numeric fields
-    config.sumFields.forEach((field) => {
-      totals[field] = tableRows.reduce(
-        (sum, row) => sum + (row.data[field] || 0),
-        0
-      );
-    });
+      // Copy sum fields from the grand total row
+      config.sumFields.forEach((field) => {
+        totals[field] = grandTotalRow![field];
+      });
 
-    // Calculate total percentages
-    if (config.calculatedPercentages) {
-      Object.entries(config.calculatedPercentages).forEach(
-        ([fieldName, calc]) => {
-          const numerator = totals[calc.numerator] || 0;
-          const denominator = totals[calc.denominator] || 0;
-          totals[fieldName] =
-            denominator > 0 ? (numerator / denominator) * 100 : 0;
-        }
-      );
+      // Convert decimal percentages to display percentages (*100)
+      if (config.percentageFieldsToConvert) {
+        config.percentageFieldsToConvert.forEach((field) => {
+          if (grandTotalRow![field] !== null && grandTotalRow![field] !== undefined) {
+            totals[field] = grandTotalRow![field] * 100;
+          }
+        });
+      }
+
+      // For aggregated data, calculate percentages from the grand total values
+      if (config.aggregate && config.calculatedPercentages) {
+        Object.entries(config.calculatedPercentages).forEach(
+          ([fieldName, calc]) => {
+            const numerator = totals[calc.numerator] || 0;
+            const denominator = totals[calc.denominator] || 0;
+            totals[fieldName] =
+              denominator > 0 ? (numerator / denominator) * 100 : 0;
+          }
+        );
+      }
+
+      tableRows.push({
+        id: "total",
+        mediaType: "Total",
+        type: "Actual",
+        level: 0,
+        data: totals,
+      });
+    } else {
+      // Fall back to calculating totals by summing rows
+      const totals: Record<string, number> = {};
+
+      // Sum all numeric fields
+      config.sumFields.forEach((field) => {
+        totals[field] = tableRows.reduce(
+          (sum, row) => sum + (row.data[field] || 0),
+          0
+        );
+      });
+
+      // Calculate total percentages
+      if (config.calculatedPercentages) {
+        Object.entries(config.calculatedPercentages).forEach(
+          ([fieldName, calc]) => {
+            const numerator = totals[calc.numerator] || 0;
+            const denominator = totals[calc.denominator] || 0;
+            totals[fieldName] =
+              denominator > 0 ? (numerator / denominator) * 100 : 0;
+          }
+        );
+      }
+
+      tableRows.push({
+        id: "total",
+        mediaType: "Total",
+        type: "Actual",
+        level: 0,
+        data: totals,
+      });
     }
-
-    tableRows.push({
-      id: "total",
-      mediaType: "Total",
-      type: "Actual",
-      level: 0,
-      data: totals,
-    });
   }
 
   return tableRows;
 }
 
 // ============================================
-// CLIENT-SPECIFIC TRANSFORM CONFIGS
-// ============================================
-
-/**
- * Kering All Brand Summary transform config
- * Data comes from "All Brand summary" sheet - one row per market
- */
-export const keringAllBrandSummaryTransform: TransformConfig = {
-  groupByField: "market",
-  sumFields: [
-    "total_spend",
-    "addressable_spend",
-    "measured_spend",
-    "measured_savings",
-    "added_value",
-  ],
-  percentageFieldsToConvert: [
-    "measured_spend_pct",
-    "measured_savings_pct",
-    "added_value_pct",
-  ],
-  aggregate: false, // Data is already per-market
-  includeTotals: true,
-  calculatedPercentages: {
-    measured_spend_pct: {
-      numerator: "measured_spend",
-      denominator: "addressable_spend",
-    },
-    measured_savings_pct: {
-      numerator: "measured_savings",
-      denominator: "measured_spend",
-    },
-    added_value_pct: {
-      numerator: "added_value",
-      denominator: "measured_spend",
-    },
-  },
-};
-
-/**
- * Kering Consolidated Brand Summary transform config
- * Data comes from individual brand sheets - needs aggregation by market
- */
-export const keringConsolidatedBrandTransform: TransformConfig = {
-  groupByField: "market",
-  sumFields: [
-    "total_spend",
-    "addressable_spend",
-    "measured_spend",
-    "measured_savings",
-    "added_value",
-  ],
-  aggregate: true, // Need to aggregate by market
-  includeTotals: true,
-  calculatedPercentages: {
-    measured_spend_pct: {
-      numerator: "measured_spend",
-      denominator: "addressable_spend",
-    },
-    measured_savings_pct: {
-      numerator: "measured_savings",
-      denominator: "measured_spend",
-    },
-    added_value_pct: {
-      numerator: "added_value",
-      denominator: "measured_spend",
-    },
-  },
-};
-
-/**
- * Kering Tracker Summary transform config
- * Data comes from tracker/summary endpoint - aggregated by media type
- */
-export const keringTrackerSummaryTransform: TransformConfig = {
-  groupByField: "media_type",
-  filterField: "type",
-  filterValue: "ALL",
-  periodField: "period",
-  skipValues: ["Grand Total", "Tv", "Tv - Linear", "Tv - Vod"],
-  sumFields: [
-    "total_net_net_media_spend",
-    "total_non_affectable_spend",
-    "total_affectable_spend",
-    "measured_spend",
-    "non_measured_spend",
-    "total_savings",
-    "measured_savings",
-    "inflation_mitigation",
-    "added_value_penalty_avoidance",
-  ],
-  aggregate: true,
-  includeTotals: true,
-  calculatedPercentages: {
-    measured_spend_pct: {
-      numerator: "measured_spend",
-      denominator: "total_affectable_spend",
-    },
-    total_savings_pct: {
-      numerator: "total_savings",
-      denominator: "measured_spend",
-    },
-    measured_savings_pct: {
-      numerator: "measured_savings",
-      denominator: "measured_spend",
-    },
-    added_value_penalty_avoidance_pct: {
-      numerator: "added_value_penalty_avoidance",
-      denominator: "measured_spend",
-    },
-  },
-};
-
-/**
- * Kering Tracker Brand Summary transform config
- * Data comes from tracker/brand-summary endpoint - aggregated by media type
- */
-export const keringTrackerBrandTransform: TransformConfig = {
-  groupByField: "media_type",
-  filterField: "type",
-  filterValue: "ALL",
-  periodField: "period",
-  skipValues: ["Grand Total", "Tv", "Tv - Linear", "Tv - Vod"],
-  sumFields: [
-    "total_net_net_media_spend",
-    "total_non_affectable_spend",
-    "total_affectable_spend",
-    "measured_spend",
-    "total_savings",
-    "measured_savings",
-    "added_value_penalty_avoidance",
-  ],
-  aggregate: true,
-  includeTotals: true,
-  calculatedPercentages: {
-    measured_spend_pct: {
-      numerator: "measured_spend",
-      denominator: "total_affectable_spend",
-    },
-    total_savings_pct: {
-      numerator: "total_savings",
-      denominator: "measured_spend",
-    },
-  },
-};
-
-// ============================================
 // TRANSFORM REGISTRY
 // ============================================
 
 /**
- * Map of transform config names to their configs
+ * Global transform registry - maps transform names to configs
+ * Client-specific transforms are registered here from their respective modules
  */
-export const transformRegistry: Record<string, TransformConfig> = {
-  "kering:allBrandSummary": keringAllBrandSummaryTransform,
-  "kering:consolidatedBrand": keringConsolidatedBrandTransform,
-  "kering:trackerSummary": keringTrackerSummaryTransform,
-  "kering:trackerBrand": keringTrackerBrandTransform,
-};
+const transformRegistry: Record<string, TransformConfig> = {};
+
+/**
+ * Register transforms from a client module
+ * Called during client module initialization
+ *
+ * @example
+ * // In kering/transforms.ts
+ * export const keringTransforms = { "kering:summary": config };
+ *
+ * // In index.ts or during app init
+ * registerTransforms(keringTransforms);
+ */
+export function registerTransforms(transforms: Record<string, TransformConfig>): void {
+  Object.assign(transformRegistry, transforms);
+}
 
 /**
  * Get a transform config by name
  */
 export function getTransformConfig(name: string): TransformConfig | null {
   return transformRegistry[name] || null;
+}
+
+/**
+ * Get all registered transform names (useful for debugging)
+ */
+export function getRegisteredTransformNames(): string[] {
+  return Object.keys(transformRegistry);
 }

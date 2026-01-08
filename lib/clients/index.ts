@@ -20,6 +20,8 @@ export * from "./types";
 export {
   transformDataWithConfig,
   getTransformConfig,
+  registerTransforms,
+  getRegisteredTransformNames,
   normalizeToTitleCase,
   type TableRow,
   type TransformConfig,
@@ -56,6 +58,9 @@ export const DEFAULT_CHART_THRESHOLDS: ChartThresholds = {
   maxBarCategories: 20,
 };
 
+// Import transform registration function
+import { registerTransforms } from "./transforms";
+
 // Import all client modules
 import * as arla from "./arla";
 import * as kering from "./kering";
@@ -72,6 +77,22 @@ const clientRegistry: Record<string, ClientModule> = {
   // Add new clients here:
   // newclient: newclientModule,
 };
+
+// ============================================
+// REGISTER CLIENT TRANSFORMS
+// ============================================
+// Each client module that has transforms should export a `transforms` object
+// Register them here so they're available globally
+
+// Register Kering transforms
+if (kering.keringTransforms) {
+  registerTransforms(kering.keringTransforms);
+}
+
+// Add new client transform registrations here:
+// if (newclient.newclientTransforms) {
+//   registerTransforms(newclient.newclientTransforms);
+// }
 
 /**
  * Get a client module by slug
