@@ -8,10 +8,44 @@ import type {
   ClientModule,
   ChartThresholds,
   ChartPreferences,
+  TableViewConfig,
+  TableColumnConfig,
+  PeriodOption,
 } from "./types";
 
 // Re-export types for convenience
 export * from "./types";
+
+// Re-export transform utilities
+export {
+  transformDataWithConfig,
+  getTransformConfig,
+  normalizeToTitleCase,
+  type TableRow,
+  type TransformConfig,
+} from "./transforms";
+
+// Re-export hooks
+export {
+  useTableViewData,
+  tableViewQueryKeys,
+  type UseTableViewDataParams,
+  type UseTableViewDataResult,
+} from "./hooks";
+
+// Re-export API utilities
+export {
+  fetchClientData,
+  getClientApiConfig,
+  hasGenericApi,
+  clientApiRegistry,
+  type ClientApiConfig,
+  type EndpointConfig,
+  type EndpointParam,
+  type FetchParams,
+  type FetchResult,
+  type HttpMethod,
+} from "./api";
 
 /**
  * Default chart thresholds used when client doesn't specify
@@ -138,4 +172,100 @@ export function getClientChartPreferences(slug: string): ChartPreferences & {
  */
 export function getClientChartThresholds(slug: string): ChartThresholds {
   return getClientChartPreferences(slug).thresholds;
+}
+
+// ============================================
+// TABLE VIEW HELPERS
+// ============================================
+
+/**
+ * Get table view configuration for a client
+ */
+export function getClientTableView(slug: string): TableViewConfig | null {
+  const client = getClient(slug);
+  return client?.tableView || null;
+}
+
+/**
+ * Get tracker periods for a client
+ * Returns default periods if client doesn't have custom ones
+ */
+export function getClientTrackerPeriods(slug: string): PeriodOption[] {
+  const tableView = getClientTableView(slug);
+  if (tableView?.trackers?.periods) {
+    return tableView.trackers.periods;
+  }
+  // Default periods for clients without custom config
+  return [
+    { code: "Jan", name: "January" },
+    { code: "Feb", name: "February" },
+    { code: "Mar", name: "March" },
+    { code: "Apr", name: "April" },
+    { code: "May", name: "May" },
+    { code: "Jun", name: "June" },
+    { code: "Jul", name: "July" },
+    { code: "Aug", name: "August" },
+    { code: "Sep", name: "September" },
+    { code: "Oct", name: "October" },
+    { code: "Nov", name: "November" },
+    { code: "Dec", name: "December" },
+  ];
+}
+
+/**
+ * Get default tracker period for a client
+ */
+export function getClientDefaultTrackerPeriod(slug: string): string {
+  const tableView = getClientTableView(slug);
+  return tableView?.trackers?.defaultPeriod || "Jan";
+}
+
+/**
+ * Get tracker columns for a client
+ * @param slug - client slug
+ * @param isBrandView - whether to get brand-specific columns
+ */
+export function getClientTrackerColumns(
+  slug: string,
+  isBrandView: boolean = false
+): TableColumnConfig[] | null {
+  const tableView = getClientTableView(slug);
+  if (!tableView?.trackers) return null;
+
+  if (isBrandView && tableView.trackers.brandColumns) {
+    return tableView.trackers.brandColumns;
+  }
+  return tableView.trackers.detailedColumns;
+}
+
+/**
+ * Get summary columns for a client
+ */
+export function getClientSummaryColumns(slug: string): TableColumnConfig[] | null {
+  const tableView = getClientTableView(slug);
+  return tableView?.summary?.columns || null;
+}
+
+/**
+ * Get brands list for a client
+ */
+export function getClientBrands(slug: string): string[] {
+  const tableView = getClientTableView(slug);
+  return tableView?.brands?.list || [];
+}
+
+/**
+ * Check if client has brands in a specific data source
+ */
+export function clientHasBrandsIn(
+  slug: string,
+  dataSource: "summary" | "trackers"
+): boolean {
+  const tableView = getClientTableView(slug);
+  if (!tableView?.brands) return false;
+
+  if (dataSource === "summary") {
+    return tableView.brands.inSummary ?? false;
+  }
+  return tableView.brands.inTrackers ?? false;
 }
