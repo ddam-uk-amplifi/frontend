@@ -18,19 +18,19 @@ import {
   fetchConsolidatedSummary,
   fetchTrackerSummaryData,
   fetchLatestJob,
-  fetchKeringAllBrandSummary,
-  fetchKeringConsolidatedBrandSummary,
-  fetchKeringBrandSummary,
-  fetchKeringTrackerSummary,
   type ConsolidatedSummaryResponse,
   type TrackerSummaryItem,
-  type KeringAllBrandSummaryItem,
-  type KeringConsolidatedBrandSummaryItem,
-  type KeringBrandSummaryResponse,
-  type KeringTrackerSummaryItem,
-  type KeringTrackerSummaryResponse,
 } from "@/lib/api/dashboard";
-import { getClientIdByName } from "@/lib/clients";
+import {
+  getClientIdByName,
+  getClientTableView,
+  getClientTrackerColumns,
+  getClientSummaryColumns,
+  getClientBrands,
+  clientHasBrandsIn,
+  useTableViewData,
+  type TableColumnConfig,
+} from "@/lib/clients";
 
 // ============================================================================
 // Type Definitions
@@ -89,43 +89,6 @@ const AVAILABLE_PERIODS = [
   { code: "Oct", name: "October" },
   { code: "Nov", name: "November" },
   { code: "Dec", name: "December" },
-];
-
-// Available periods for Kering tracker data
-const KERING_TRACKER_PERIODS = [
-  { code: "DECEMBER", name: "December (YTD)" },
-  { code: "FY", name: "Full Year" },
-  { code: "1H", name: "First Half" },
-  { code: "1Q", name: "Q1" },
-  { code: "2Q", name: "Q2" },
-  { code: "3Q", name: "Q3" },
-  { code: "4Q", name: "Q4" },
-  { code: "JANUARY", name: "January" },
-  { code: "FEBRUARY", name: "February" },
-  { code: "MARCH", name: "March" },
-  { code: "APRIL", name: "April" },
-  { code: "MAY", name: "May" },
-  { code: "JUNE", name: "June" },
-  { code: "JULY", name: "July" },
-  { code: "AUGUST", name: "August" },
-  { code: "SEPTEMBER", name: "September" },
-  { code: "OCTOBER", name: "October" },
-  { code: "NOVEMBER", name: "November" },
-];
-
-// Kering brand names for dropdown
-const KERING_BRANDS = [
-  "Alexander McQueen",
-  "Balenciaga",
-  "Bottega Veneta",
-  "Boucheron",
-  "Brioni",
-  "Dodo",
-  "Gucci",
-  "Kering Eyewear",
-  "Pomellato",
-  "Saint Laurent",
-  "Kering Corporate",
 ];
 
 // Summary fields to fetch (FYFC and YTD)
@@ -303,277 +266,6 @@ const TRACKER_COLUMNS: TableColumn[] = [
   },
 ];
 
-// Columns for Kering All Brand Summary data
-const KERING_ALL_BRAND_COLUMNS: TableColumn[] = [
-  {
-    id: "market",
-    label: "Market",
-    type: "text",
-    align: "left",
-    visible: true,
-    order: 0,
-    frozen: true,
-  },
-  {
-    id: "total_spend",
-    label: "Total Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 1,
-  },
-  {
-    id: "addressable_spend",
-    label: "Addressable Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 2,
-  },
-  {
-    id: "measured_spend",
-    label: "Measured Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 3,
-  },
-  {
-    id: "measured_spend_pct",
-    label: "Measured %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 4,
-  },
-  {
-    id: "measured_savings",
-    label: "Measured Savings",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 5,
-  },
-  {
-    id: "measured_savings_pct",
-    label: "Savings %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 6,
-  },
-  {
-    id: "added_value",
-    label: "Added Value",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 7,
-  },
-  {
-    id: "added_value_pct",
-    label: "Added Value %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 8,
-  },
-];
-
-// Columns for Kering Specific Brand Summary data (grouped by media type)
-const KERING_BRAND_COLUMNS: TableColumn[] = [
-  {
-    id: "mediaType",
-    label: "Market", // Brand summary data is grouped by market
-    type: "text",
-    align: "left",
-    visible: true,
-    order: 0,
-    frozen: true,
-  },
-  {
-    id: "total_spend",
-    label: "Total Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 1,
-  },
-  {
-    id: "addressable_spend",
-    label: "Addressable Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 2,
-  },
-  {
-    id: "measured_spend",
-    label: "Measured Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 3,
-  },
-  {
-    id: "measured_spend_pct",
-    label: "Measured %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 4,
-  },
-  {
-    id: "measured_savings",
-    label: "Measured Savings",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 5,
-  },
-  {
-    id: "measured_savings_pct",
-    label: "Savings %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 6,
-  },
-  {
-    id: "added_value",
-    label: "Added Value",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 7,
-  },
-  {
-    id: "added_value_pct",
-    label: "Added Value %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 8,
-  },
-];
-
-// Columns for Kering Tracker Brand Summary data (from tracker/brand-summary endpoint)
-const KERING_TRACKER_BRAND_COLUMNS: TableColumn[] = [
-  {
-    id: "mediaType",
-    label: "Media Type",
-    type: "text",
-    align: "left",
-    visible: true,
-    order: 0,
-    frozen: true,
-  },
-  {
-    id: "total_net_net_media_spend",
-    label: "Net Net Media Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 1,
-  },
-  {
-    id: "total_non_affectable_spend",
-    label: "Non Affectable Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 2,
-  },
-  {
-    id: "measured_spend",
-    label: "Measured Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 3,
-  },
-  {
-    id: "non_measured_spend",
-    label: "Non Measured Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 4,
-  },
-  {
-    id: "total_affectable_spend",
-    label: "Affectable Spend",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 5,
-  },
-  {
-    id: "measured_spend_pct",
-    label: "Measured %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 6,
-  },
-  {
-    id: "total_savings",
-    label: "Total Savings",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 7,
-  },
-  {
-    id: "total_savings_pct",
-    label: "Savings %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 8,
-  },
-  {
-    id: "measured_savings",
-    label: "Measured Savings",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 9,
-  },
-  {
-    id: "measured_savings_pct",
-    label: "Measured Savings %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 10,
-  },
-  {
-    id: "inflation_mitigation",
-    label: "Inflation Mitigation",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 11,
-  },
-  {
-    id: "added_value_penalty_avoidance",
-    label: "Added Value",
-    type: "currency",
-    align: "right",
-    visible: true,
-    order: 12,
-  },
-  {
-    id: "added_value_penalty_avoidance_pct",
-    label: "Added Value %",
-    type: "percentage",
-    align: "right",
-    visible: true,
-    order: 13,
-  },
-];
-
 // ============================================================================
 // Query Keys - for cache management
 // ============================================================================
@@ -588,6 +280,34 @@ export const tableDataKeys = {
   tracker: (client: string, market: string) =>
     [...tableDataKeys.all, "tracker", client, market] as const,
 };
+
+// ============================================================================
+// Column Config Helpers
+// ============================================================================
+
+/**
+ * Convert TableColumnConfig (from client config) to TableColumn (for component state)
+ * Ensures all required fields have default values
+ */
+function configToTableColumn(config: TableColumnConfig, index: number): TableColumn {
+  return {
+    id: config.id,
+    label: config.label,
+    type: config.type,
+    align: config.align || "left",
+    visible: config.visible ?? true,
+    order: config.order ?? index,
+    frozen: config.frozen,
+  };
+}
+
+/**
+ * Convert array of TableColumnConfig to TableColumn[]
+ */
+function configsToTableColumns(configs: TableColumnConfig[] | null): TableColumn[] | null {
+  if (!configs) return null;
+  return configs.map((config, index) => configToTableColumn(config, index));
+}
 
 // ============================================================================
 // Value Formatting
@@ -773,531 +493,8 @@ function transformTrackerData(
   return tableRows;
 }
 
-/**
- * Transform Kering All Brand Summary data to table rows
- * Data is already aggregated per market from the "All Brand summary" sheet
- */
-function transformKeringAllBrandSummaryData(
-  data: KeringAllBrandSummaryItem[],
-): TableRow[] {
-  if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-  // Each row is a market - no aggregation needed
-  const tableRows: TableRow[] = data.map((item, index) => ({
-    id: `market-${item.market?.toLowerCase().replace(/\s+/g, "-") || index}`,
-    mediaType: item.market || "Unknown", // Using mediaType field for market name
-    type: "Actual" as const,
-    level: 0,
-    data: {
-      market: item.market,
-      total_spend: item.total_spend,
-      addressable_spend: item.addressable_spend,
-      measured_spend: item.measured_spend,
-      measured_spend_pct: item.measured_spend_pct
-        ? item.measured_spend_pct * 100
-        : null, // Convert to percentage
-      measured_savings: item.measured_savings,
-      measured_savings_pct: item.measured_savings_pct
-        ? item.measured_savings_pct * 100
-        : null,
-      added_value: item.added_value,
-      added_value_pct: item.added_value_pct ? item.added_value_pct * 100 : null,
-    },
-  }));
-
-  // Calculate totals
-  const totals = {
-    market: "Total",
-    total_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_spend || 0),
-      0,
-    ),
-    addressable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.addressable_spend || 0),
-      0,
-    ),
-    measured_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_spend || 0),
-      0,
-    ),
-    measured_spend_pct: 0,
-    measured_savings: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_savings || 0),
-      0,
-    ),
-    measured_savings_pct: 0,
-    added_value: tableRows.reduce(
-      (sum, row) => sum + (row.data.added_value || 0),
-      0,
-    ),
-    added_value_pct: 0,
-  };
-
-  // Calculate total percentages
-  if (totals.addressable_spend > 0) {
-    totals.measured_spend_pct =
-      (totals.measured_spend / totals.addressable_spend) * 100;
-  }
-  if (totals.measured_spend > 0) {
-    totals.measured_savings_pct =
-      (totals.measured_savings / totals.measured_spend) * 100;
-    totals.added_value_pct = (totals.added_value / totals.measured_spend) * 100;
-  }
-
-  tableRows.push({
-    id: "total",
-    mediaType: "Total",
-    type: "Actual",
-    level: 0,
-    data: totals,
-  });
-
-  return tableRows;
-}
-
-/**
- * Transform Kering Consolidated Brand Summary data to table rows
- * Data is from individual brand sheets, grouped by media type
- */
-function transformKeringConsolidatedBrandData(
-  data: KeringConsolidatedBrandSummaryItem[],
-): TableRow[] {
-  if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-  // Brand summary data is grouped by market (not media type)
-  // Each row represents a market with aggregated metrics
-  const marketGroups: Record<
-    string,
-    {
-      total_spend: number;
-      addressable_spend: number;
-      measured_spend: number;
-      measured_savings: number;
-      added_value: number;
-    }
-  > = {};
-
-  data.forEach((item) => {
-    const market = item.market || "Unknown";
-    if (!marketGroups[market]) {
-      marketGroups[market] = {
-        total_spend: 0,
-        addressable_spend: 0,
-        measured_spend: 0,
-        measured_savings: 0,
-        added_value: 0,
-      };
-    }
-    marketGroups[market].total_spend += item.total_spend || 0;
-    marketGroups[market].addressable_spend += item.addressable_spend || 0;
-    marketGroups[market].measured_spend += item.measured_spend || 0;
-    marketGroups[market].measured_savings += item.measured_savings || 0;
-    marketGroups[market].added_value += item.added_value || 0;
-  });
-
-  // Create table rows with calculated percentages
-  const tableRows: TableRow[] = Object.entries(marketGroups).map(
-    ([market, values]) => ({
-      id: market.toLowerCase().replace(/\s+/g, "-"),
-      mediaType: market, // Using mediaType field for market name (for chart compatibility)
-      type: "Actual" as const,
-      level: 0,
-      data: {
-        total_spend: values.total_spend,
-        addressable_spend: values.addressable_spend,
-        measured_spend: values.measured_spend,
-        measured_spend_pct:
-          values.addressable_spend > 0
-            ? (values.measured_spend / values.addressable_spend) * 100
-            : 0,
-        measured_savings: values.measured_savings,
-        measured_savings_pct:
-          values.measured_spend > 0
-            ? (values.measured_savings / values.measured_spend) * 100
-            : 0,
-        added_value: values.added_value,
-        added_value_pct:
-          values.measured_spend > 0
-            ? (values.added_value / values.measured_spend) * 100
-            : 0,
-      },
-    }),
-  );
-
-  // Calculate totals
-  const totals = {
-    total_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_spend || 0),
-      0,
-    ),
-    addressable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.addressable_spend || 0),
-      0,
-    ),
-    measured_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_spend || 0),
-      0,
-    ),
-    measured_spend_pct: 0,
-    measured_savings: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_savings || 0),
-      0,
-    ),
-    measured_savings_pct: 0,
-    added_value: tableRows.reduce(
-      (sum, row) => sum + (row.data.added_value || 0),
-      0,
-    ),
-    added_value_pct: 0,
-  };
-
-  // Calculate total percentages
-  if (totals.addressable_spend > 0) {
-    totals.measured_spend_pct =
-      (totals.measured_spend / totals.addressable_spend) * 100;
-  }
-  if (totals.measured_spend > 0) {
-    totals.measured_savings_pct =
-      (totals.measured_savings / totals.measured_spend) * 100;
-    totals.added_value_pct = (totals.added_value / totals.measured_spend) * 100;
-  }
-
-  tableRows.push({
-    id: "total",
-    mediaType: "Total",
-    type: "Actual",
-    level: 0,
-    data: totals,
-  });
-
-  return tableRows;
-}
-
-/**
- * Transform Kering Tracker Brand Summary data to table rows
- * Data is from tracker/brand-summary endpoint, grouped by media type
- */
-import type { KeringBrandSummaryItem } from "@/lib/api/dashboard";
-
-function transformKeringTrackerBrandData(
-  data: KeringBrandSummaryItem[],
-  period: string = "DECEMBER",
-): TableRow[] {
-  if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-  // Filter for selected period and ALL type only
-  const filteredData = data.filter(
-    (item) => item.type === "ALL" && item.period === period,
-  );
-
-  // Aggregate by media type
-  const mediaGroups: Record<
-    string,
-    {
-      total_net_net_media_spend: number;
-      total_non_affectable_spend: number;
-      total_affectable_spend: number;
-      measured_spend: number;
-      total_savings: number;
-      measured_savings: number;
-      added_value_penalty_avoidance: number;
-    }
-  > = {};
-
-  filteredData.forEach((item) => {
-    const mediaType = normalizeMediaType(item.media_type || "Unknown");
-    // Skip GRAND TOTAL rows and TV-related rows
-    if (
-      mediaType === "Grand Total" ||
-      mediaType === "Tv" ||
-      mediaType === "Tv - Linear" ||
-      mediaType === "Tv - Vod"
-    )
-      return;
-
-    if (!mediaGroups[mediaType]) {
-      mediaGroups[mediaType] = {
-        total_net_net_media_spend: 0,
-        total_non_affectable_spend: 0,
-        total_affectable_spend: 0,
-        measured_spend: 0,
-        total_savings: 0,
-        measured_savings: 0,
-        added_value_penalty_avoidance: 0,
-      };
-    }
-    mediaGroups[mediaType].total_net_net_media_spend +=
-      item.total_net_net_media_spend || 0;
-    mediaGroups[mediaType].total_non_affectable_spend +=
-      item.total_non_affectable_spend || 0;
-    mediaGroups[mediaType].total_affectable_spend +=
-      item.total_affectable_spend || 0;
-    mediaGroups[mediaType].measured_spend += item.measured_spend || 0;
-    mediaGroups[mediaType].total_savings += item.total_savings || 0;
-    mediaGroups[mediaType].measured_savings += item.measured_savings || 0;
-    mediaGroups[mediaType].added_value_penalty_avoidance +=
-      item.added_value_penalty_avoidance || 0;
-  });
-
-  // Create table rows with calculated percentages
-  const tableRows: TableRow[] = Object.entries(mediaGroups).map(
-    ([mediaType, values]) => ({
-      id: mediaType.toLowerCase().replace(/\s+/g, "-"),
-      mediaType,
-      type: "Actual" as const,
-      level: 0,
-      data: {
-        total_net_net_media_spend: values.total_net_net_media_spend,
-        total_non_affectable_spend: values.total_non_affectable_spend,
-        total_affectable_spend: values.total_affectable_spend,
-        measured_spend: values.measured_spend,
-        measured_spend_pct:
-          values.total_affectable_spend > 0
-            ? (values.measured_spend / values.total_affectable_spend) * 100
-            : 0,
-        total_savings: values.total_savings,
-        total_savings_pct:
-          values.measured_spend > 0
-            ? (values.total_savings / values.measured_spend) * 100
-            : 0,
-        measured_savings: values.measured_savings,
-        added_value_penalty_avoidance: values.added_value_penalty_avoidance,
-      },
-    }),
-  );
-
-  // Calculate totals
-  const totals = {
-    total_net_net_media_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_net_net_media_spend || 0),
-      0,
-    ),
-    total_non_affectable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_non_affectable_spend || 0),
-      0,
-    ),
-    total_affectable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_affectable_spend || 0),
-      0,
-    ),
-    measured_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_spend || 0),
-      0,
-    ),
-    measured_spend_pct: 0,
-    total_savings: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_savings || 0),
-      0,
-    ),
-    total_savings_pct: 0,
-    measured_savings: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_savings || 0),
-      0,
-    ),
-    added_value_penalty_avoidance: tableRows.reduce(
-      (sum, row) => sum + (row.data.added_value_penalty_avoidance || 0),
-      0,
-    ),
-  };
-
-  // Calculate total percentages
-  if (totals.total_affectable_spend > 0) {
-    totals.measured_spend_pct =
-      (totals.measured_spend / totals.total_affectable_spend) * 100;
-  }
-  if (totals.measured_spend > 0) {
-    totals.total_savings_pct =
-      (totals.total_savings / totals.measured_spend) * 100;
-  }
-
-  tableRows.push({
-    id: "total",
-    mediaType: "Total",
-    type: "Actual",
-    level: 0,
-    data: totals,
-  });
-
-  return tableRows;
-}
-
-/**
- * Transform Kering Tracker Summary data to table rows
- * Data is from tracker/summary endpoint, grouped by media type
- */
-function transformKeringTrackerSummaryData(
-  data: KeringTrackerSummaryItem[],
-  period: string = "DECEMBER",
-): TableRow[] {
-  if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-  // Filter for selected period and ALL type only
-  const filteredData = data.filter(
-    (item) => item.type === "ALL" && item.period === period,
-  );
-
-  // Aggregate by media type
-  const mediaGroups: Record<
-    string,
-    {
-      total_net_net_media_spend: number;
-      total_non_affectable_spend: number;
-      total_affectable_spend: number;
-      measured_spend: number;
-      non_measured_spend: number;
-      total_savings: number;
-      measured_savings: number;
-      inflation_mitigation: number;
-      added_value_penalty_avoidance: number;
-    }
-  > = {};
-
-  filteredData.forEach((item) => {
-    const mediaType = normalizeMediaType(item.media_type || "Unknown");
-    // Skip GRAND TOTAL rows and TV-related rows
-    if (
-      mediaType === "Grand Total" ||
-      mediaType === "Tv" ||
-      mediaType === "Tv - Linear" ||
-      mediaType === "Tv - Vod"
-    )
-      return;
-
-    if (!mediaGroups[mediaType]) {
-      mediaGroups[mediaType] = {
-        total_net_net_media_spend: 0,
-        total_non_affectable_spend: 0,
-        total_affectable_spend: 0,
-        measured_spend: 0,
-        non_measured_spend: 0,
-        total_savings: 0,
-        measured_savings: 0,
-        inflation_mitigation: 0,
-        added_value_penalty_avoidance: 0,
-      };
-    }
-    mediaGroups[mediaType].total_net_net_media_spend +=
-      item.total_net_net_media_spend || 0;
-    mediaGroups[mediaType].total_non_affectable_spend +=
-      item.total_non_affectable_spend || 0;
-    mediaGroups[mediaType].total_affectable_spend +=
-      item.total_affectable_spend || 0;
-    mediaGroups[mediaType].measured_spend += item.measured_spend || 0;
-    mediaGroups[mediaType].non_measured_spend += item.non_measured_spend || 0;
-    mediaGroups[mediaType].total_savings += item.total_savings || 0;
-    mediaGroups[mediaType].measured_savings += item.measured_savings || 0;
-    mediaGroups[mediaType].inflation_mitigation +=
-      item.inflation_mitigation || 0;
-    mediaGroups[mediaType].added_value_penalty_avoidance +=
-      item.added_value_penalty_avoidance || 0;
-  });
-
-  // Create table rows with calculated percentages
-  const tableRows: TableRow[] = Object.entries(mediaGroups).map(
-    ([mediaType, values]) => ({
-      id: mediaType.toLowerCase().replace(/\s+/g, "-"),
-      mediaType,
-      type: "Actual" as const,
-      level: 0,
-      data: {
-        total_net_net_media_spend: values.total_net_net_media_spend,
-        total_non_affectable_spend: values.total_non_affectable_spend,
-        measured_spend: values.measured_spend,
-        non_measured_spend: values.non_measured_spend,
-        total_affectable_spend: values.total_affectable_spend,
-        measured_spend_pct:
-          values.total_affectable_spend > 0
-            ? (values.measured_spend / values.total_affectable_spend) * 100
-            : 0,
-        total_savings: values.total_savings,
-        total_savings_pct:
-          values.measured_spend > 0
-            ? (values.total_savings / values.measured_spend) * 100
-            : 0,
-        measured_savings: values.measured_savings,
-        measured_savings_pct:
-          values.measured_spend > 0
-            ? (values.measured_savings / values.measured_spend) * 100
-            : 0,
-        inflation_mitigation: values.inflation_mitigation,
-        added_value_penalty_avoidance: values.added_value_penalty_avoidance,
-        added_value_penalty_avoidance_pct:
-          values.measured_spend > 0
-            ? (values.added_value_penalty_avoidance / values.measured_spend) *
-            100
-            : 0,
-      },
-    }),
-  );
-
-  // Calculate totals
-  const totals = {
-    total_net_net_media_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_net_net_media_spend || 0),
-      0,
-    ),
-    total_non_affectable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_non_affectable_spend || 0),
-      0,
-    ),
-    total_affectable_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_affectable_spend || 0),
-      0,
-    ),
-    measured_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_spend || 0),
-      0,
-    ),
-    non_measured_spend: tableRows.reduce(
-      (sum, row) => sum + (row.data.non_measured_spend || 0),
-      0,
-    ),
-    measured_spend_pct: 0,
-    total_savings: tableRows.reduce(
-      (sum, row) => sum + (row.data.total_savings || 0),
-      0,
-    ),
-    total_savings_pct: 0,
-    measured_savings: tableRows.reduce(
-      (sum, row) => sum + (row.data.measured_savings || 0),
-      0,
-    ),
-    measured_savings_pct: 0,
-    inflation_mitigation: tableRows.reduce(
-      (sum, row) => sum + (row.data.inflation_mitigation || 0),
-      0,
-    ),
-    added_value_penalty_avoidance: tableRows.reduce(
-      (sum, row) => sum + (row.data.added_value_penalty_avoidance || 0),
-      0,
-    ),
-    added_value_penalty_avoidance_pct: 0,
-  };
-
-  // Calculate total percentages
-  if (totals.total_affectable_spend > 0) {
-    totals.measured_spend_pct =
-      (totals.measured_spend / totals.total_affectable_spend) * 100;
-  }
-  if (totals.measured_spend > 0) {
-    totals.total_savings_pct =
-      (totals.total_savings / totals.measured_spend) * 100;
-    totals.measured_savings_pct =
-      (totals.measured_savings / totals.measured_spend) * 100;
-    totals.added_value_penalty_avoidance_pct =
-      (totals.added_value_penalty_avoidance / totals.measured_spend) * 100;
-  }
-
-  tableRows.push({
-    id: "total",
-    mediaType: "Total",
-    type: "Actual",
-    level: 0,
-    data: totals,
-  });
-
-  return tableRows;
-}
+// Note: Kering-specific transform functions have been moved to lib/clients/transforms.ts
+// and are now handled by the generic transformDataWithConfig function via useTableViewData hook
 
 // ============================================================================
 // Component
@@ -1320,21 +517,26 @@ export function DataTableView({
   // For others: sheetType is "ytd" or "fyfc"
   const [sheetType, setSheetType] = useState<string>("ytd");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
-  const [keringTrackerPeriod, setKeringTrackerPeriod] = useState<string>("DECEMBER"); // Kering tracker period filter
+  const [trackerPeriodFilter, setTrackerPeriodFilter] = useState<string>("DECEMBER"); // Tracker period filter (for clients with hasPeriodFilter)
   const [isSheetTypeOpen, setIsSheetTypeOpen] = useState(false);
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
-  const [isKeringPeriodOpen, setIsKeringPeriodOpen] = useState(false);
+  const [isPeriodFilterOpen, setIsPeriodFilterOpen] = useState(false);
 
-  // Check if current sheetType is a Kering brand (for Summary)
-  const isKeringBrandSelected = KERING_BRANDS.includes(sheetType);
-  const selectedBrand = isKeringBrandSelected ? sheetType : undefined;
+  // Get client-specific configuration
+  const clientSlug = selectedClient?.toLowerCase() || "";
+  const clientBrands = useMemo(() => getClientBrands(clientSlug), [clientSlug]);
+  const clientHasBrandsTrackers = useMemo(() => clientHasBrandsIn(clientSlug, "trackers"), [clientSlug]);
 
-  // Check if selectedPeriod is a brand name for Kering trackers (defined early for column selection)
-  const isKeringTrackerBrandSelected =
-    selectedClient?.toLowerCase() === "kering" &&
+  // Check if current sheetType is a brand (for Summary)
+  const isBrandSelected = clientBrands.includes(sheetType);
+  const selectedBrand = isBrandSelected ? sheetType : undefined;
+
+  // Check if selectedPeriod is a brand name for trackers (defined early for column selection)
+  const isTrackerBrandSelected =
+    clientHasBrandsTrackers &&
     selectedDataSource === "trackers" &&
-    KERING_BRANDS.includes(selectedPeriod);
-  const selectedTrackerBrand = isKeringTrackerBrandSelected
+    clientBrands.includes(selectedPeriod);
+  const selectedTrackerBrand = isTrackerBrandSelected
     ? selectedPeriod
     : undefined;
 
@@ -1370,37 +572,69 @@ export function DataTableView({
     ? getClientIdByName(selectedClient)
     : undefined;
 
-  // Check if this is Kering client (defined early for use in effects)
-  const isKering = selectedClient?.toLowerCase() === "kering";
+  // Check if client has custom table view config
+  const clientTableView = useMemo(() => getClientTableView(clientSlug), [clientSlug]);
+  const hasClientConfig = clientTableView !== null;
 
-  // Update columns based on data source and client
+  // Config-driven UI settings
+  const summaryDefaultView = clientTableView?.summary?.defaultView || "ytd";
+  const summaryDefaultViewLabel = clientTableView?.summary?.defaultViewLabel || "YTD Summary";
+  const trackerDefaultView = clientTableView?.trackers?.defaultView;
+  const trackerDefaultViewLabel = clientTableView?.trackers?.defaultViewLabel || "Detailed Summary";
+  const hasPeriodFilter = clientTableView?.trackers?.hasPeriodFilter || false;
+  const periodFilterConfig = clientTableView?.trackers?.periodFilter;
+
+  // Check if client uses custom API endpoints
+  const useCustomApi = clientTableView?.api?.useCustomEndpoints || false;
+
+  // Use the generic table view data hook for clients with custom API
+  const {
+    rows: customApiRows,
+    isLoading: isCustomApiLoading,
+    lastUpdated: customApiLastUpdated,
+    refetch: refetchCustomApi,
+    noJobFound: customApiNoJobFound,
+  } = useTableViewData({
+    clientName: useCustomApi ? selectedClient : undefined, // Only use hook for custom API clients
+    dataSource: selectedDataSource,
+    sheetType,
+    selectedPeriod,
+    selectedMarket,
+    periodFilter: trackerPeriodFilter,
+  });
+
+
+  // Update columns based on data source and client config
   useEffect(() => {
-    if (isKering && selectedDataSource === "summary") {
-      if (isKeringBrandSelected) {
-        // Kering specific brand - grouped by media type
-        setColumns(KERING_BRAND_COLUMNS);
-      } else {
-        // Kering All Brand Summary - grouped by market
-        setColumns(KERING_ALL_BRAND_COLUMNS);
+    // Try to get columns from client config first
+    if (hasClientConfig && selectedDataSource === "summary") {
+      const summaryColumns = getClientSummaryColumns(clientSlug);
+      if (summaryColumns) {
+        setColumns(configsToTableColumns(summaryColumns) || SUMMARY_COLUMNS);
+        return;
       }
-    } else if (isKering && selectedDataSource === "trackers") {
-      if (isKeringTrackerBrandSelected) {
-        // Kering specific brand tracker - grouped by media type (tracker fields)
-        setColumns(KERING_TRACKER_BRAND_COLUMNS);
-      } else {
-        // Kering Detailed Summary tracker - grouped by media type (same columns as brand)
-        setColumns(KERING_TRACKER_BRAND_COLUMNS);
+    }
+
+    if (hasClientConfig && selectedDataSource === "trackers") {
+      const trackerColumns = getClientTrackerColumns(clientSlug, isTrackerBrandSelected);
+      if (trackerColumns) {
+        setColumns(configsToTableColumns(trackerColumns) || TRACKER_COLUMNS);
+        return;
       }
-    } else if (selectedDataSource === "trackers") {
+    }
+
+    // Fall back to default columns
+    if (selectedDataSource === "trackers") {
       setColumns(TRACKER_COLUMNS);
     } else {
       setColumns(SUMMARY_COLUMNS);
     }
   }, [
     selectedDataSource,
-    isKering,
-    isKeringBrandSelected,
-    isKeringTrackerBrandSelected,
+    clientSlug,
+    hasClientConfig,
+    isBrandSelected,
+    isTrackerBrandSelected,
   ]);
 
   // Reset sheetType when client changes
@@ -1415,11 +649,11 @@ export function DataTableView({
       selectedMarket &&
       !selectedPeriod
     ) {
-      // For Kering, auto-select "detailed" (Detailed Summary)
-      // For others, auto-select "Jan"
-      setSelectedPeriod(isKering ? "detailed" : "Jan");
+      // Use config-driven default view, fallback to "Jan" for clients without config
+      const defaultView = trackerDefaultView || "Jan";
+      setSelectedPeriod(defaultView);
     }
-  }, [selectedDataSource, selectedMarket, selectedPeriod, isKering]);
+  }, [selectedDataSource, selectedMarket, selectedPeriod, trackerDefaultView]);
 
   // Query: Fetch latest job ID (for summary)
   const {
@@ -1435,9 +669,12 @@ export function DataTableView({
   });
 
   const jobId = latestJob?.consolidation_job_id || "";
-  const noJobFound = isLatestJobError && selectedDataSource === "summary";
+  // For custom API clients, use the hook's noJobFound; for others use local check
+  const noJobFound = useCustomApi
+    ? customApiNoJobFound
+    : (isLatestJobError && selectedDataSource === "summary");
 
-  // Query: Fetch Summary data (for non-Kering clients)
+  // Query: Fetch Summary data (for default clients - non-custom API)
   const {
     data: summaryData,
     isLoading: isSummaryLoading,
@@ -1453,7 +690,7 @@ export function DataTableView({
         fields: SUMMARY_FIELDS,
       }),
     enabled: Boolean(
-      selectedClient && selectedDataSource === "summary" && jobId && !isKering,
+      selectedClient && selectedDataSource === "summary" && jobId && !useCustomApi,
     ),
     staleTime: 2 * 60 * 1000, // 2 minutes - data can be cached
     gcTime: 5 * 60 * 1000,
@@ -1461,66 +698,9 @@ export function DataTableView({
     retry: 2,
   });
 
-  // Query: Fetch Kering Consolidated Brand Summary data (specific brand from individual brand sheets)
-  const {
-    data: keringBrandData,
-    isLoading: isKeringLoading,
-    refetch: refetchKering,
-    dataUpdatedAt: keringUpdatedAt,
-  } = useQuery({
-    queryKey: [
-      "kering",
-      "consolidatedBrandSummary",
-      clientId,
-      selectedBrand,
-      selectedMarket,
-    ],
-    queryFn: () =>
-      fetchKeringConsolidatedBrandSummary(
-        selectedBrand!, // brand name (required)
-        selectedMarket || undefined, // market filter
-        clientId!, // client ID to find latest consolidation job
-      ),
-    enabled: Boolean(
-      isKering &&
-      selectedDataSource === "summary" &&
-      clientId &&
-      isKeringBrandSelected &&
-      selectedBrand,
-    ),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    placeholderData: (prev) => prev,
-    retry: 2,
-  });
+  // Note: Kering-specific summary queries have been moved to useTableViewData hook
 
-  // Query: Fetch Kering All Brand Summary data (from "All Brand summary" sheet)
-  const {
-    data: keringAllBrandData,
-    isLoading: isKeringAllBrandLoading,
-    refetch: refetchKeringAllBrand,
-    dataUpdatedAt: keringAllBrandUpdatedAt,
-  } = useQuery({
-    queryKey: ["kering", "allBrandSummary", clientId, selectedMarket],
-    queryFn: () =>
-      fetchKeringAllBrandSummary(
-        clientId!,
-        undefined, // consolidationJobId - let backend find latest
-        selectedMarket || undefined, // market filter
-      ),
-    enabled: Boolean(
-      isKering &&
-      selectedDataSource === "summary" &&
-      clientId &&
-      !isKeringBrandSelected,
-    ),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    placeholderData: (prev) => prev,
-    retry: 2,
-  });
-
-  // Query: Fetch Tracker data (for non-Kering clients)
+  // Query: Fetch Tracker data (for default clients - non-custom API)
   const {
     data: trackerData,
     isLoading: isTrackerLoading,
@@ -1543,7 +723,7 @@ export function DataTableView({
       selectedDataSource === "trackers" &&
       selectedMarket &&
       clientId &&
-      !isKering, // Disable for Kering - use keringTrackerData instead
+      !useCustomApi, // Disable for custom API clients - they use the hook
     ),
     staleTime: 5 * 60 * 1000, // Cache longer since we filter on frontend
     gcTime: 10 * 60 * 1000,
@@ -1551,188 +731,58 @@ export function DataTableView({
     retry: 2,
   });
 
-  // Query: Fetch Kering Tracker Brand data (specific brand from tracker/brand-summary endpoint)
-  const {
-    data: keringTrackerBrandData,
-    isLoading: isKeringTrackerBrandLoading,
-    refetch: refetchKeringTrackerBrand,
-    dataUpdatedAt: keringTrackerBrandUpdatedAt,
-  } = useQuery({
-    queryKey: [
-      "kering",
-      "trackerBrandSummary",
-      clientId,
-      selectedTrackerBrand,
-      selectedMarket,
-    ],
-    queryFn: () =>
-      fetchKeringBrandSummary(
-        clientId!,
-        selectedTrackerBrand!, // brand name (required)
-        undefined, // period - get all periods
-        undefined, // mediaType
-        undefined, // type
-        undefined, // marketId
-        selectedMarket || undefined, // markets
-      ),
-    enabled: Boolean(
-      isKering &&
-      selectedDataSource === "trackers" &&
-      clientId &&
-      selectedMarket &&
-      isKeringTrackerBrandSelected &&
-      selectedTrackerBrand,
-    ),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    placeholderData: (prev) => prev,
-    retry: 2,
-  });
-
-  // Query: Fetch Kering Tracker Summary data (Detailed Summary from tracker/summary endpoint)
-  const {
-    data: keringTrackerAllBrandData,
-    isLoading: isKeringTrackerAllBrandLoading,
-    refetch: refetchKeringTrackerAllBrand,
-    dataUpdatedAt: keringTrackerAllBrandUpdatedAt,
-  } = useQuery({
-    queryKey: ["kering", "trackerSummary", clientId, selectedMarket],
-    queryFn: () =>
-      fetchKeringTrackerSummary(
-        clientId!,
-        undefined, // period - get all periods
-        undefined, // mediaType
-        undefined, // type
-        undefined, // marketId
-        selectedMarket || undefined, // markets
-      ),
-    enabled: Boolean(
-      isKering &&
-      selectedDataSource === "trackers" &&
-      clientId &&
-      selectedMarket &&
-      !isKeringTrackerBrandSelected,
-    ),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    placeholderData: (prev) => prev,
-    retry: 2,
-  });
+  // Note: Kering-specific tracker queries have been moved to useTableViewData hook
 
   // Transform data to rows (with frontend period filtering for trackers)
   const rows = useMemo(() => {
-    // Kering summary - specific brand (from consolidated/brand-summary)
-    if (
-      isKering &&
-      selectedDataSource === "summary" &&
-      isKeringBrandSelected &&
-      keringBrandData?.data
-    ) {
-      return transformKeringConsolidatedBrandData(keringBrandData.data);
+    // Use custom API hook data for clients with custom endpoints
+    if (useCustomApi && customApiRows.length > 0) {
+      return customApiRows;
     }
-    // Kering summary - all brand summary (from consolidated/all-brand-summary)
-    if (
-      isKering &&
-      selectedDataSource === "summary" &&
-      !isKeringBrandSelected &&
-      keringAllBrandData?.data
-    ) {
-      return transformKeringAllBrandSummaryData(keringAllBrandData.data);
-    }
-    // Other clients summary
+
+    // Default transforms for clients without custom config
+    // Summary data
     if (selectedDataSource === "summary" && summaryData) {
       return transformSummaryData(summaryData);
     }
-    // Kering trackers - specific brand (from tracker/brand-summary endpoint)
-    if (
-      isKering &&
-      selectedDataSource === "trackers" &&
-      isKeringTrackerBrandSelected &&
-      keringTrackerBrandData?.data
-    ) {
-      return transformKeringTrackerBrandData(keringTrackerBrandData.data, keringTrackerPeriod);
-    }
-    // Kering trackers - detailed summary (from tracker/summary endpoint)
-    if (
-      isKering &&
-      selectedDataSource === "trackers" &&
-      !isKeringTrackerBrandSelected &&
-      keringTrackerAllBrandData?.data
-    ) {
-      return transformKeringTrackerSummaryData(keringTrackerAllBrandData.data, keringTrackerPeriod);
-    }
-    // Other clients trackers
+    // Tracker data
     if (selectedDataSource === "trackers" && trackerData && selectedPeriod) {
-      // Filter by period on frontend
       return transformTrackerData(trackerData, selectedPeriod);
     }
     return [];
   }, [
+    useCustomApi,
+    customApiRows,
     selectedDataSource,
     summaryData,
     trackerData,
     selectedPeriod,
-    isKering,
-    isKeringBrandSelected,
-    keringBrandData,
-    keringAllBrandData,
-    isKeringTrackerBrandSelected,
-    keringTrackerBrandData,
-    keringTrackerAllBrandData,
-    keringTrackerPeriod,
   ]);
 
-  const isLoading =
-    (selectedDataSource === "summary" && !isKering && isSummaryLoading) ||
-    (selectedDataSource === "summary" &&
-      isKering &&
-      isKeringBrandSelected &&
-      isKeringLoading) ||
-    (selectedDataSource === "summary" &&
-      isKering &&
-      !isKeringBrandSelected &&
-      isKeringAllBrandLoading) ||
-    (selectedDataSource === "trackers" && !isKering && isTrackerLoading) ||
-    (selectedDataSource === "trackers" &&
-      isKering &&
-      isKeringTrackerBrandSelected &&
-      isKeringTrackerBrandLoading) ||
-    (selectedDataSource === "trackers" &&
-      isKering &&
-      !isKeringTrackerBrandSelected &&
-      isKeringTrackerAllBrandLoading);
+  const isLoading = useCustomApi
+    ? isCustomApiLoading
+    : (selectedDataSource === "summary" && isSummaryLoading) ||
+      (selectedDataSource === "trackers" && isTrackerLoading);
 
   const lastUpdated = useMemo(() => {
+    // Use custom API hook's lastUpdated for custom clients
+    if (useCustomApi) {
+      return customApiLastUpdated;
+    }
+    // Default clients
     let timestamp: number | undefined;
     if (selectedDataSource === "summary") {
-      if (isKering) {
-        timestamp = isKeringBrandSelected
-          ? keringUpdatedAt
-          : keringAllBrandUpdatedAt;
-      } else {
-        timestamp = summaryUpdatedAt;
-      }
+      timestamp = summaryUpdatedAt;
     } else if (selectedDataSource === "trackers") {
-      if (isKering) {
-        timestamp = isKeringTrackerBrandSelected
-          ? keringTrackerBrandUpdatedAt
-          : keringTrackerAllBrandUpdatedAt;
-      } else {
-        timestamp = trackerUpdatedAt;
-      }
+      timestamp = trackerUpdatedAt;
     }
     return timestamp ? new Date(timestamp) : null;
   }, [
+    useCustomApi,
+    customApiLastUpdated,
     selectedDataSource,
     summaryUpdatedAt,
     trackerUpdatedAt,
-    isKering,
-    isKeringBrandSelected,
-    keringUpdatedAt,
-    keringAllBrandUpdatedAt,
-    isKeringTrackerBrandSelected,
-    keringTrackerBrandUpdatedAt,
-    keringTrackerAllBrandUpdatedAt,
   ]);
 
   // Column visibility helpers
@@ -1761,26 +811,12 @@ export function DataTableView({
   };
 
   const handleRefresh = () => {
-    if (selectedDataSource === "summary") {
-      if (isKering) {
-        if (isKeringBrandSelected) {
-          refetchKering();
-        } else {
-          refetchKeringAllBrand();
-        }
-      } else {
-        refetchSummary();
-      }
+    if (useCustomApi) {
+      refetchCustomApi();
+    } else if (selectedDataSource === "summary") {
+      refetchSummary();
     } else if (selectedDataSource === "trackers") {
-      if (isKering) {
-        if (isKeringTrackerBrandSelected) {
-          refetchKeringTrackerBrand();
-        } else {
-          refetchKeringTrackerAllBrand();
-        }
-      } else {
-        refetchTracker();
-      }
+      refetchTracker();
     }
   };
 
@@ -1805,18 +841,22 @@ export function DataTableView({
 
   const getTableTitle = () => {
     if (selectedDataSource === "summary") {
-      if (isKering) {
-        return selectedBrand ? `${selectedBrand} Summary` : "All Brand Summary";
+      // Config-driven title for clients with brands
+      if (hasClientConfig && clientHasBrandsIn(clientSlug, "summary")) {
+        return selectedBrand ? `${selectedBrand} Summary` : summaryDefaultViewLabel;
       }
+      // Default YTD/FYFC title
       return sheetType === "ytd" ? "YTD Summary" : "FYFC Summary";
     }
     if (selectedDataSource === "trackers") {
-      if (isKering) {
+      // Config-driven title for clients with brands in trackers
+      if (hasClientConfig && clientHasBrandsIn(clientSlug, "trackers")) {
         const title = selectedTrackerBrand
           ? `${selectedTrackerBrand} Tracker`
-          : "Detailed Summary";
+          : trackerDefaultViewLabel;
         return selectedMarket ? `${title} - ${selectedMarket}` : title;
       }
+      // Default tracker title
       const parts = ["Tracker Summary"];
       if (selectedMarket) parts.push(selectedMarket);
       if (selectedPeriod) parts.push(selectedPeriod);
@@ -1825,12 +865,13 @@ export function DataTableView({
     return "Data Table";
   };
 
-  // Check if we need period selection for trackers (not for Kering - auto-selects "detailed")
+  // Check if we need period selection for trackers
+  // Clients with trackerDefaultView don't need manual period selection (they auto-select)
   const needsPeriodSelection =
     selectedDataSource === "trackers" &&
     selectedMarket &&
     !selectedPeriod &&
-    !isKering;
+    !trackerDefaultView;
 
   return (
     <div className="bg-white border-b border-slate-200 overflow-hidden max-w-full">
@@ -1848,14 +889,15 @@ export function DataTableView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Sheet Type Selector (Summary only) - Different options for Kering */}
+          {/* Sheet Type Selector (Summary only) - Config-driven */}
           {selectedDataSource === "summary" && (
             <Popover open={isSheetTypeOpen} onOpenChange={setIsSheetTypeOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="min-w-[140px]">
-                  {selectedClient?.toLowerCase() === "kering"
-                    ? sheetType === "ytd"
-                      ? "All Brand Summary"
+                  {/* Config-driven: clients with brands show brand name or default label */}
+                  {hasClientConfig && clientHasBrandsIn(clientSlug, "summary")
+                    ? sheetType === summaryDefaultView
+                      ? summaryDefaultViewLabel
                       : sheetType
                     : sheetType === "ytd"
                       ? "YTD"
@@ -1865,45 +907,51 @@ export function DataTableView({
               </PopoverTrigger>
               <PopoverContent className="w-48" align="end">
                 <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {selectedClient?.toLowerCase() === "kering" ? (
+                  {/* Config-driven: clients with brands in summary */}
+                  {hasClientConfig && clientHasBrandsIn(clientSlug, "summary") ? (
                     <>
-                      {/* Kering-specific options */}
+                      {/* Default view option */}
                       <button
                         onClick={() => {
-                          setSheetType("ytd");
+                          setSheetType(summaryDefaultView);
                           setIsSheetTypeOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === "ytd"
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === summaryDefaultView
                           ? "bg-violet-100 text-violet-700"
                           : "hover:bg-slate-100"
                           }`}
                       >
-                        All Brand Summary
+                        {summaryDefaultViewLabel}
                       </button>
-                      <div className="border-t border-slate-100 my-1 pt-1">
-                        <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
-                          Brands
-                        </p>
-                      </div>
-                      {KERING_BRANDS.map((brand) => (
-                        <button
-                          key={brand}
-                          onClick={() => {
-                            setSheetType(brand as any);
-                            setIsSheetTypeOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === brand
-                            ? "bg-violet-100 text-violet-700"
-                            : "hover:bg-slate-100"
-                            }`}
-                        >
-                          {brand}
-                        </button>
-                      ))}
+                      {/* Brand options */}
+                      {clientBrands.length > 0 && (
+                        <>
+                          <div className="border-t border-slate-100 my-1 pt-1">
+                            <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
+                              Brands
+                            </p>
+                          </div>
+                          {clientBrands.map((brand) => (
+                            <button
+                              key={brand}
+                              onClick={() => {
+                                setSheetType(brand);
+                                setIsSheetTypeOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === brand
+                                ? "bg-violet-100 text-violet-700"
+                                : "hover:bg-slate-100"
+                                }`}
+                            >
+                              {brand}
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
-                      {/* Default YTD/FYFC options */}
+                      {/* Default YTD/FYFC options for clients without brand config */}
                       <button
                         onClick={() => {
                           setSheetType("ytd");
@@ -1935,14 +983,15 @@ export function DataTableView({
             </Popover>
           )}
 
-          {/* Period/Brand Selector (Trackers only) - Different options for Kering */}
+          {/* Period/Brand Selector (Trackers only) - Config-driven */}
           {selectedDataSource === "trackers" && (
             <Popover open={isPeriodOpen} onOpenChange={setIsPeriodOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="min-w-[140px]">
-                  {isKering
-                    ? selectedPeriod === "detailed" || !selectedPeriod
-                      ? "Detailed Summary"
+                  {/* Config-driven: clients with brands in trackers show brand/detailed view */}
+                  {hasClientConfig && clientHasBrandsIn(clientSlug, "trackers")
+                    ? selectedPeriod === trackerDefaultView || !selectedPeriod
+                      ? trackerDefaultViewLabel
                       : selectedPeriod
                     : selectedPeriod
                       ? AVAILABLE_PERIODS.find((p) => p.code === selectedPeriod)
@@ -1953,45 +1002,51 @@ export function DataTableView({
               </PopoverTrigger>
               <PopoverContent className="w-48" align="end">
                 <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {isKering ? (
+                  {/* Config-driven: clients with brands in trackers */}
+                  {hasClientConfig && clientHasBrandsIn(clientSlug, "trackers") ? (
                     <>
-                      {/* Kering-specific options for trackers */}
+                      {/* Default view option */}
                       <button
                         onClick={() => {
-                          setSelectedPeriod("detailed");
+                          setSelectedPeriod(trackerDefaultView || "detailed");
                           setIsPeriodOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === "detailed" || !selectedPeriod
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === trackerDefaultView || !selectedPeriod
                           ? "bg-violet-100 text-violet-700"
                           : "hover:bg-slate-100"
                           }`}
                       >
-                        Detailed Summary
+                        {trackerDefaultViewLabel}
                       </button>
-                      <div className="border-t border-slate-100 my-1 pt-1">
-                        <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
-                          Brands
-                        </p>
-                      </div>
-                      {KERING_BRANDS.map((brand) => (
-                        <button
-                          key={brand}
-                          onClick={() => {
-                            setSelectedPeriod(brand);
-                            setIsPeriodOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === brand
-                            ? "bg-violet-100 text-violet-700"
-                            : "hover:bg-slate-100"
-                            }`}
-                        >
-                          {brand}
-                        </button>
-                      ))}
+                      {/* Brand options */}
+                      {clientBrands.length > 0 && (
+                        <>
+                          <div className="border-t border-slate-100 my-1 pt-1">
+                            <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
+                              Brands
+                            </p>
+                          </div>
+                          {clientBrands.map((brand) => (
+                            <button
+                              key={brand}
+                              onClick={() => {
+                                setSelectedPeriod(brand);
+                                setIsPeriodOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedPeriod === brand
+                                ? "bg-violet-100 text-violet-700"
+                                : "hover:bg-slate-100"
+                                }`}
+                            >
+                              {brand}
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
-                      {/* Default period options */}
+                      {/* Default period options for clients without brand config */}
                       {AVAILABLE_PERIODS.map((period) => (
                         <button
                           key={period.code}
@@ -2014,50 +1069,32 @@ export function DataTableView({
             </Popover>
           )}
 
-          {/* Kering Tracker Period Selector */}
-          {selectedDataSource === "trackers" && isKering && (
-            <Popover open={isKeringPeriodOpen} onOpenChange={setIsKeringPeriodOpen}>
+          {/* Tracker Period Filter - Config-driven (shown for clients with hasPeriodFilter) */}
+          {selectedDataSource === "trackers" && hasPeriodFilter && periodFilterConfig && (
+            <Popover open={isPeriodFilterOpen} onOpenChange={setIsPeriodFilterOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="min-w-[140px]">
-                  {KERING_TRACKER_PERIODS.find((p) => p.code === keringTrackerPeriod)?.name || keringTrackerPeriod}
+                  {periodFilterConfig.periods.find((p) => p.code === trackerPeriodFilter)?.name || trackerPeriodFilter}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-56" align="end">
                 <div className="space-y-1 max-h-80 overflow-y-auto">
-                  <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
-                    Summary Periods
-                  </p>
-                  {KERING_TRACKER_PERIODS.slice(0, 7).map((period) => (
-                    <button
-                      key={period.code}
-                      onClick={() => {
-                        setKeringTrackerPeriod(period.code);
-                        setIsKeringPeriodOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        keringTrackerPeriod === period.code
-                          ? "bg-violet-100 text-violet-700"
-                          : "hover:bg-slate-100"
-                      }`}
-                    >
-                      {period.name}
-                    </button>
-                  ))}
-                  <div className="border-t border-slate-100 my-1 pt-1">
+                  {/* First group of periods */}
+                  {periodFilterConfig.firstGroupLabel && (
                     <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
-                      Monthly
+                      {periodFilterConfig.firstGroupLabel}
                     </p>
-                  </div>
-                  {KERING_TRACKER_PERIODS.slice(7).map((period) => (
+                  )}
+                  {periodFilterConfig.periods.slice(0, periodFilterConfig.groupSeparatorIndex || periodFilterConfig.periods.length).map((period) => (
                     <button
                       key={period.code}
                       onClick={() => {
-                        setKeringTrackerPeriod(period.code);
-                        setIsKeringPeriodOpen(false);
+                        setTrackerPeriodFilter(period.code);
+                        setIsPeriodFilterOpen(false);
                       }}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        keringTrackerPeriod === period.code
+                        trackerPeriodFilter === period.code
                           ? "bg-violet-100 text-violet-700"
                           : "hover:bg-slate-100"
                       }`}
@@ -2065,6 +1102,32 @@ export function DataTableView({
                       {period.name}
                     </button>
                   ))}
+                  {/* Second group of periods (if separator defined) */}
+                  {periodFilterConfig.groupSeparatorIndex && periodFilterConfig.groupSeparatorIndex < periodFilterConfig.periods.length && (
+                    <>
+                      <div className="border-t border-slate-100 my-1 pt-1">
+                        <p className="px-3 py-1 text-xs text-slate-400 uppercase tracking-wide">
+                          {periodFilterConfig.secondGroupLabel || "Other"}
+                        </p>
+                      </div>
+                      {periodFilterConfig.periods.slice(periodFilterConfig.groupSeparatorIndex).map((period) => (
+                        <button
+                          key={period.code}
+                          onClick={() => {
+                            setTrackerPeriodFilter(period.code);
+                            setIsPeriodFilterOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                            trackerPeriodFilter === period.code
+                              ? "bg-violet-100 text-violet-700"
+                              : "hover:bg-slate-100"
+                          }`}
+                        >
+                          {period.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
