@@ -8,6 +8,7 @@ import { apiClient } from "@/lib/api/client";
 
 // Import client-specific API configs
 import { keringApiConfig } from "./kering/api";
+import { carlsbergApiConfig } from "./carlsberg/api";
 
 // ============================================
 // TYPES
@@ -49,6 +50,16 @@ export interface EndpointConfig {
 }
 
 /**
+ * Endpoint variant types - can be extended per client
+ */
+export type EndpointVariant = "default" | "brand" | "meu" | "media" | "filters";
+
+/**
+ * Endpoint group - allows flexible endpoint variants
+ */
+export type EndpointGroup = Partial<Record<EndpointVariant, EndpointConfig>>;
+
+/**
  * Complete API configuration for a client's table view
  */
 export interface ClientApiConfig {
@@ -57,19 +68,11 @@ export interface ClientApiConfig {
   /** Base path prefix for all endpoints (e.g., "/api/v1/client/kering") */
   basePath?: string;
   /** Summary data endpoints */
-  summary?: {
-    /** Default/all-brand summary endpoint */
-    default?: EndpointConfig;
-    /** Brand-specific summary endpoint */
-    brand?: EndpointConfig;
-  };
+  summary?: EndpointGroup;
   /** Tracker data endpoints */
-  trackers?: {
-    /** Default/detailed tracker endpoint */
-    default?: EndpointConfig;
-    /** Brand-specific tracker endpoint */
-    brand?: EndpointConfig;
-  };
+  trackers?: EndpointGroup;
+  /** Filter endpoints for getting available filter values */
+  filters?: EndpointGroup;
 }
 
 /**
@@ -158,8 +161,8 @@ function buildUrl(
  */
 export async function fetchClientData<T = any>(
   apiConfig: ClientApiConfig,
-  endpointType: "summary" | "trackers",
-  endpointVariant: "default" | "brand",
+  endpointType: "summary" | "trackers" | "filters",
+  endpointVariant: EndpointVariant,
   params: FetchParams
 ): Promise<FetchResult<T>> {
   try {
@@ -222,6 +225,7 @@ export async function fetchClientData<T = any>(
  */
 export const clientApiRegistry: Record<string, ClientApiConfig> = {
   kering: keringApiConfig,
+  carlsberg: carlsbergApiConfig,
 };
 
 /**

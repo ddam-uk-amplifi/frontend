@@ -28,6 +28,8 @@ export interface ClientConfig {
   name: string;
   slug: string; // URL-safe lowercase
   markets: string[];
+  /** Market code to display name mapping (e.g., { "UK": "United Kingdom" }) */
+  marketNames?: Record<string, string>;
   features: {
     hasTrackers: boolean;
     hasBrandSummary: boolean;
@@ -167,12 +169,16 @@ export interface TableViewConfig {
     columns: TableColumnConfig[];
     /** Column definitions for brand-specific summary (if different) */
     brandColumns?: TableColumnConfig[];
-    /** Available sheet types (e.g., "ytd", "fyfc") */
+    /** Column definitions for variant-specific views (e.g., MEU) keyed by sheet type code */
+    variantColumns?: Record<string, TableColumnConfig[]>;
+    /** Available sheet types (e.g., "ytd", "fyfc", "overview", "meu") */
     sheetTypes?: { code: string; name: string }[];
     /** Transform config name for all-brand summary (from transform registry) */
     transformName?: string;
     /** Transform config name for brand-specific summary */
     brandTransformName?: string;
+    /** Transform config names for variant-specific views keyed by sheet type code */
+    variantTransformNames?: Record<string, string>;
     /** Default view option code (e.g., "ytd") */
     defaultView?: string;
     /** Label for the default/main view option (e.g., "All Brand Summary") */
