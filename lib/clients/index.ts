@@ -89,6 +89,11 @@ if (kering.keringTransforms) {
   registerTransforms(kering.keringTransforms);
 }
 
+// Register Carlsberg transforms
+if (carlsberg.carlsbergTransforms) {
+  registerTransforms(carlsberg.carlsbergTransforms);
+}
+
 // Add new client transform registrations here:
 // if (newclient.newclientTransforms) {
 //   registerTransforms(newclient.newclientTransforms);
@@ -261,10 +266,42 @@ export function getClientTrackerColumns(
 
 /**
  * Get summary columns for a client
+ * @param slug - client slug
+ * @param sheetType - optional sheet type for variant-specific columns (e.g., "meu")
  */
-export function getClientSummaryColumns(slug: string): TableColumnConfig[] | null {
+export function getClientSummaryColumns(
+  slug: string,
+  sheetType?: string
+): TableColumnConfig[] | null {
   const tableView = getClientTableView(slug);
-  return tableView?.summary?.columns || null;
+  if (!tableView?.summary) return null;
+
+  // Check for variant-specific columns
+  if (sheetType && tableView.summary.variantColumns?.[sheetType]) {
+    return tableView.summary.variantColumns[sheetType];
+  }
+
+  return tableView.summary.columns || null;
+}
+
+/**
+ * Get summary transform name for a client
+ * @param slug - client slug
+ * @param sheetType - optional sheet type for variant-specific transform (e.g., "meu")
+ */
+export function getClientSummaryTransformName(
+  slug: string,
+  sheetType?: string
+): string | null {
+  const tableView = getClientTableView(slug);
+  if (!tableView?.summary) return null;
+
+  // Check for variant-specific transform
+  if (sheetType && tableView.summary.variantTransformNames?.[sheetType]) {
+    return tableView.summary.variantTransformNames[sheetType];
+  }
+
+  return tableView.summary.transformName || null;
 }
 
 /**

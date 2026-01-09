@@ -42,10 +42,11 @@ import {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // --- Client ID Mapping to satisfy API's integer client_id requirement ---
+// NOTE: These IDs must match the database client IDs
 const clientMap = {
   arla: 1,
-  carlsberg: 2,
-  kering: 3,
+  kering: 2,
+  carlsberg: 3,
 };
 type ClientIdString = keyof typeof clientMap;
 
@@ -129,18 +130,25 @@ function ReportAutomationContent() {
     "excel" | "ppt" | null
   >(null);
 
-  // Fetch available markets on mount
+  // Fetch available markets when client changes
   useEffect(() => {
     const fetchMarkets = async () => {
+      // Only fetch markets if a client is selected
+      if (!clientNumberId) {
+        setAvailableMarkets([]);
+        return;
+      }
+
       try {
-        const response = await apiClient.get("/api/v1/markets");
+        const response = await apiClient.get(`/api/v1/markets?client_id=${clientNumberId}`);
         setAvailableMarkets(response.data.markets || []);
       } catch (error) {
         console.error("Failed to fetch markets:", error);
+        setAvailableMarkets([]);
       }
     };
     fetchMarkets();
-  }, []);
+  }, [clientNumberId]); // Re-fetch when client changes
 
   // Fetch consolidation history when history tab is active
   useEffect(() => {

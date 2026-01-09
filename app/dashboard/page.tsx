@@ -227,7 +227,7 @@ export default function Dashboard() {
     setDynamicDataError(null);
   };
 
-  // Handle dynamic field selection from QueryBuilderPanel (for Arla trackers)
+  // Handle dynamic field selection from QueryBuilderPanel (for Arla/Carlsberg trackers)
   const handleDynamicFieldSelect = useCallback(
     async (
       mediaType: TrackerMediaType,
@@ -245,28 +245,38 @@ export default function Dashboard() {
       // Also update selectedFields so the graph recommendations panel shows
       // Use a synthetic group ID for dynamic tracker fields
       // Include "spend" in the field ID so chart compatibility logic recognizes it as a metric
-      const syntheticGroupId = `arla-tracker-${mediaType}-dynamic`;
+      const clientLower = selectedClient?.toLowerCase() || "";
+      const syntheticGroupId = `${clientLower}-tracker-${mediaType}-dynamic`;
       const syntheticFieldId = `${mediaType}-spend-${fieldName}-${fieldValue}`;
+
+      // Track which field values are currently selected
+      let currentSelectedFieldValues: string[] = [];
 
       setSelectedFields((prev) => {
         const groupFields = prev[syntheticGroupId] || [];
         const isSelected = groupFields.includes(syntheticFieldId);
 
+        let newFields: string[];
         if (isSelected) {
-          // Deselect
-          const newFields = groupFields.filter((id) => id !== syntheticFieldId);
-          if (newFields.length === 0) {
-            const { [syntheticGroupId]: _, ...rest } = prev;
-            return rest;
-          }
-          return { ...prev, [syntheticGroupId]: newFields };
+          // Deselect - remove this selection
+          newFields = groupFields.filter((id) => id !== syntheticFieldId);
         } else {
-          // Select
-          return {
-            ...prev,
-            [syntheticGroupId]: [...groupFields, syntheticFieldId],
-          };
+          // Select - add this selection
+          newFields = [...groupFields, syntheticFieldId];
         }
+
+        // Extract field values from the synthetic field IDs
+        currentSelectedFieldValues = newFields.map((id) => {
+          // Format: {mediaType}-spend-{fieldName}-{fieldValue}
+          const parts = id.split("-");
+          return parts.slice(3).join("-"); // Get everything after the third dash
+        });
+
+        if (newFields.length === 0) {
+          const { [syntheticGroupId]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [syntheticGroupId]: newFields };
       });
 
       // If no generalIds (all fields deselected) or no client, clear data
@@ -283,16 +293,43 @@ export default function Dashboard() {
       setDynamicDataError(null);
 
       try {
+        // For Carlsberg: fetch ALL data for the field_name (no field_value filter)
+        // This allows multi-selection to work - we get all values and the chart groups by field_value
+        const isCarlsberg = clientLower === "carlsberg";
+
         const response = await fetchTrackerFieldData(
           selectedClient,
           mediaType,
           generalIds,
           fieldName, // Pass the field name for normalized response
           true, // include general record data
+          isCarlsberg ? undefined : fieldValue, // Don't filter by field_value for Carlsberg (get all)
+          selectedClientId || undefined, // Pass client ID for Carlsberg
+          selectedMarket || undefined, // Pass markets for Carlsberg
         );
 
         console.log("[handleDynamicFieldSelect] Data received:", response);
-        setDynamicTrackerData(response);
+
+        // For Carlsberg: filter the response to only include selected field values
+        if (isCarlsberg && currentSelectedFieldValues.length > 0) {
+          const filteredResponse = {
+            ...response,
+            general: (response.general || []).filter((item: any) =>
+              currentSelectedFieldValues.includes(item.field_value || "")
+            ),
+            monthly: (response.monthly || []).filter((item: any) =>
+              currentSelectedFieldValues.includes(item.field_value || "")
+            ),
+          };
+          console.log("[handleDynamicFieldSelect] Filtered for Carlsberg:", {
+            selectedValues: currentSelectedFieldValues,
+            originalCount: (response.monthly || []).length,
+            filteredCount: filteredResponse.monthly.length,
+          });
+          setDynamicTrackerData(filteredResponse);
+        } else {
+          setDynamicTrackerData(response);
+        }
       } catch (error) {
         console.error("[handleDynamicFieldSelect] Error:", error);
         setDynamicDataError(
@@ -305,7 +342,7 @@ export default function Dashboard() {
         setIsLoadingDynamicData(false);
       }
     },
-    [selectedClient],
+    [selectedClient, selectedClientId, selectedMarket],
   );
 
   // When data source changes, clear market selection if switching to summary

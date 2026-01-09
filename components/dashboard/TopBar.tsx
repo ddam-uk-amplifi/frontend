@@ -41,7 +41,7 @@ export function TopBar({
   availableMarkets = [],
   isLoadingMarkets = false,
 }: TopBarProps) {
-  const clients = ["Arla", "Kering"];
+  const clients = ["Arla", "Kering", "Carlsberg"];
 
   // Get display name for selected market code
   const selectedMarketName = selectedMarket

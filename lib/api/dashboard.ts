@@ -136,7 +136,11 @@ export type TrackerMediaType =
   | "print"
   | "ooh"
   | "online"
-  | "cinema";
+  | "cinema"
+  // Carlsberg specific media types
+  | "newspapers"
+  | "magazines"
+  | "outdoor";
 export type TrackerDataLevel = "general" | "monthly" | "percentile";
 
 export interface TrackerSummaryParams {
@@ -185,20 +189,32 @@ export interface TrackerCompleteResponse {
 }
 
 // Tracker Summary (from Summary_YTD sheets) response
+// Supports both Arla and Carlsberg field structures
 export interface TrackerSummaryItem {
   id: number;
   market_id: number;
-  period: string;
-  data_type: string;
-  media_type: string;
-  total_net_net_spend: number | null;
-  total_non_addressable_spend: number | null;
-  total_addressable_spend: number | null;
-  measured_spend: number | null;
-  measured_spend_pct: number | null;
-  benchmark_equivalent_net_net_spend: number | null;
-  value_loss: number | null;
-  value_loss_pct: number | null;
+  // Arla fields
+  period?: string;
+  data_type?: string;
+  media_type?: string;
+  total_net_net_spend?: number | null;
+  total_non_addressable_spend?: number | null;
+  total_addressable_spend?: number | null;
+  measured_spend?: number | null;
+  measured_spend_pct?: number | null;
+  benchmark_equivalent_net_net_spend?: number | null;
+  value_loss?: number | null;
+  value_loss_pct?: number | null;
+  // Carlsberg fields
+  summary_type?: string;
+  media_or_category?: string;
+  measured_net_net_spend?: number | null;
+  non_measured_net_net_spend?: number | null;
+  net_net_cpu?: number | null;
+  cpu_index?: number | null;
+  actual_units?: number | null;
+  savings?: number | null;
+  savings_pct?: number | null;
 }
 
 // ============================================
@@ -844,11 +860,20 @@ export async function fetchTrackerSummaryData(
     queryParams.append("period", period);
   }
 
-  const response = await apiClient.get<TrackerSummaryItem[]>(
+  const response = await apiClient.get<TrackerSummaryItem[] | { data: TrackerSummaryItem[] }>(
     `/api/v1/client/${clientName.toLowerCase()}/tracker/summary?${queryParams.toString()}`,
   );
 
-  return response.data;
+  // Handle both response formats:
+  // - Direct array (Arla): TrackerSummaryItem[]
+  // - Wrapped in object (Carlsberg): { data: TrackerSummaryItem[], ... }
+  if (Array.isArray(response.data)) {
+    return response.data;
+  }
+  if (response.data && 'data' in response.data && Array.isArray(response.data.data)) {
+    return response.data.data;
+  }
+  return [];
 }
 
 /**
@@ -960,8 +985,8 @@ export async function fetchTrackerAvailableFields(
 /**
  * Fetch tracker buy_specifics fields with their unique values and associated general_ids
  * Uses the new /tracker/{media_type}/fields endpoint
- * @param clientName - Client name (e.g., "arla")
- * @param mediaType - Media type (e.g., "tv", "radio", "print")
+ * @param clientName - Client name (e.g., "arla", "carlsberg")
+ * @param mediaType - Media type (e.g., "tv", "radio", "print", "outdoor")
  * @param clientId - Client ID for auto-resolving latest consolidation job
  * @param markets - Comma-separated market codes (e.g., "UK,DK,SE")
  */
@@ -979,8 +1004,14 @@ export async function fetchTrackerFields(
     queryParams.append("markets", markets);
   }
 
+  // Carlsberg uses a different endpoint path structure
+  const clientLower = clientName.toLowerCase();
+  const endpoint = clientLower === "carlsberg"
+    ? `/api/v1/client/carlsberg/tracker/media/${mediaType}/fields`
+    : `/api/v1/client/${clientLower}/tracker/${mediaType}/fields`;
+
   const response = await apiClient.get<TrackerFieldsResponse>(
-    `/api/v1/client/${clientName.toLowerCase()}/tracker/${mediaType}/fields?${queryParams.toString()}`,
+    `${endpoint}?${queryParams.toString()}`,
   );
 
   return response.data;
@@ -990,11 +1021,14 @@ export async function fetchTrackerFields(
  * Fetch tracker monthly and percentile data for selected general_id(s)
  * Uses the new /tracker/{media_type}/data endpoint
  * Returns normalized, chart-ready data with field_value in each record
- * @param clientName - Client name (e.g., "arla")
- * @param mediaType - Media type (e.g., "tv", "radio", "print")
- * @param generalIds - Array of general_ids to fetch data for
+ * @param clientName - Client name (e.g., "arla", "carlsberg")
+ * @param mediaType - Media type (e.g., "tv", "radio", "print", "outdoor")
+ * @param generalIds - Array of general_ids to fetch data for (used by Arla)
  * @param fieldName - The buy_specifics field name to extract (e.g., "Channel", "Sales House")
  * @param includeGeneral - Whether to include general record data (default: true)
+ * @param fieldValue - The specific field value to filter by (used by Carlsberg)
+ * @param clientId - Client ID for Carlsberg (to resolve consolidation job)
+ * @param markets - Market codes for filtering (used by Carlsberg)
  */
 export async function fetchTrackerFieldData(
   clientName: string,
@@ -1002,7 +1036,43 @@ export async function fetchTrackerFieldData(
   generalIds: number[],
   fieldName: string,
   includeGeneral: boolean = true,
+  fieldValue?: string,
+  clientId?: number,
+  markets?: string,
 ): Promise<TrackerFieldDataResponse> {
+  const clientLower = clientName.toLowerCase();
+
+  // Carlsberg uses different parameters - field_name + field_value instead of general_ids
+  if (clientLower === "carlsberg") {
+    const queryParams = new URLSearchParams();
+
+    // Carlsberg requires client_id to resolve consolidation job
+    if (clientId) {
+      queryParams.append("client_id", clientId.toString());
+    }
+
+    if (fieldName) {
+      queryParams.append("field_name", fieldName);
+    }
+
+    if (fieldValue) {
+      queryParams.append("field_value", fieldValue);
+    }
+
+    if (markets) {
+      queryParams.append("markets", markets);
+    }
+
+    queryParams.append("include_buy_specifics", "true");
+
+    const response = await apiClient.get<TrackerFieldDataResponse>(
+      `/api/v1/client/carlsberg/tracker/media/${mediaType}/data?${queryParams.toString()}`,
+    );
+
+    return response.data;
+  }
+
+  // Default behavior for other clients (Arla, etc.) - use general_ids
   const queryParams = new URLSearchParams({
     general_ids: generalIds.join(","),
     field_name: fieldName,
@@ -1012,8 +1082,143 @@ export async function fetchTrackerFieldData(
     queryParams.append("include_general", "true");
   }
 
+  const endpoint = `/api/v1/client/${clientLower}/tracker/${mediaType}/data`;
+
   const response = await apiClient.get<TrackerFieldDataResponse>(
-    `/api/v1/client/${clientName.toLowerCase()}/tracker/${mediaType}/data?${queryParams.toString()}`,
+    `${endpoint}?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+// ============================================
+// CARLSBERG TYPES (re-exported from client module)
+// ============================================
+
+// Import Carlsberg types from client module
+export type {
+  CarlsbergMediaDataGeneralItem,
+  CarlsbergMediaDataMonthlyItem,
+  CarlsbergMediaDataResponse,
+  CarlsbergConsolidatedOverviewItem,
+  CarlsbergConsolidatedOverviewResponse,
+  CarlsbergConsolidatedMEUItem,
+  CarlsbergConsolidatedMEUResponse,
+} from "@/lib/clients/carlsberg/types";
+
+// Import for local use in functions
+import type { CarlsbergMediaDataResponse } from "@/lib/clients/carlsberg/types";
+
+/**
+ * Fetch Carlsberg media data with optional buy_specifics
+ * Uses the /carlsberg/tracker/media/{media_type}/data endpoint
+ * @param mediaType - Media type (e.g., "outdoor", "online", "tv")
+ * @param clientId - Client ID for auto-resolving latest consolidation job
+ * @param markets - Comma-separated market codes (e.g., "KH,DK")
+ * @param period - Optional period filter (e.g., "JANUARY", "FULLYEARTOTAL")
+ * @param includeBuySpecifics - Whether to include full buy_specifics in response
+ */
+export async function fetchCarlsbergMediaData(
+  mediaType: string,
+  clientId: number,
+  markets?: string,
+  period?: string,
+  includeBuySpecifics: boolean = true,
+): Promise<CarlsbergMediaDataResponse> {
+  const queryParams = new URLSearchParams({
+    client_id: clientId.toString(),
+  });
+
+  if (markets) {
+    queryParams.append("markets", markets);
+  }
+
+  if (period) {
+    queryParams.append("period", period);
+  }
+
+  if (includeBuySpecifics) {
+    queryParams.append("include_buy_specifics", "true");
+  }
+
+  const response = await apiClient.get<CarlsbergMediaDataResponse>(
+    `/api/v1/client/carlsberg/tracker/media/${mediaType}/data?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Extract unique field names from Carlsberg media data buy_specifics
+ * Returns field names that can be used for filtering/grouping
+ */
+export function extractCarlsbergBuySpecificsFields(
+  data: CarlsbergMediaDataResponse,
+): string[] {
+  const fieldNames = new Set<string>();
+
+  data.general.forEach((item) => {
+    if (item.buy_specifics) {
+      Object.keys(item.buy_specifics).forEach((key) => {
+        fieldNames.add(key);
+      });
+    }
+  });
+
+  return Array.from(fieldNames).sort();
+}
+
+// Import consolidated types for local use in functions
+import type {
+  CarlsbergConsolidatedOverviewResponse,
+  CarlsbergConsolidatedMEUResponse,
+} from "@/lib/clients/carlsberg/types";
+
+/**
+ * Fetch Carlsberg consolidated overview data
+ * Uses the /carlsberg/consolidated/overview endpoint
+ * @param clientId - Client ID for auto-resolving latest consolidation job
+ * @param markets - Comma-separated market codes (e.g., "BE,DK")
+ */
+export async function fetchCarlsbergConsolidatedOverview(
+  clientId: number,
+  markets?: string,
+): Promise<CarlsbergConsolidatedOverviewResponse> {
+  const queryParams = new URLSearchParams({
+    client_id: clientId.toString(),
+  });
+
+  if (markets) {
+    queryParams.append("markets", markets);
+  }
+
+  const response = await apiClient.get<CarlsbergConsolidatedOverviewResponse>(
+    `/api/v1/client/carlsberg/consolidated/overview?${queryParams.toString()}`,
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetch Carlsberg consolidated MEU data
+ * Uses the /carlsberg/consolidated/meu endpoint
+ * @param clientId - Client ID for auto-resolving latest consolidation job
+ * @param markets - Comma-separated market codes (e.g., "BE,DK")
+ */
+export async function fetchCarlsbergConsolidatedMEU(
+  clientId: number,
+  markets?: string,
+): Promise<CarlsbergConsolidatedMEUResponse> {
+  const queryParams = new URLSearchParams({
+    client_id: clientId.toString(),
+  });
+
+  if (markets) {
+    queryParams.append("markets", markets);
+  }
+
+  const response = await apiClient.get<CarlsbergConsolidatedMEUResponse>(
+    `/api/v1/client/carlsberg/consolidated/meu?${queryParams.toString()}`,
   );
 
   return response.data;
