@@ -87,7 +87,7 @@ function ReportAutomationContent() {
   // Client companies - lowercase names for API
   const clients = [
     { id: "arla", name: "Arla" },
-    // { id: "carlsberg", name: "Carlsberg" },
+    { id: "carlsberg", name: "Carlsberg" },
     { id: "kering", name: "Kering" },
   ];
 
