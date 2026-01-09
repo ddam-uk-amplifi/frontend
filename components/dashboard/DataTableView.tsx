@@ -419,7 +419,7 @@ function transformTrackerData(
   const tableRows: TableRow[] = filteredData
     .filter((item) => item.media_type?.toUpperCase() !== "GRAND TOTAL")
     .map((item, index) => {
-      const mediaType = normalizeMediaType(item.media_type);
+      const mediaType = normalizeMediaType(item.media_type || "");
       return {
         id: `${mediaType.toLowerCase().replace(/\s+/g, "-")}-${index}`,
         mediaType,
@@ -517,7 +517,7 @@ export function DataTableView({
   // For others: sheetType is "ytd" or "fyfc"
   const [sheetType, setSheetType] = useState<string>("ytd");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
-  const [trackerPeriodFilter, setTrackerPeriodFilter] = useState<string>("DECEMBER"); // Tracker period filter (for clients with hasPeriodFilter)
+  const [trackerPeriodFilter, setTrackerPeriodFilter] = useState<string>(""); // Initialized from client config in useEffect
   const [isSheetTypeOpen, setIsSheetTypeOpen] = useState(false);
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
   const [isPeriodFilterOpen, setIsPeriodFilterOpen] = useState(false);
@@ -579,6 +579,10 @@ export function DataTableView({
   // Config-driven UI settings
   const summaryDefaultView = clientTableView?.summary?.defaultView || "ytd";
   const summaryDefaultViewLabel = clientTableView?.summary?.defaultViewLabel || "YTD Summary";
+  const summarySheetTypes = clientTableView?.summary?.sheetTypes || [
+    { code: "ytd", name: "YTD Summary" },
+    { code: "fyfc", name: "FYFC Summary" },
+  ];
   const trackerDefaultView = clientTableView?.trackers?.defaultView;
   const trackerDefaultViewLabel = clientTableView?.trackers?.defaultViewLabel || "Detailed Summary";
   const hasPeriodFilter = clientTableView?.trackers?.hasPeriodFilter || false;
@@ -608,7 +612,8 @@ export function DataTableView({
   useEffect(() => {
     // Try to get columns from client config first
     if (hasClientConfig && selectedDataSource === "summary") {
-      const summaryColumns = getClientSummaryColumns(clientSlug);
+      // Pass sheetType for variant-specific columns (e.g., "meu" for Carlsberg)
+      const summaryColumns = getClientSummaryColumns(clientSlug, sheetType);
       if (summaryColumns) {
         setColumns(configsToTableColumns(summaryColumns) || SUMMARY_COLUMNS);
         return;
@@ -635,12 +640,17 @@ export function DataTableView({
     hasClientConfig,
     isBrandSelected,
     isTrackerBrandSelected,
+    sheetType,
   ]);
 
-  // Reset sheetType when client changes
+  // Reset sheetType and trackerPeriodFilter when client changes
   useEffect(() => {
-    setSheetType("ytd");
-  }, [selectedClient]);
+    // Use config-driven default sheet type
+    setSheetType(summaryDefaultView);
+    // Reset tracker period filter to client's default
+    const defaultPeriodFilter = periodFilterConfig?.defaultPeriod || "Jan";
+    setTrackerPeriodFilter(defaultPeriodFilter);
+  }, [selectedClient, periodFilterConfig?.defaultPeriod, summaryDefaultView]);
 
   // Auto-select default period/brand when trackers is selected and market is chosen
   useEffect(() => {
@@ -845,6 +855,11 @@ export function DataTableView({
       if (hasClientConfig && clientHasBrandsIn(clientSlug, "summary")) {
         return selectedBrand ? `${selectedBrand} Summary` : summaryDefaultViewLabel;
       }
+      // Config-driven title using sheetTypes (e.g., Carlsberg: Overview, MEU)
+      const matchedSheetType = summarySheetTypes.find(st => st.code === sheetType);
+      if (matchedSheetType) {
+        return matchedSheetType.name;
+      }
       // Default YTD/FYFC title
       return sheetType === "ytd" ? "YTD Summary" : "FYFC Summary";
     }
@@ -856,7 +871,12 @@ export function DataTableView({
           : trackerDefaultViewLabel;
         return selectedMarket ? `${title} - ${selectedMarket}` : title;
       }
-      // Default tracker title
+      // Config-driven title for clients with period filter (no brands) - e.g., Carlsberg
+      if (hasClientConfig && hasPeriodFilter) {
+        const title = trackerDefaultViewLabel || "Tracker Summary";
+        return selectedMarket ? `${title} - ${selectedMarket}` : title;
+      }
+      // Default tracker title (shows period for non-config clients)
       const parts = ["Tracker Summary"];
       if (selectedMarket) parts.push(selectedMarket);
       if (selectedPeriod) parts.push(selectedPeriod);
@@ -894,14 +914,12 @@ export function DataTableView({
             <Popover open={isSheetTypeOpen} onOpenChange={setIsSheetTypeOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="min-w-[140px]">
-                  {/* Config-driven: clients with brands show brand name or default label */}
+                  {/* Config-driven: show selected sheet type name */}
                   {hasClientConfig && clientHasBrandsIn(clientSlug, "summary")
                     ? sheetType === summaryDefaultView
                       ? summaryDefaultViewLabel
                       : sheetType
-                    : sheetType === "ytd"
-                      ? "YTD"
-                      : "FYFC"}
+                    : summarySheetTypes.find(st => st.code === sheetType)?.name || sheetType}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </PopoverTrigger>
@@ -951,31 +969,22 @@ export function DataTableView({
                     </>
                   ) : (
                     <>
-                      {/* Default YTD/FYFC options for clients without brand config */}
-                      <button
-                        onClick={() => {
-                          setSheetType("ytd");
-                          setIsSheetTypeOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === "ytd"
-                          ? "bg-violet-100 text-violet-700"
-                          : "hover:bg-slate-100"
-                          }`}
-                      >
-                        YTD Summary
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSheetType("fyfc");
-                          setIsSheetTypeOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === "fyfc"
-                          ? "bg-violet-100 text-violet-700"
-                          : "hover:bg-slate-100"
-                          }`}
-                      >
-                        FYFC Summary
-                      </button>
+                      {/* Config-driven sheet type options */}
+                      {summarySheetTypes.map((st) => (
+                        <button
+                          key={st.code}
+                          onClick={() => {
+                            setSheetType(st.code);
+                            setIsSheetTypeOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sheetType === st.code
+                            ? "bg-violet-100 text-violet-700"
+                            : "hover:bg-slate-100"
+                            }`}
+                        >
+                          {st.name}
+                        </button>
+                      ))}
                     </>
                   )}
                 </div>
@@ -984,7 +993,8 @@ export function DataTableView({
           )}
 
           {/* Period/Brand Selector (Trackers only) - Config-driven */}
-          {selectedDataSource === "trackers" && (
+          {/* Hide this dropdown if client uses hasPeriodFilter without brands (e.g., Carlsberg) */}
+          {selectedDataSource === "trackers" && !(hasPeriodFilter && !clientHasBrandsTrackers) && (
             <Popover open={isPeriodOpen} onOpenChange={setIsPeriodOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="min-w-[140px]">

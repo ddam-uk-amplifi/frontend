@@ -4,9 +4,13 @@ import type { TransformConfig } from "../transforms";
  * Carlsberg Tracker Summary transform
  * Data source: /tracker/summary
  * Groups by media_or_category field
+ *
+ * Note: The API returns data with summary_type field (e.g., "FullYear", "YTD_Apr")
+ * The transform filters by this field using the periodField config.
  */
 export const carlsbergTrackerSummaryTransform: TransformConfig = {
   groupByField: "media_or_category",
+  periodField: "summary_type",  // Filter by summary_type field from API response
   sumFields: [
     "total_net_net_spend",
     "measured_net_net_spend",
@@ -16,22 +20,26 @@ export const carlsbergTrackerSummaryTransform: TransformConfig = {
     "actual_units",
     "savings",
   ],
-  percentageFieldsRaw: [
+  // API returns decimals (0.9915) - convert to percentages (99.15%)
+  percentageFieldsToConvert: [
     "measured_spend_pct",
     "savings_pct",
   ],
   aggregate: false,  // Data is already aggregated by backend
-  includeTotals: false,  // Backend provides totals
-  skipValues: ["Grand Total", "GRAND TOTAL"],
+  includeTotals: true,  // Add totals row
+  skipValues: ["Grand Total", "GRAND TOTAL", "CATEGORIES"],  // Skip header/total rows
 };
 
 /**
  * Carlsberg Consolidated Overview transform
  * Data source: /consolidated/overview
- * Groups by market field
+ * Groups by market, filters to TOTAL media only (one row per market)
  */
 export const carlsbergConsolidatedOverviewTransform: TransformConfig = {
   groupByField: "market",
+  // Filter to only show TOTAL rows (one per market)
+  filterField: "media",
+  filterValue: "TOTAL",
   sumFields: [
     "fy_actual_media_expenditure",
     "fy_yoy_comparable_media_expenditure",
@@ -50,8 +58,9 @@ export const carlsbergConsolidatedOverviewTransform: TransformConfig = {
     "ytd_value_achievement",
     "inflation_media_inflation_pct",
   ],
-  aggregate: false,  // Pass through as-is
-  includeTotals: true,
+  aggregate: false,  // Pass through as-is (already filtered to TOTAL)
+  includeTotals: true,  // Add totals row at bottom
+  skipValues: ["Market"],  // Skip header row
   calculatedPercentages: {
     fy_measured_spend_pct: {
       numerator: "fy_actual_media_expenditure",
@@ -75,7 +84,7 @@ export const carlsbergConsolidatedOverviewTransform: TransformConfig = {
 /**
  * Carlsberg Consolidated MEU transform
  * Data source: /consolidated/meu
- * Groups by market field
+ * Groups by market field (already one row per market)
  */
 export const carlsbergConsolidatedMEUTransform: TransformConfig = {
   groupByField: "market",
@@ -109,33 +118,11 @@ export const carlsbergConsolidatedMEUTransform: TransformConfig = {
     "digital_compliance_rate",
   ],
   aggregate: false,
-  includeTotals: true,
-  calculatedPercentages: {
-    fy_total_cost_avoidance_pct: {
-      numerator: "fy_total_cost_avoidance",
-      denominator: "total_spend_budgeted",
-    },
-    measured_vs_affectable_media_spend_pct: {
-      numerator: "fy_projected_measured_spend",
-      denominator: "fy_projected_spend",
-    },
-    fy_projected_value_achievement_pct: {
-      numerator: "fy_projected_savings_delivery",
-      denominator: "fy_projected_measured_spend",
-    },
-    h1_total_cost_avoidance_pct: {
-      numerator: "h1_total_cost_avoidance",
-      denominator: "h1_total_spend",
-    },
-    h1_measured_spend_pct: {
-      numerator: "h1_measured_spend",
-      denominator: "h1_affectable_spend",
-    },
-    h1_value_achievement_pct: {
-      numerator: "h1_savings_delivery",
-      denominator: "h1_measured_spend",
-    },
-  },
+  includeTotals: true,  // Add Total row at bottom
+  skipValues: ["Country", "KEY", "100", "89", "99", "Total"],  // Skip header, invalid rows, and API's Total row
+  // Use the API's "Total" row and move it to the bottom
+  useGrandTotalFromApi: true,
+  grandTotalValue: "Total",
 };
 
 /**

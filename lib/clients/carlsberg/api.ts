@@ -5,7 +5,7 @@ export const carlsbergApiConfig: ClientApiConfig = {
   basePath: "/api/v1/client/carlsberg",
 
   summary: {
-    // Overview endpoint (consolidated data)
+    // Overview endpoint (consolidated data) - maps to "default" variant
     default: {
       path: "/consolidated/overview",
       method: "GET",

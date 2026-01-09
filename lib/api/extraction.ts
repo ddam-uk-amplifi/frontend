@@ -45,9 +45,10 @@ export interface SingleExtractionResponse {
 }
 
 // Helper to extract market code from path like "extracted/arla/.../extracted_uuid_DK.xlsx"
+// Supports 2-4 letter market codes (e.g., DK, UK, MXAW, HKMO)
 export function extractMarketCodeFromPath(path: string): string {
   const filename = path.split("/").pop() || "";
-  const match = filename.match(/_([A-Z]{2})\.xlsx$/);
+  const match = filename.match(/_([A-Z]{2,4})\.xlsx$/);
   return match ? match[1] : "";
 }
 

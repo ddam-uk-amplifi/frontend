@@ -49,6 +49,11 @@ import {
   fetchKeringConsolidatedBrandSummary, // Keeping for future use if brand filtering is enabled
   type KeringBrandSummaryResponse,
   type KeringAllBrandSummaryItem,
+  // Carlsberg consolidated endpoints
+  fetchCarlsbergConsolidatedOverview,
+  fetchCarlsbergConsolidatedMEU,
+  type CarlsbergConsolidatedOverviewResponse,
+  type CarlsbergConsolidatedMEUResponse,
 } from "@/lib/api/dashboard";
 
 // Field name to readable label mapping
@@ -81,6 +86,39 @@ const FIELD_LABELS: Record<string, string> = {
   measured_savings_pct: "Measured Savings %",
   added_value: "Added Value",
   added_value_pct: "Added Value %",
+  // Carlsberg tracker fields
+  measured_net_net_spend: "Measured Spend",
+  non_measured_net_net_spend: "Non-Measured Spend",
+  net_net_cpu: "Net Net CPU",
+  cpu_index: "CPU Index",
+  actual_units: "Actual Units",
+  // Carlsberg overview fields
+  fy_actual_media_expenditure: "FY Actual Media Expenditure",
+  fy_yoy_comparable_media_expenditure: "FY YoY Comparable",
+  fy_measured_spend_pct: "FY Measured %",
+  fy_savings_delivery: "FY Savings Delivery",
+  fy_value_achievement: "FY Value Achievement %",
+  ytd_total_ytd_media_expenditure: "YTD Media Expenditure",
+  ytd_affectable_spend: "YTD Affectable Spend",
+  ytd_yoy_comparable_media_expenditure: "YTD YoY Comparable",
+  ytd_measured_spend_pct: "YTD Measured %",
+  ytd_savings_delivery_vs_adjusted_pitch_grid_for_inflation: "YTD Savings Delivery",
+  ytd_value_achievement: "YTD Value Achievement %",
+  inflation_media_inflation_pct: "Media Inflation %",
+  inflation_cost_avoidance_ytd: "Cost Avoidance YTD",
+  inflation_cost_avoidance_fy: "Cost Avoidance FY",
+  // Carlsberg MEU fields
+  total_spend_budgeted: "Total Spend Budgeted",
+  fy_total_cost_avoidance: "FY Cost Avoidance",
+  fy_total_cost_avoidance_pct: "FY Cost Avoidance %",
+  fy_projected_spend: "FY Projected Spend",
+  fy_projected_measured_spend: "FY Projected Measured Spend",
+  measured_vs_affectable_media_spend_pct: "Measured vs Affectable %",
+  fy_projected_savings_delivery: "FY Projected Savings",
+  fy_projected_value_achievement_pct: "FY Value Achievement %",
+  h1_total_spend: "H1 Total Spend",
+  h1_savings_delivery: "H1 Savings Delivery",
+  h1_value_achievement_pct: "H1 Value Achievement %",
 };
 
 // Get readable label for a field name
@@ -206,11 +244,18 @@ export function VisualizationCanvas({
   >(null);
   const [keringBrandData, setKeringBrandData] =
     useState<KeringBrandSummaryResponse | null>(null);
+  // Carlsberg consolidated data state
+  const [carlsbergOverviewData, setCarlsbergOverviewData] =
+    useState<CarlsbergConsolidatedOverviewResponse | null>(null);
+  const [carlsbergMEUData, setCarlsbergMEUData] =
+    useState<CarlsbergConsolidatedMEUResponse | null>(null);
   const [isLoadingApiData, setIsLoadingApiData] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // Check if this is Kering client
   const isKering = client?.toLowerCase() === "kering";
+  // Check if this is Carlsberg client
+  const isCarlsberg = client?.toLowerCase() === "carlsberg";
 
   // Generate a unique graph ID based on current state (include jobId or clientId)
   const graphId = `${selectedGraphType}-${client}-${market}-${period}-${jobId || clientId}`;
@@ -247,6 +292,8 @@ export function VisualizationCanvas({
     trackerData,
     trackerSummaryData,
     keringBrandData,
+    carlsbergOverviewData,
+    carlsbergMEUData,
     isLoadingApiData,
   ]); // Re-check when these change
 
@@ -313,6 +360,8 @@ export function VisualizationCanvas({
       if (totalSelected === 0) {
         setApiData(null);
         setTrackerData(null);
+        setCarlsbergOverviewData(null);
+        setCarlsbergMEUData(null);
         return;
       }
 
@@ -325,6 +374,8 @@ export function VisualizationCanvas({
         setTrackerData(null);
         setTrackerSummaryData(null);
         setApiData(null);
+        setCarlsbergOverviewData(null);
+        setCarlsbergMEUData(null);
         return;
       }
 
@@ -332,8 +383,44 @@ export function VisualizationCanvas({
       setApiError(null);
 
       try {
-        if (dataSource === "summary" && (jobId || (isKering && clientId))) {
-          if (isKering && clientId) {
+        if (dataSource === "summary" && (jobId || (isKering && clientId) || (isCarlsberg && clientId))) {
+          if (isCarlsberg && clientId) {
+            // Carlsberg Summary data source - calls Overview and/or MEU endpoints
+            // Determine which endpoints to call based on selected fields
+            const allSelectedFieldIds = Object.values(selectedFields).flat();
+
+            const hasOverviewFields = allSelectedFieldIds.some((f) =>
+              f.startsWith("carlsberg-overview-")
+            );
+            const hasMEUFields = allSelectedFieldIds.some((f) =>
+              f.startsWith("carlsberg-meu-")
+            );
+
+            // Fetch data from appropriate endpoints
+            let overviewResponse: CarlsbergConsolidatedOverviewResponse | null = null;
+            let meuResponse: CarlsbergConsolidatedMEUResponse | null = null;
+
+            if (hasOverviewFields) {
+              overviewResponse = await fetchCarlsbergConsolidatedOverview(
+                clientId,
+                market || undefined,
+              );
+            }
+
+            if (hasMEUFields) {
+              meuResponse = await fetchCarlsbergConsolidatedMEU(
+                clientId,
+                market || undefined,
+              );
+            }
+
+            setCarlsbergOverviewData(overviewResponse);
+            setCarlsbergMEUData(meuResponse);
+            setApiData(null);
+            setTrackerData(null);
+            setTrackerSummaryData(null);
+            setKeringBrandData(null);
+          } else if (isKering && clientId) {
             // Kering Summary Excel data source
             // Determine if a specific brand is selected
             // Typically brand selection comes from the "dataset" dropdown in Kering context
@@ -498,6 +585,8 @@ export function VisualizationCanvas({
             setTrackerData(null);
             setTrackerSummaryData(null);
             setKeringBrandData(null);
+            setCarlsbergOverviewData(null);
+            setCarlsbergMEUData(null);
           } else {
             // Generic Consolidated Summary logic
             const response = await fetchSummaryDataFromSelection(
@@ -512,6 +601,8 @@ export function VisualizationCanvas({
             setTrackerData(null);
             setTrackerSummaryData(null);
             setKeringBrandData(null);
+            setCarlsbergOverviewData(null);
+            setCarlsbergMEUData(null);
           }
         } else if (dataSource === "trackers" && clientId) {
           // Kering uses brand-summary endpoint for trackers
@@ -557,6 +648,8 @@ export function VisualizationCanvas({
             setTrackerData(null);
             setTrackerSummaryData(null);
             setApiData(null);
+            setCarlsbergOverviewData(null);
+            setCarlsbergMEUData(null);
           } else {
             // Auto-detect media type from selected fields if not explicitly provided
             const detectedMediaType =
@@ -573,6 +666,8 @@ export function VisualizationCanvas({
               setTrackerSummaryData(null);
               setKeringBrandData(null);
               setApiData(null);
+              setCarlsbergOverviewData(null);
+              setCarlsbergMEUData(null);
               setIsLoadingApiData(false);
               return;
             }
@@ -594,6 +689,8 @@ export function VisualizationCanvas({
               setTrackerData(null);
               setKeringBrandData(null);
               setApiData(null);
+              setCarlsbergOverviewData(null);
+              setCarlsbergMEUData(null);
             } else {
               // Fetch complete tracker data using /tracker/{media}/complete endpoint
               const response = await fetchTrackerComplete(
@@ -607,6 +704,8 @@ export function VisualizationCanvas({
               setTrackerSummaryData(null);
               setKeringBrandData(null);
               setApiData(null);
+              setCarlsbergOverviewData(null);
+              setCarlsbergMEUData(null);
             }
           }
         } else {
@@ -614,6 +713,8 @@ export function VisualizationCanvas({
           setTrackerData(null);
           setTrackerSummaryData(null);
           setKeringBrandData(null);
+          setCarlsbergOverviewData(null);
+          setCarlsbergMEUData(null);
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -624,6 +725,8 @@ export function VisualizationCanvas({
         setTrackerData(null);
         setTrackerSummaryData(null);
         setKeringBrandData(null);
+        setCarlsbergOverviewData(null);
+        setCarlsbergMEUData(null);
       } finally {
         setIsLoadingApiData(false);
       }
@@ -640,6 +743,7 @@ export function VisualizationCanvas({
     market,
     hasDynamicTrackerFields,
     isKering,
+    isCarlsberg,
   ]);
 
   const getTotalSelected = () => {
@@ -690,6 +794,92 @@ export function VisualizationCanvas({
       });
     });
   }, [apiData]);
+
+  // Transform Carlsberg consolidated data into chart-compatible format
+  const getCarlsbergChartData = useMemo(() => {
+    const allSelectedFieldIds = Object.values(selectedFields).flat();
+    if (!carlsbergOverviewData && !carlsbergMEUData) return null;
+
+    // Extract field names from selected field IDs
+    const selectedOverviewFields: string[] = [];
+    const selectedMEUFields: string[] = [];
+    allSelectedFieldIds.forEach((fieldId) => {
+      if (fieldId.startsWith("carlsberg-overview-")) {
+        selectedOverviewFields.push(fieldId.replace("carlsberg-overview-", ""));
+      } else if (fieldId.startsWith("carlsberg-meu-")) {
+        selectedMEUFields.push(fieldId.replace("carlsberg-meu-", ""));
+      }
+    });
+
+    const allSelectedFields = [...selectedOverviewFields, ...selectedMEUFields];
+    if (allSelectedFields.length === 0) return null;
+
+    // Group data by market
+    const marketAggregates: Record<string, Record<string, unknown>> = {};
+
+    // Process Overview data - aggregate by market (since it has multiple media rows per market)
+    // Only use TOTAL rows or sum up individual media types
+    if (carlsbergOverviewData?.data && selectedOverviewFields.length > 0) {
+      carlsbergOverviewData.data.forEach((row) => {
+        const rowData = row as unknown as Record<string, unknown>;
+        const marketName = String(rowData.market || `Market ${row.market_id}`);
+        const mediaType = String(rowData.media || "");
+
+        // Only use TOTAL rows for market-level aggregation
+        if (mediaType.toUpperCase() !== "TOTAL") return;
+
+        if (!marketAggregates[marketName]) {
+          marketAggregates[marketName] = {
+            name: marketName,
+          };
+        }
+
+        // Copy selected fields from TOTAL row
+        selectedOverviewFields.forEach((field) => {
+          const value = rowData[field];
+          if (value !== undefined && value !== null && typeof value === "number") {
+            marketAggregates[marketName][field] = value;
+          }
+        });
+      });
+    }
+
+    // Process MEU data - direct mapping (one row per market)
+    if (carlsbergMEUData?.data && selectedMEUFields.length > 0) {
+      carlsbergMEUData.data.forEach((row) => {
+        const rowData = row as unknown as Record<string, unknown>;
+        const marketName = String(rowData.market || `Market ${row.market_id}`);
+
+        // Skip numeric-only market names (like "100", "89", "99") - these are likely invalid
+        if (/^\d+$/.test(marketName)) return;
+
+        if (!marketAggregates[marketName]) {
+          marketAggregates[marketName] = {
+            name: marketName,
+          };
+        }
+
+        // Copy selected fields
+        selectedMEUFields.forEach((field) => {
+          const value = rowData[field];
+          if (value !== undefined && value !== null && typeof value === "number") {
+            marketAggregates[marketName][field] = value;
+          }
+        });
+      });
+    }
+
+    // Convert to array and filter out rows where all selected fields are empty/null/zero
+    const result = Object.values(marketAggregates).filter((item) => {
+      return allSelectedFields.some((field) => {
+        const val = item[field];
+        return val !== undefined && val !== null && val !== 0;
+      });
+    });
+
+    console.log("[getCarlsbergChartData] Result:", result);
+    return result.length > 0 ? result : null;
+  }, [carlsbergOverviewData, carlsbergMEUData, selectedFields]);
 
   // Transform tracker data into chart-compatible format
   // TrackerCompleteResponse has { general, monthly, percentile } arrays
@@ -831,13 +1021,18 @@ export function VisualizationCanvas({
   const getTrackerSummaryChartData = useMemo(() => {
     if (!trackerSummaryData || trackerSummaryData.length === 0) return null;
 
-    // Get numeric field names from first row (excluding id, market_id)
-    const sampleRow = trackerSummaryData[0] as unknown as Record<
+    // Get first valid row (not null/undefined)
+    const sampleRow = trackerSummaryData.find((row) => row != null) as unknown as Record<
       string,
       unknown
-    >;
+    > | undefined;
+
+    // If no valid rows, return null
+    if (!sampleRow) return null;
+
+    // Get numeric field names from first row (excluding id, market_id)
     const numericFields = Object.keys(sampleRow).filter((key) => {
-      return !["id", "market_id", "period", "data_type", "media_type"].includes(
+      return !["id", "market_id", "period", "data_type", "media_type", "summary_type", "media_or_category"].includes(
         key,
       );
     });
@@ -848,25 +1043,41 @@ export function VisualizationCanvas({
 
     trackerSummaryData.forEach((row) => {
       const rowData = row as unknown as Record<string, unknown>;
-      const mediaType = row.media_type || "Unknown";
-      const period = row.period || "";
+      // Support both Arla (media_type) and Carlsberg (media_or_category) field names
+      const mediaType = row.media_type || row.media_or_category || "Unknown";
+      // Support both Arla (period) and Carlsberg (summary_type) field names
+      const period = row.period || row.summary_type || "";
 
       // Skip GRAND TOTAL rows - we want individual media types
-      if (mediaType === "GRAND TOTAL") return;
+      if (mediaType === "GRAND TOTAL" || mediaType === "CATEGORIES") return;
 
-      // Use the latest period data (prefer Dec, then Nov, etc.)
+      // Use the latest period data (prefer Dec/FullYear, then Nov, etc.)
+      // Support both Arla period format (Dec, Nov) and Carlsberg (FullYear, YTD_Dec)
       const periodOrder = [
+        "FullYear",
+        "YTD_Dec",
         "Dec",
+        "YTD_Nov",
         "Nov",
+        "YTD_Oct",
         "Oct",
+        "YTD_Sep",
         "Sep",
+        "YTD_Aug",
         "Aug",
+        "YTD_Jul",
         "Jul",
+        "YTD_Jun",
         "Jun",
+        "YTD_May",
         "May",
+        "YTD_Apr",
         "Apr",
+        "YTD_Mar",
         "Mar",
+        "YTD_Feb",
         "Feb",
+        "YTD_Jan",
         "Jan",
       ];
       const currentPeriodIndex = periodOrder.indexOf(period);
@@ -1015,12 +1226,20 @@ export function VisualizationCanvas({
   // Works for any client, not just Arla
   const getClientData = useMemo(() => {
     // Use API data for summary
-    if (
-      dataSource === "summary" &&
-      getApiChartData &&
-      getApiChartData.length > 0
-    ) {
-      return getApiChartData;
+    if (dataSource === "summary") {
+      // Carlsberg uses consolidated Overview/MEU data
+      if (
+        isCarlsberg &&
+        getCarlsbergChartData &&
+        getCarlsbergChartData.length > 0
+      ) {
+        return getCarlsbergChartData;
+      }
+      // Other clients use generic API data
+      if (getApiChartData && getApiChartData.length > 0) {
+        return getApiChartData;
+      }
+      return null;
     }
 
     // Use tracker data for trackers
@@ -1050,10 +1269,12 @@ export function VisualizationCanvas({
   }, [
     dataSource,
     getApiChartData,
+    getCarlsbergChartData,
     getTrackerChartData,
     getTrackerSummaryChartData,
     getKeringBrandChartData,
     isKering,
+    isCarlsberg,
   ]);
 
   // Alias for backwards compatibility
@@ -1098,9 +1319,11 @@ export function VisualizationCanvas({
       const excludedFields = [
         "field_value",
         "month",
+        "period", // Carlsberg uses 'period' instead of 'month'
         "id",
         "market_id",
         "general_id",
+        "general_data_id", // Carlsberg uses this
         "tv_data_general_id",
         "print_data_general_id",
         "ooh_data_general_id",
@@ -1140,7 +1363,8 @@ export function VisualizationCanvas({
         const channelNames = Array.from(uniqueFieldValues);
 
         monthlyData.forEach((item) => {
-          const month = String(item.month || "Unknown");
+          // Support both 'month' (Arla) and 'period' (Carlsberg) field names
+          const month = String(item.month || (item as any).period || "Unknown");
           const channelName = item.field_value || "Unknown";
           const value = getMetricValue(item as Record<string, unknown>);
 
@@ -1205,7 +1429,8 @@ export function VisualizationCanvas({
 
         const monthlyMap = new Map<string, Record<string, string | number>>();
         monthlyData.forEach((item) => {
-          const month = String(item.month || "Unknown");
+          // Support both 'month' (Arla) and 'period' (Carlsberg) field names
+          const month = String(item.month || (item as any).period || "Unknown");
           if (!monthlyMap.has(month)) {
             monthlyMap.set(month, { name: month });
           }
@@ -1369,7 +1594,16 @@ export function VisualizationCanvas({
     // For tracker data source, strip the media type prefix and convert to API format
     if (dataSource === "trackers") {
       return rawFields.map((field) => {
-        // Remove prefixes like "summary-", "tv-", "radio-", etc.
+        // Handle Carlsberg field IDs: "carlsberg-tracker-summary-total_net_net_spend"
+        // or "carlsberg-tracker-tv-measured_net_net_spend"
+        if (field.startsWith("carlsberg-tracker-")) {
+          // Remove "carlsberg-tracker-{mediaType}-" prefix
+          const withoutPrefix = field.replace(/^carlsberg-tracker-[^-]+-/, "");
+          // Carlsberg fields already use underscores, just return as-is
+          return withoutPrefix;
+        }
+
+        // Handle Arla/other field IDs with simple prefixes
         const prefixes = [
           "summary-",
           "tv-",
@@ -1447,18 +1681,55 @@ export function VisualizationCanvas({
 
   // Get all requested fields from either API source
   // For summary: use apiData.requested_fields
+  // For Carlsberg summary: extract from selectedFields
   // For Kering trackers: use mapped backend fields
   // For dynamic trackers: use actual numeric fields from the response
-  // For static trackers: use the selected fields from Query Builder
-  const allApiFields = isApiData
-    ? apiData.requested_fields
-    : isKering && keringBrandData
-      ? mapKeringFieldsToBackend(selectedFields)
-      : dynamicTrackerData && dynamicTrackerNumericFields.length > 0
-        ? dynamicTrackerNumericFields
-        : dataSource === "trackers" && selectedFieldNames.length > 0
-          ? selectedFieldNames
-          : [];
+  // For static trackers: use the selected fields from Query Builder, or auto-detect from data
+  const allApiFields = useMemo(() => {
+    if (isApiData) {
+      return apiData.requested_fields;
+    }
+    // Carlsberg summary uses Overview and MEU data
+    if (isCarlsberg && (carlsbergOverviewData || carlsbergMEUData)) {
+      const fields: string[] = [];
+      const allSelectedFieldIds = Object.values(selectedFields).flat();
+      allSelectedFieldIds.forEach((fieldId) => {
+        if (fieldId.startsWith("carlsberg-overview-")) {
+          fields.push(fieldId.replace("carlsberg-overview-", ""));
+        } else if (fieldId.startsWith("carlsberg-meu-")) {
+          fields.push(fieldId.replace("carlsberg-meu-", ""));
+        }
+      });
+      return fields;
+    }
+    if (isKering && keringBrandData) {
+      return mapKeringFieldsToBackend(selectedFields);
+    }
+    if (dynamicTrackerData && dynamicTrackerNumericFields.length > 0) {
+      return dynamicTrackerNumericFields;
+    }
+    if (dataSource === "trackers") {
+      // If fields are explicitly selected, use them
+      if (selectedFieldNames.length > 0) {
+        return selectedFieldNames;
+      }
+      // Auto-detect numeric fields from tracker summary data
+      if (trackerSummaryData && trackerSummaryData.length > 0) {
+        const sampleRow = trackerSummaryData[0] as unknown as Record<string, unknown>;
+        const numericFields = Object.keys(sampleRow).filter((key) => {
+          // Exclude non-metric fields
+          if (["id", "market_id", "period", "data_type", "media_type", "summary_type", "media_or_category", "name"].includes(key)) {
+            return false;
+          }
+          // Check if the value is numeric
+          const val = sampleRow[key];
+          return typeof val === "number" || (val !== null && val !== undefined && !isNaN(Number(val)));
+        });
+        return numericFields;
+      }
+    }
+    return [];
+  }, [isApiData, apiData, isCarlsberg, carlsbergOverviewData, carlsbergMEUData, isKering, keringBrandData, selectedFields, dynamicTrackerData, dynamicTrackerNumericFields, dataSource, selectedFieldNames, trackerSummaryData]);
 
   const primaryApiField =
     isApiData && apiData.requested_fields.length > 0

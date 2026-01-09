@@ -13,7 +13,7 @@ import {
 } from "@/lib/api/dashboard";
 import { getClientTableView, getClientIdByName } from "../index";
 import { transformDataWithConfig, getTransformConfig } from "../transforms";
-import { fetchClientData, getClientApiConfig, hasGenericApi } from "../api";
+import { fetchClientData, getClientApiConfig, hasGenericApi, EndpointVariant } from "../api";
 import type { TableRow } from "../transforms";
 
 // ============================================
@@ -107,6 +107,36 @@ export function useTableViewData(params: UseTableViewDataParams): UseTableViewDa
   const isTrackerBrandSelected = hasBrandsInTrackers && brands.includes(selectedPeriod);
   const selectedTrackerBrand = isTrackerBrandSelected ? selectedPeriod : undefined;
 
+  // Determine the API variant based on sheetType
+  // For clients with sheetTypes config (like Carlsberg), use the sheetType code as variant
+  // For clients with brands, use "brand" variant when a brand is selected
+  const summarySheetTypes = clientTableView?.summary?.sheetTypes || [];
+  const summaryVariant = useMemo((): EndpointVariant => {
+    if (isSummaryBrandSelected) return "brand";
+    // Check if sheetType matches a configured sheet type code
+    const matchedSheetType = summarySheetTypes.find(st => st.code === sheetType);
+    if (matchedSheetType) {
+      // Use the sheet type code as variant (e.g., "overview", "meu")
+      // Map to EndpointVariant - "overview" maps to "default", others use their code
+      if (sheetType === clientTableView?.summary?.defaultView) return "default";
+      return sheetType as EndpointVariant;
+    }
+    return "default";
+  }, [isSummaryBrandSelected, sheetType, summarySheetTypes, clientTableView?.summary?.defaultView]);
+
+  // Get the transform name based on variant
+  const summaryTransformName = useMemo(() => {
+    if (isSummaryBrandSelected) {
+      return clientTableView?.summary?.brandTransformName;
+    }
+    // Check for variant-specific transform
+    const variantTransforms = clientTableView?.summary?.variantTransformNames;
+    if (variantTransforms && sheetType in variantTransforms) {
+      return variantTransforms[sheetType];
+    }
+    return clientTableView?.summary?.transformName;
+  }, [isSummaryBrandSelected, sheetType, clientTableView?.summary]);
+
   // ============================================
   // LATEST JOB QUERY (for default clients without generic API)
   // ============================================
@@ -188,19 +218,19 @@ export function useTableViewData(params: UseTableViewDataParams): UseTableViewDa
   // GENERIC API QUERIES
   // ============================================
 
-  // Generic Summary - Default (all-brand)
+  // Generic Summary - Default (all-brand) or variant-based (overview/meu)
   const {
     data: genericSummaryDefaultResult,
     isLoading: isGenericSummaryDefaultLoading,
     refetch: refetchGenericSummaryDefault,
     dataUpdatedAt: genericSummaryDefaultUpdatedAt,
   } = useQuery({
-    queryKey: tableViewQueryKeys.genericSummary(clientSlug, "default", undefined, selectedMarket),
+    queryKey: tableViewQueryKeys.genericSummary(clientSlug, summaryVariant, undefined, selectedMarket),
     queryFn: () =>
       fetchClientData(
         apiConfig!,
         "summary",
-        "default",
+        summaryVariant,
         {
           clientId: clientId ?? undefined,
           market: selectedMarket || undefined,
@@ -335,11 +365,11 @@ export function useTableViewData(params: UseTableViewDataParams): UseTableViewDa
           }
         }
       }
-      // All-brand summary
+      // All-brand summary or variant-based (overview/meu)
       if (!isSummaryBrandSelected && genericSummaryDefaultResult?.success && genericSummaryDefaultResult.data) {
-        const transformName = clientTableView?.summary?.transformName;
-        if (transformName) {
-          const config = getTransformConfig(transformName);
+        // Use variant-specific transform name
+        if (summaryTransformName) {
+          const config = getTransformConfig(summaryTransformName);
           if (config) {
             return transformDataWithConfig(genericSummaryDefaultResult.data, config);
           }
@@ -386,6 +416,7 @@ export function useTableViewData(params: UseTableViewDataParams): UseTableViewDa
     genericTrackerDefaultResult,
     clientTableView,
     periodFilter,
+    summaryTransformName,
   ]);
 
   // ============================================

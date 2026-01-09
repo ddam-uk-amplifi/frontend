@@ -15,9 +15,13 @@ import {
   fetchTrackerFields,
   TrackerFieldsResponse,
   TrackerMediaType,
+  fetchCarlsbergMediaData,
+  CarlsbergMediaDataResponse,
+  extractCarlsbergBuySpecificsFields,
 } from "@/lib/api/dashboard";
 import { getClientDataSchemas, type FieldGroup } from "@/lib/clients";
 import { TRACKER_MEDIA_TYPES as ARLA_TRACKER_MEDIA_TYPES } from "@/lib/clients/arla";
+import { CARLSBERG_TRACKER_MEDIA_TYPES } from "@/lib/clients/carlsberg";
 
 interface QueryBuilderPanelProps {
   isOpen: boolean;
@@ -54,9 +58,13 @@ export function QueryBuilderPanel({
 }: QueryBuilderPanelProps) {
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  // State for dynamically loaded tracker fields
+  // State for dynamically loaded tracker fields (Arla)
   const [dynamicFields, setDynamicFields] = useState<
     Record<string, TrackerFieldsResponse>
+  >({});
+  // State for Carlsberg media data with buy_specifics
+  const [carlsbergMediaData, setCarlsbergMediaData] = useState<
+    Record<string, CarlsbergMediaDataResponse>
   >({});
   const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>(
     {},
@@ -71,36 +79,61 @@ export function QueryBuilderPanel({
     >
   >({});
 
-  // Check if we should use dynamic fields for Arla trackers
+  // Check if we should use dynamic fields for Arla or Carlsberg trackers
   const usesDynamicFields =
-    selectedClient === "Arla" && dataSource === "trackers";
+    (selectedClient === "Arla" || selectedClient === "Carlsberg") && dataSource === "trackers";
+
+  // Get the appropriate media type mapping for the current client
+  const getClientMediaTypeMap = (): Record<string, string> => {
+    if (selectedClient === "Arla") return ARLA_TRACKER_MEDIA_TYPES;
+    if (selectedClient === "Carlsberg") return CARLSBERG_TRACKER_MEDIA_TYPES;
+    return {};
+  };
 
   // Fetch dynamic fields when a media type group is expanded
   const fetchDynamicFields = useCallback(
     async (groupId: string) => {
-      const mediaType = ARLA_TRACKER_MEDIA_TYPES[groupId];
+      const clientMediaTypes = getClientMediaTypeMap();
+      const mediaType = clientMediaTypes[groupId];
       if (!mediaType || !clientId || !usesDynamicFields) return;
 
       // Already loaded or loading
-      if (dynamicFields[mediaType] || loadingFields[mediaType]) return;
+      if (selectedClient === "Carlsberg") {
+        if (carlsbergMediaData[mediaType] || loadingFields[mediaType]) return;
+      } else {
+        if (dynamicFields[mediaType] || loadingFields[mediaType]) return;
+      }
 
       setLoadingFields((prev) => ({ ...prev, [mediaType]: true }));
       setFieldErrors((prev) => ({ ...prev, [mediaType]: "" }));
 
       try {
-        const response = await fetchTrackerFields(
-          selectedClient,
-          mediaType,
-          clientId,
-          selectedMarkets,
-        );
-        setDynamicFields((prev) => ({ ...prev, [mediaType]: response }));
+        if (selectedClient === "Carlsberg") {
+          // Carlsberg: fetch media data directly with buy_specifics
+          const response = await fetchCarlsbergMediaData(
+            mediaType,
+            clientId,
+            selectedMarkets,
+            undefined, // no period filter
+            true, // include buy_specifics
+          );
+          setCarlsbergMediaData((prev) => ({ ...prev, [mediaType]: response }));
+        } else {
+          // Arla: fetch fields endpoint
+          const response = await fetchTrackerFields(
+            selectedClient,
+            mediaType as TrackerMediaType,
+            clientId,
+            selectedMarkets,
+          );
+          setDynamicFields((prev) => ({ ...prev, [mediaType]: response }));
+        }
       } catch (error) {
-        console.error(`Failed to fetch fields for ${mediaType}:`, error);
+        console.error(`Failed to fetch data for ${mediaType}:`, error);
         setFieldErrors((prev) => ({
           ...prev,
           [mediaType]:
-            error instanceof Error ? error.message : "Failed to load fields",
+            error instanceof Error ? error.message : "Failed to load data",
         }));
       } finally {
         setLoadingFields((prev) => ({ ...prev, [mediaType]: false }));
@@ -111,6 +144,7 @@ export function QueryBuilderPanel({
       selectedClient,
       selectedMarkets,
       dynamicFields,
+      carlsbergMediaData,
       loadingFields,
       usesDynamicFields,
     ],
@@ -119,6 +153,7 @@ export function QueryBuilderPanel({
   // Clear dynamic fields when client/source/markets change
   useEffect(() => {
     setDynamicFields({});
+    setCarlsbergMediaData({});
     setLoadingFields({});
     setFieldErrors({});
     setSelectedDynamicFields({});
@@ -133,8 +168,9 @@ export function QueryBuilderPanel({
         : [...prev, groupId],
     );
 
-    // Fetch dynamic fields when expanding an Arla tracker media type group
-    if (isExpanding && usesDynamicFields && ARLA_TRACKER_MEDIA_TYPES[groupId]) {
+    // Fetch dynamic fields when expanding a tracker media type group
+    const clientMediaTypes = getClientMediaTypeMap();
+    if (isExpanding && usesDynamicFields && clientMediaTypes[groupId]) {
       fetchDynamicFields(groupId);
     }
   };
@@ -222,10 +258,10 @@ export function QueryBuilderPanel({
     return [];
   }, [dataSource, selectedClient]);
 
-  // Auto-expand first group when client/data source changes
+  // Collapse all groups when client/data source changes (reset state)
   useMemo(() => {
-    if (queryGroups.length > 0 && expandedGroups.length === 0) {
-      setExpandedGroups([queryGroups[0].id]);
+    if (queryGroups.length > 0) {
+      setExpandedGroups([]);
     }
   }, [queryGroups]);
 
@@ -280,8 +316,8 @@ export function QueryBuilderPanel({
   };
 
   // Render dynamic fields for Arla tracker media types
+  // Or Carlsberg buy_specifics fields
   const renderDynamicFields = (mediaType: TrackerMediaType) => {
-    const fieldsData = dynamicFields[mediaType];
     const isLoading = loadingFields[mediaType];
     const error = fieldErrors[mediaType];
 
@@ -289,7 +325,7 @@ export function QueryBuilderPanel({
       return (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
-          <span className="ml-2 text-sm text-slate-500">Loading fields...</span>
+          <span className="ml-2 text-sm text-slate-500">Loading data...</span>
         </div>
       );
     }
@@ -301,6 +337,147 @@ export function QueryBuilderPanel({
         </div>
       );
     }
+
+    // Handle Carlsberg: show buy_specifics fields from media data
+    if (selectedClient === "Carlsberg") {
+      const mediaData = carlsbergMediaData[mediaType];
+      
+      if (!mediaData || mediaData.general.length === 0) {
+        return (
+          <div className="text-center py-4">
+            <p className="text-sm text-slate-400">No data available for this media type</p>
+          </div>
+        );
+      }
+
+      // Extract unique buy_specifics field names
+      const buySpecificsFields = extractCarlsbergBuySpecificsFields(mediaData);
+      
+      if (buySpecificsFields.length === 0) {
+        return (
+          <div className="text-center py-4">
+            <p className="text-sm text-slate-400">No subfields available</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {mediaData.counts.general} records, {mediaData.counts.monthly} monthly entries
+            </p>
+          </div>
+        );
+      }
+
+      // Group values by field name with their associated general_ids
+      const fieldValuesMap: Record<string, Map<string, number[]>> = {};
+      mediaData.general.forEach((item) => {
+        if (item.buy_specifics) {
+          Object.entries(item.buy_specifics).forEach(([key, value]) => {
+            if (!fieldValuesMap[key]) {
+              fieldValuesMap[key] = new Map();
+            }
+            if (value !== null && value !== undefined) {
+              const strValue = String(value);
+              const existingIds = fieldValuesMap[key].get(strValue) || [];
+              existingIds.push(item.id);
+              fieldValuesMap[key].set(strValue, existingIds);
+            }
+          });
+        }
+      });
+
+      return (
+        <>
+          {buySpecificsFields.map((fieldName) => {
+            const subgroupId = `${mediaType}-carlsberg-${fieldName}`;
+            const isSubgroupExpanded = expandedGroups.includes(subgroupId);
+            const fieldValuesWithIds = fieldValuesMap[fieldName] || new Map();
+            const sortedValues = Array.from(fieldValuesWithIds.entries()).sort((a, b) =>
+              a[0].localeCompare(b[0])
+            );
+
+            // Count selected values for this field
+            const selectedValuesCount = sortedValues.filter(([value]) =>
+              isDynamicFieldSelected(mediaType, fieldName, value)
+            ).length;
+
+            return (
+              <div
+                key={subgroupId}
+                className="ml-3 mt-2 bg-slate-50/80 rounded-xl overflow-hidden border border-slate-100"
+              >
+                <button
+                  onClick={() => toggleGroup(subgroupId)}
+                  className="w-full flex items-center justify-between p-3 py-2.5 hover:bg-slate-100/80 transition-all"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-5 h-5 rounded-md flex items-center justify-center ${isSubgroupExpanded ? "bg-violet-100" : "bg-slate-200/60"}`}
+                    >
+                      {isSubgroupExpanded ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-violet-600" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                      )}
+                    </div>
+                    <span className="font-medium text-slate-700 text-sm">
+                      {fieldName}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">
+                      {sortedValues.length} values
+                    </span>
+                    {selectedValuesCount > 0 && (
+                      <span className="px-2 py-0.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-medium rounded-full shadow-sm">
+                        {selectedValuesCount}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {isSubgroupExpanded && (
+                  <div className="px-3 pb-3 space-y-1.5 max-h-60 overflow-y-auto">
+                    {sortedValues.map(([value, generalIds]) => {
+                      const isSelected = isDynamicFieldSelected(
+                        mediaType,
+                        fieldName,
+                        value,
+                      );
+
+                      return (
+                        <button
+                          key={`${fieldName}-${value}`}
+                          onClick={() =>
+                            handleDynamicFieldSelect(
+                              mediaType,
+                              fieldName,
+                              value,
+                              generalIds,
+                            )
+                          }
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                            isSelected
+                              ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200"
+                              : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 hover:border-slate-300"
+                          }`}
+                        >
+                          <span className="text-sm truncate">{value}</span>
+                          <span
+                            className={`text-xs ${isSelected ? "text-violet-200" : "text-slate-400"}`}
+                          >
+                            {generalIds.length} record{generalIds.length !== 1 ? "s" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      );
+    }
+
+    // Handle Arla: show fields from /fields endpoint
+    const fieldsData = dynamicFields[mediaType];
 
     if (!fieldsData || Object.keys(fieldsData.fields).length === 0) {
       return (
@@ -411,8 +588,9 @@ export function QueryBuilderPanel({
     const hasSubgroups = group.subgroups && group.subgroups.length > 0;
     const hasFields = group.fields && group.fields.length > 0;
 
-    // Check if this is an Arla tracker media type group that uses dynamic fields
-    const mediaType = ARLA_TRACKER_MEDIA_TYPES[group.id];
+    // Check if this is a tracker media type group that uses dynamic fields
+    const clientMediaTypes = getClientMediaTypeMap();
+    const mediaType = clientMediaTypes[group.id];
     const shouldUseDynamicFields =
       usesDynamicFields && mediaType && depth === 0;
 
@@ -424,7 +602,7 @@ export function QueryBuilderPanel({
       });
     }
     if (shouldUseDynamicFields && mediaType) {
-      totalSubgroupSelections += getDynamicFieldSelectionCount(mediaType);
+      totalSubgroupSelections += getDynamicFieldSelectionCount(mediaType as TrackerMediaType);
     }
 
     return (
@@ -461,9 +639,9 @@ export function QueryBuilderPanel({
 
         {isExpanded && (
           <div className="px-3 pb-3 space-y-1.5">
-            {/* For Arla tracker media types, render dynamic fields from API */}
+            {/* For tracker media types, render dynamic fields from API */}
             {shouldUseDynamicFields && mediaType ? (
-              renderDynamicFields(mediaType)
+              renderDynamicFields(mediaType as TrackerMediaType)
             ) : (
               <>
                 {/* Render static fields if present */}
