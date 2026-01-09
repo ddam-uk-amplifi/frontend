@@ -342,13 +342,18 @@ function ReportAutomationContent() {
     console.log("Starting consolidation...");
 
     try {
-      // Build extracted_paths array (simple string array of paths)
-      const extractedPaths = successfulExtractions.map((p) => p.extractedPath!);
+      // Build extracted_files array with market_id for proper market tracking
+      // This ensures markets are correctly identified in consolidation history
+      // instead of showing as "Unknown" when parsed from filenames
+      const extractedFiles = successfulExtractions.map((p) => ({
+        path: p.extractedPath!,
+        market_id: p.dbMarketId, // Database market ID from extraction
+      }));
 
       // Prepare consolidation request
       const consolidationData = {
         client_name: clientId, // lowercase client name
-        extracted_paths: extractedPaths, // Simple array of path strings
+        extracted_files: extractedFiles, // Array of {path, market_id} objects
         ytd_month: ytdMonth,
         include_ppt: includePpt,
       };
